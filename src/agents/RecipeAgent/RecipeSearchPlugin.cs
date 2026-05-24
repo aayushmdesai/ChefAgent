@@ -1,10 +1,10 @@
 using System.ComponentModel;
+using System.Net.Http.Json;
+using ChefAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
-using ChefAgent.Shared.Models;
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
-using System.Net.Http.Json;
 
 namespace ChefAgent.Agents.Recipe;
 
@@ -27,7 +27,8 @@ public class RecipeSearchPlugin
         string ollamaUrl,
         string embeddingModel,
         string collectionName,
-        ILogger<RecipeSearchPlugin> logger)
+        ILogger<RecipeSearchPlugin> logger
+    )
     {
         _qdrantClient = qdrantClient;
         _httpClient = httpClient;
@@ -38,57 +39,118 @@ public class RecipeSearchPlugin
     }
 
     [KernelFunction("search_recipes")]
-    [Description("Search for recipes by a natural language query. Returns ranked recipes matching the search terms. Use this when the user wants to find recipes by name, ingredient, cuisine, or cooking style.")]
+    [Description(
+        "Search for recipes by a natural language query. Returns ranked recipes matching the search terms. Use this when the user wants to find recipes by name, ingredient, cuisine, or cooking style."
+    )]
     public async Task<List<RecipeDocument>> SearchRecipesAsync(
-        [Description("Natural language search query, e.g., 'quick chicken stir fry' or 'vegetarian pasta under 30 minutes'")] string query,
+        [Description("Natural language search query")] string query,
         [Description("Maximum number of results to return (default 5)")] int maxResults = 5,
-        CancellationToken cancellationToken = default)
+        [Description("Filter: max number of ingredients (null = no filter)")]
+            int? maxIngredients = null,
+        [Description("Filter: max number of steps (null = no filter)")] int? maxSteps = null,
+        CancellationToken cancellationToken = default
+    )
     {
-        _logger.LogInformation("Searching recipes for query: {Query}, maxResults: {MaxResults}", query, maxResults);
+        _logger.LogInformation(
+            "Searching recipes for query: {Query}, maxResults: {MaxResults}",
+            query,
+            maxResults
+        );
 
         // 1. Embed the query via Ollama
         var queryVector = await GetEmbeddingAsync(query, cancellationToken);
+
+        // Build optional Qdrant filter
+        Filter? filter = null;
+        var conditions = new List<Condition>();
+
+        if (maxIngredients.HasValue)
+        {
+            conditions.Add(
+                new Condition
+                {
+                    Field = new FieldCondition
+                    {
+                        Key = "ingredient_count",
+                        Range = new Qdrant.Client.Grpc.Range { Lte = maxIngredients.Value },
+                    },
+                }
+            );
+        }
+
+        if (maxSteps.HasValue)
+        {
+            conditions.Add(
+                new Condition
+                {
+                    Field = new FieldCondition
+                    {
+                        Key = "step_count",
+                        Range = new Qdrant.Client.Grpc.Range { Lte = maxSteps.Value },
+                    },
+                }
+            );
+        }
+
+        if (conditions.Count > 0)
+        {
+            filter = new Filter();
+            filter.Must.AddRange(conditions);
+        }
+        if (filter != null)
+            _logger.LogInformation(
+                "Applying filters — maxIngredients: {MaxIng}, maxSteps: {MaxSteps}",
+                maxIngredients,
+                maxSteps
+            );
 
         // 2. Search Qdrant
         var searchResult = await _qdrantClient.SearchAsync(
             collectionName: _collectionName,
             vector: queryVector,
             limit: (ulong)maxResults,
+            filter: filter,
             cancellationToken: cancellationToken
         );
 
         // 3. Map results to RecipeDocuments
-        var results = searchResult.Select(point =>
-        {
-            var payload = point.Payload;
-            return new RecipeDocument
+        var results = searchResult
+            .Select(point =>
             {
-                Id = GetString(payload, "doc_id"),
-                Title = GetString(payload, "title"),
-                Ingredients = GetStringList(payload, "ingredients"),
-                Directions = GetStringList(payload, "directions"),
-                Source = GetString(payload, "source"),
-                SourceUrl = GetString(payload, "source_url"),
-                IngredientCount = GetInt(payload, "ingredient_count"),
-                StepCount = GetInt(payload, "step_count"),
-                RelevanceScore = point.Score,
-            };
-        }).ToList();
+                var payload = point.Payload;
+                return new RecipeDocument
+                {
+                    Id = GetString(payload, "doc_id"),
+                    Title = GetString(payload, "title"),
+                    Ingredients = GetStringList(payload, "ingredients"),
+                    Directions = GetStringList(payload, "directions"),
+                    Source = GetString(payload, "source"),
+                    SourceUrl = GetString(payload, "source_url"),
+                    IngredientCount = GetInt(payload, "ingredient_count"),
+                    StepCount = GetInt(payload, "step_count"),
+                    RelevanceScore = point.Score,
+                };
+            })
+            .ToList();
 
         _logger.LogInformation("Found {Count} recipes for query: {Query}", results.Count, query);
         return results;
     }
 
     [KernelFunction("search_by_ingredients")]
-    [Description("Search for recipes that use specific ingredients. Use this when the user says 'what can I make with...' or lists ingredients they have on hand.")]
+    [Description(
+        "Search for recipes that use specific ingredients. Use this when the user says 'what can I make with...' or lists ingredients they have on hand."
+    )]
     public async Task<List<RecipeDocument>> SearchByIngredientsAsync(
-        [Description("Comma-separated list of ingredients, e.g., 'chicken, garlic, soy sauce'")] string ingredients,
+        [Description("Comma-separated list of ingredients, e.g., 'chicken, garlic, soy sauce'")]
+            string ingredients,
         [Description("Maximum number of results to return (default 5)")] int maxResults = 5,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         var query = $"recipes with {ingredients}";
         _logger.LogInformation("Searching by ingredients: {Ingredients}", ingredients);
-        return await SearchRecipesAsync(query, maxResults, cancellationToken);
+        return await SearchRecipesAsync(query, maxResults, null, null, cancellationToken);
     }
 
     private async Task<float[]> GetEmbeddingAsync(string text, CancellationToken ct)
@@ -101,15 +163,16 @@ public class RecipeSearchPlugin
         return result!.Embeddings[0];
     }
 
-    private static string GetString(IDictionary<string, Value> payload, string key)
-        => payload.TryGetValue(key, out var v) ? v.StringValue ?? "" : "";
+    private static string GetString(IDictionary<string, Value> payload, string key) =>
+        payload.TryGetValue(key, out var v) ? v.StringValue ?? "" : "";
 
-    private static int GetInt(IDictionary<string, Value> payload, string key)
-        => payload.TryGetValue(key, out var v) ? (int)v.IntegerValue : 0;
+    private static int GetInt(IDictionary<string, Value> payload, string key) =>
+        payload.TryGetValue(key, out var v) ? (int)v.IntegerValue : 0;
 
     private static List<string> GetStringList(IDictionary<string, Value> payload, string key)
     {
-        if (!payload.TryGetValue(key, out var v) || v.ListValue == null) return [];
+        if (!payload.TryGetValue(key, out var v) || v.ListValue == null)
+            return [];
         return v.ListValue.Values.Select(x => x.StringValue ?? "").Where(s => s != "").ToList();
     }
 

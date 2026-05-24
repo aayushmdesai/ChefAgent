@@ -1,5 +1,5 @@
-using Qdrant.Client;
 using ChefAgent.Agents.Recipe;
+using Qdrant.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,16 +28,25 @@ builder.Services.AddSingleton(sp =>
     var embeddingModel = builder.Configuration["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
     var collection = builder.Configuration["Qdrant:CollectionName"] ?? "recipes";
 
-    return new RecipeSearchPlugin(qdrant, httpClient, ollamaUrl, embeddingModel, collection, logger);
+    return new RecipeSearchPlugin(
+        qdrant,
+        httpClient,
+        ollamaUrl,
+        embeddingModel,
+        collection,
+        logger
+    );
 });
 
 // CORS for React frontend
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
-        policy.WithOrigins("http://localhost:3000", "http://localhost:5173")
-              .AllowAnyHeader()
-              .AllowAnyMethod());
+        policy
+            .WithOrigins("http://localhost:3000", "http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+    );
 });
 
 // Health checks
@@ -51,36 +60,71 @@ app.UseCors();
 
 app.MapHealthChecks("/health");
 
-app.MapGet("/", () => new
-{
-    service = "ChefAgent API",
-    version = "0.1.0",
-    status = "running",
-    stack = new { vectorDb = "Qdrant", llm = "Ollama", memory = "Redis" },
-    agents = new[] { "recipe", "diet (coming soon)", "planner (coming soon)" }
-});
+app.MapGet(
+    "/",
+    () =>
+        new
+        {
+            service = "ChefAgent API",
+            version = "0.1.0",
+            status = "running",
+            stack = new
+            {
+                vectorDb = "Qdrant",
+                llm = "Ollama",
+                memory = "Redis",
+            },
+            agents = new[] { "recipe", "diet (coming soon)", "planner (coming soon)" },
+        }
+);
 
 // Recipe search endpoint
-app.MapPost("/recipes/search", async (RecipeSearchRequest request, RecipeSearchPlugin plugin) =>
-{
-    var results = await plugin.SearchRecipesAsync(request.Query, request.MaxResults);
-    return Results.Ok(new { query = request.Query, count = results.Count, recipes = results });
-});
+app.MapPost(
+    "/recipes/search",
+    async (RecipeSearchRequest request, RecipeSearchPlugin plugin) =>
+    {
+        var results = await plugin.SearchRecipesAsync(
+            request.Query,
+            request.MaxResults,
+            request.MaxIngredients,
+            request.MaxSteps
+        );
+        return Results.Ok(
+            new
+            {
+                query = request.Query,
+                count = results.Count,
+                recipes = results,
+            }
+        );
+    }
+);
 
 // Chat endpoint — will wire to Orchestrator in Week 4
-app.MapPost("/chat", (ChatRequest request) =>
-{
-    // TODO: Route through Orchestrator -> appropriate agent(s)
-    return Results.Ok(new
+app.MapPost(
+    "/chat",
+    (ChatRequest request) =>
     {
-        message = $"Received: {request.Message}. Orchestrator coming in Week 4!",
-        intent = "unknown"
-    });
-});
+        // TODO: Route through Orchestrator -> appropriate agent(s)
+        return Results.Ok(
+            new
+            {
+                message = $"Received: {request.Message}. Orchestrator coming in Week 4!",
+                intent = "unknown",
+            }
+        );
+    }
+);
 
 app.Run();
 
 // --- Request DTOs ---
 
-record RecipeSearchRequest(string Query, int MaxResults = 5);
+record RecipeSearchRequest(
+    string Query,
+    int MaxResults = 5,
+    int? MaxIngredients = null,
+    int? MaxSteps = null
+);
+
 record ChatRequest(string Message, string? SessionId = null);
