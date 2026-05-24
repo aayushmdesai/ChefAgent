@@ -1,0 +1,72 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    ports:
+      - "5100:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Qdrant__Endpoint=http://qdrant:6334
+      - Qdrant__CollectionName=recipes
+      - Ollama__Endpoint=http://ollama:11434
+      - Ollama__ChatModel=llama3.2
+      - Ollama__EmbeddingModel=nomic-embed-text
+      - Redis__ConnectionString=redis:6379
+      - Langfuse__Endpoint=http://langfuse:3000
+    depends_on:
+      - qdrant
+      - redis
+      - ollama
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.1
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    # After first `docker compose up`, run:
+    #   docker compose exec ollama ollama pull llama3.2
+    #   docker compose exec ollama ollama pull nomic-embed-text
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  # Uncomment when ready for observability (Month 3)
+  # langfuse:
+  #   image: langfuse/langfuse:latest
+  #   ports:
+  #     - "3100:3000"
+  #   environment:
+  #     - DATABASE_URL=postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+  #     - NEXTAUTH_SECRET=your-secret-here
+  #     - NEXTAUTH_URL=http://localhost:3100
+  #   depends_on:
+  #     - langfuse-db
+  #
+  # langfuse-db:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     - POSTGRES_USER=langfuse
+  #     - POSTGRES_PASSWORD=langfuse
+  #     - POSTGRES_DB=langfuse
+  #   volumes:
+  #     - langfuse-db-data:/var/lib/postgresql/data
+
+volumes:
+  qdrant-data:
+  ollama-data:
+  redis-data:
+  # langfuse-db-data:

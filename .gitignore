@@ -1,0 +1,61 @@
+# .NET
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.sln.docstates
+.vs/
+*.DotSettings.user
+*.userosscache
+*.vcxproj.user
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+dist/
+venv/
+.venv/
+*.egg
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+appsettings.Development.json
+
+# Data (large files — use git-lfs or download via script)
+data/raw/
+# Generated data (too large for git)
+data/processed/
+data/embeddings/
+*.parquet
+*.csv
+!eval/datasets/*.csv
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+logs/
+*.log

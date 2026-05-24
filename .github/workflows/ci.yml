@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore src/ChefAgent.sln
+
+      - name: Build
+        run: dotnet build src/ChefAgent.sln --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test src/ChefAgent.sln --no-build --configuration Release --verbosity normal
+
+  # Uncomment when eval pipeline is ready (Month 3)
+  # eval:
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.12'
+  #     - name: Install eval dependencies
+  #       run: pip install -r eval/requirements.txt
+  #     - name: Run RAG evaluation
+  #       run: python eval/harnesses/run_ragas.py
+  #       env:
+  #         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+  #         AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}

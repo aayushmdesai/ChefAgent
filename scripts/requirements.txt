@@ -1,0 +1,10 @@
+# Data pipeline
+datasets>=2.20.0
+pandas>=2.2.0
+tqdm>=4.66.0
+
+# Embeddings (Ollama - just needs HTTP)
+requests>=2.32.0
+
+# Vector database
+qdrant-client>=1.12.0

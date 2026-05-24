@@ -1,0 +1,23 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /app
+
+# Copy solution and project files first for layer caching
+COPY src/ChefAgent.sln ./src/
+COPY src/api/*.csproj ./src/api/
+COPY src/shared/*.csproj ./src/shared/
+COPY src/agents/RecipeAgent/*.csproj ./src/agents/RecipeAgent/
+COPY src/agents/DietAgent/*.csproj ./src/agents/DietAgent/
+COPY src/agents/PlannerAgent/*.csproj ./src/agents/PlannerAgent/
+COPY src/agents/Orchestrator/*.csproj ./src/agents/Orchestrator/
+
+RUN dotnet restore src/ChefAgent.sln
+
+# Copy everything else and build
+COPY src/ ./src/
+RUN dotnet publish src/api/ChefAgent.Api.csproj -c Release -o /out
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+COPY --from=build /out .
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "ChefAgent.Api.dll"]

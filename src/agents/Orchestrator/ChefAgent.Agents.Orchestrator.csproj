@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ChefAgent.Agents.Orchestrator</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.30.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../shared/ChefAgent.Shared.csproj" />
+    <ProjectReference Include="../RecipeAgent/ChefAgent.Agents.Recipe.csproj" />
+    <ProjectReference Include="../DietAgent/ChefAgent.Agents.Diet.csproj" />
+    <ProjectReference Include="../PlannerAgent/ChefAgent.Agents.Planner.csproj" />
+  </ItemGroup>
+</Project>
