@@ -20,6 +20,10 @@ public class RecipeSearchPlugin
     private readonly string _ollamaUrl;
     private readonly string _embeddingModel;
     private readonly ILogger<RecipeSearchPlugin> _logger;
+    // Optional reranker plugin for LLM-based candidate reordering.
+    private readonly RecipeReranker? _reranker;
+    // Optional preprocessor plugin for negation parsing and query expansion.
+    private readonly QueryPreprocessor? _preprocessor;
 
     public RecipeSearchPlugin(
         QdrantClient qdrantClient,
@@ -27,7 +31,9 @@ public class RecipeSearchPlugin
         string ollamaUrl,
         string embeddingModel,
         string collectionName,
-        ILogger<RecipeSearchPlugin> logger
+        ILogger<RecipeSearchPlugin> logger,
+        RecipeReranker? reranker = null,
+        QueryPreprocessor? preprocessor = null
     )
     {
         _qdrantClient = qdrantClient;
@@ -36,6 +42,8 @@ public class RecipeSearchPlugin
         _embeddingModel = embeddingModel;
         _collectionName = collectionName;
         _logger = logger;
+        _reranker = reranker;
+        _preprocessor = preprocessor;
     }
 
     [KernelFunction("search_recipes")]
@@ -48,6 +56,8 @@ public class RecipeSearchPlugin
         [Description("Filter: max number of ingredients (null = no filter)")]
             int? maxIngredients = null,
         [Description("Filter: max number of steps (null = no filter)")] int? maxSteps = null,
+        bool rerank = false,
+        bool expand = false,
         CancellationToken cancellationToken = default
     )
     {
@@ -57,10 +67,25 @@ public class RecipeSearchPlugin
             maxResults
         );
 
-        // 1. Embed the query via Ollama
-        var queryVector = await GetEmbeddingAsync(query, cancellationToken);
+        // 1. Preprocess: parse negation (always) + expand abstract queries (opt-in)
+        var searchQuery = query;
+        List<string> excludedTerms = [];
 
-        // Build optional Qdrant filter
+        if (_preprocessor != null)
+        {
+            var preprocessed = await _preprocessor.PreprocessAsync(
+                query,
+                expand,
+                cancellationToken
+            );
+            searchQuery = preprocessed.SearchQuery;
+            excludedTerms = preprocessed.ExcludedTerms;
+        }
+
+        // 2. Embed the cleaned/expanded query
+        var queryVector = await GetEmbeddingAsync(searchQuery, cancellationToken);
+
+        // 3. Build optional Qdrant filter
         Filter? filter = null;
         var conditions = new List<Condition>();
 
@@ -97,6 +122,7 @@ public class RecipeSearchPlugin
             filter = new Filter();
             filter.Must.AddRange(conditions);
         }
+
         if (filter != null)
             _logger.LogInformation(
                 "Applying filters — maxIngredients: {MaxIng}, maxSteps: {MaxSteps}",
@@ -104,16 +130,20 @@ public class RecipeSearchPlugin
                 maxSteps
             );
 
-        // 2. Search Qdrant
+        // Fetch extra candidates if re-ranking or if negation may remove some
+        var fetchLimit = (_reranker != null && rerank) ? maxResults + 5 : maxResults;
+        if (excludedTerms.Count > 0)
+            fetchLimit += 10; // buffer for negation removals
+
         var searchResult = await _qdrantClient.SearchAsync(
             collectionName: _collectionName,
             vector: queryVector,
-            limit: (ulong)maxResults,
             filter: filter,
+            limit: (ulong)fetchLimit,
             cancellationToken: cancellationToken
         );
 
-        // 3. Map results to RecipeDocuments
+        // 4. Map results to RecipeDocuments
         var results = searchResult
             .Select(point =>
             {
@@ -133,6 +163,23 @@ public class RecipeSearchPlugin
             })
             .ToList();
 
+        // 5. Filter negation violations
+        if (_preprocessor != null && excludedTerms.Count > 0)
+        {
+            results = _preprocessor.FilterNegations(results, excludedTerms);
+        }
+
+        // 6. Re-rank if enabled
+        if (_reranker != null && rerank && results.Count > 0)
+        {
+            results = await _reranker.RerankAsync(query, results, maxResults, cancellationToken);
+        }
+        else
+        {
+            // Preserve the original vector similarity ranking when reranking is not requested.
+            results = results.Take(maxResults).ToList();
+        }
+
         _logger.LogInformation("Found {Count} recipes for query: {Query}", results.Count, query);
         return results;
     }
@@ -150,11 +197,20 @@ public class RecipeSearchPlugin
     {
         var query = $"recipes with {ingredients}";
         _logger.LogInformation("Searching by ingredients: {Ingredients}", ingredients);
-        return await SearchRecipesAsync(query, maxResults, null, null, cancellationToken);
+        return await SearchRecipesAsync(
+            query,
+            maxResults,
+            null,
+            null,
+            false,
+            false,
+            cancellationToken
+        );
     }
 
     private async Task<float[]> GetEmbeddingAsync(string text, CancellationToken ct)
     {
+        // Request an embedding vector from Ollama for the query text.
         var request = new { model = _embeddingModel, input = $"search_query: {text}" };
         var response = await _httpClient.PostAsJsonAsync($"{_ollamaUrl}/api/embed", request, ct);
         response.EnsureSuccessStatusCode();
@@ -171,6 +227,7 @@ public class RecipeSearchPlugin
 
     private static List<string> GetStringList(IDictionary<string, Value> payload, string key)
     {
+        // Safely extract a list of string values from the payload field.
         if (!payload.TryGetValue(key, out var v) || v.ListValue == null)
             return [];
         return v.ListValue.Values.Select(x => x.StringValue ?? "").Where(s => s != "").ToList();

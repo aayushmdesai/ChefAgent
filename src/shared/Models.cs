@@ -87,7 +87,7 @@ public enum UserIntent
     CreateMealPlan,
     ModifyMealPlan,
     GeneralQuestion,
-    Unknown
+    Unknown,
 }
 
 /// <summary>

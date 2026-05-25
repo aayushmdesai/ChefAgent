@@ -14,8 +14,16 @@ builder.Services.AddSingleton(sp =>
 });
 
 // HTTP client for Ollama
-builder.Services.AddHttpClient("Ollama");
+// Use an increased timeout for embedding and chart calls, which can take several seconds.
+builder.Services.AddHttpClient(
+    "Ollama",
+    client =>
+    {
+        client.Timeout = TimeSpan.FromMinutes(5);
+    }
+);
 
+// Recipe Agent
 // Recipe Agent
 builder.Services.AddSingleton(sp =>
 {
@@ -26,15 +34,32 @@ builder.Services.AddSingleton(sp =>
 
     var ollamaUrl = builder.Configuration["Ollama:Endpoint"] ?? "http://localhost:11434";
     var embeddingModel = builder.Configuration["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
+    var chatModel = builder.Configuration["Ollama:ChatModel"] ?? "llama3.2";
     var collection = builder.Configuration["Qdrant:CollectionName"] ?? "recipes";
 
+    var reranker = new RecipeReranker(
+        httpClient,
+        ollamaUrl,
+        chatModel,
+        sp.GetRequiredService<ILogger<RecipeReranker>>()
+    );
+    var preprocessor = new QueryPreprocessor(
+        httpClient,
+        ollamaUrl,
+        chatModel,
+        sp.GetRequiredService<ILogger<QueryPreprocessor>>()
+    );
+
+    // Create the recipe search plugin with optional LLM-powered preprocessing and reranking.
     return new RecipeSearchPlugin(
         qdrant,
         httpClient,
         ollamaUrl,
         embeddingModel,
         collection,
-        logger
+        logger,
+        reranker,
+        preprocessor
     );
 });
 
@@ -87,7 +112,9 @@ app.MapPost(
             request.Query,
             request.MaxResults,
             request.MaxIngredients,
-            request.MaxSteps
+            request.MaxSteps,
+            request.Rerank,
+            request.Expand
         );
         return Results.Ok(
             new
@@ -124,7 +151,9 @@ record RecipeSearchRequest(
     string Query,
     int MaxResults = 5,
     int? MaxIngredients = null,
-    int? MaxSteps = null
+    int? MaxSteps = null,
+    bool Rerank = false,
+    bool Expand = false
 );
 
 record ChatRequest(string Message, string? SessionId = null);
