@@ -1,4 +1,6 @@
+using ChefAgent.Agents.Diet;
 using ChefAgent.Agents.Recipe;
+using ChefAgent.Shared.Models;
 using Qdrant.Client;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,7 +16,6 @@ builder.Services.AddSingleton(sp =>
 });
 
 // HTTP client for Ollama
-// Use an increased timeout for embedding and chart calls, which can take several seconds.
 builder.Services.AddHttpClient(
     "Ollama",
     client =>
@@ -23,7 +24,6 @@ builder.Services.AddHttpClient(
     }
 );
 
-// Recipe Agent
 // Recipe Agent
 builder.Services.AddSingleton(sp =>
 {
@@ -50,7 +50,6 @@ builder.Services.AddSingleton(sp =>
         sp.GetRequiredService<ILogger<QueryPreprocessor>>()
     );
 
-    // Create the recipe search plugin with optional LLM-powered preprocessing and reranking.
     return new RecipeSearchPlugin(
         qdrant,
         httpClient,
@@ -60,6 +59,21 @@ builder.Services.AddSingleton(sp =>
         logger,
         reranker,
         preprocessor
+    );
+});
+
+// Diet Agent
+builder.Services.AddSingleton(sp =>
+{
+    var httpFactory = sp.GetRequiredService<IHttpClientFactory>();
+    var httpClient = httpFactory.CreateClient("Ollama");
+    var ollamaUrl = builder.Configuration["Ollama:Endpoint"] ?? "http://localhost:11434";
+    var chatModel = builder.Configuration["Ollama:ChatModel"] ?? "llama3.2";
+    return new DietValidationPlugin(
+        httpClient,
+        ollamaUrl,
+        chatModel,
+        sp.GetRequiredService<ILogger<DietValidationPlugin>>()
     );
 });
 
@@ -99,11 +113,11 @@ app.MapGet(
                 llm = "Ollama",
                 memory = "Redis",
             },
-            agents = new[] { "recipe", "diet (coming soon)", "planner (coming soon)" },
+            agents = new[] { "recipe", "diet", "planner (coming soon)" },
         }
 );
 
-// Recipe search endpoint
+// Recipe search endpoint — no dietary validation
 app.MapPost(
     "/recipes/search",
     async (RecipeSearchRequest request, RecipeSearchPlugin plugin) =>
@@ -122,6 +136,61 @@ app.MapPost(
                 query = request.Query,
                 count = results.Count,
                 recipes = results,
+            }
+        );
+    }
+);
+
+// Validated recipe search endpoint — Recipe Agent + Diet Agent combined
+app.MapPost(
+    "/recipes/search-validated",
+    async (
+        RecipeSearchRequest request,
+        RecipeSearchPlugin recipePlugin,
+        DietValidationPlugin dietPlugin
+    ) =>
+    {
+        // Step 1: Recipe Agent — find candidates
+        var results = await recipePlugin.SearchRecipesAsync(
+            request.Query,
+            request.MaxResults,
+            request.MaxIngredients,
+            request.MaxSteps,
+            request.Rerank,
+            request.Expand
+        );
+
+        // Step 2: Diet Agent — validate each recipe against profile
+        // No profile = validation skipped, same results as /recipes/search
+        var validated = new List<object>();
+        foreach (var recipe in results)
+        {
+            var validation = await dietPlugin.ValidateRecipeAsync(recipe, request.DietaryProfile);
+            validated.Add(
+                new
+                {
+                    recipe,
+                    dietary = new
+                    {
+                        isCompatible = validation.IsCompatible,
+                        violations = validation.Violations,
+                        substitutions = validation.Substitutions,
+                        explanation = validation.Explanation,
+                    },
+                }
+            );
+        }
+
+        // Compatible recipes first, incompatible (with substitutions) after
+        var sorted = validated.OrderByDescending(v => ((dynamic)v).dietary.isCompatible).ToList();
+
+        return Results.Ok(
+            new
+            {
+                query = request.Query,
+                count = sorted.Count,
+                profileApplied = request.DietaryProfile is not null,
+                recipes = sorted,
             }
         );
     }
@@ -153,7 +222,8 @@ record RecipeSearchRequest(
     int? MaxIngredients = null,
     int? MaxSteps = null,
     bool Rerank = false,
-    bool Expand = false
+    bool Expand = false,
+    DietaryProfile? DietaryProfile = null
 );
 
 record ChatRequest(string Message, string? SessionId = null);

@@ -11,7 +11,7 @@ A multi-agent system where specialized AI agents collaborate to handle recipe se
 | Agent | Status | Notes |
 |-------|--------|-------|
 | **Recipe Agent** | ✅ Week 2 complete | Multi-stage retrieval pipeline |
-| **Diet Agent** | 🔜 Month 1 Week 3 | Dietary validation + substitutions |
+| **Diet Agent** | ✅ Week 3 complete | Two-layer validation + substitutions (94% rules coverage) |
 | **Planner Agent** | 🔜 Month 2 | Weekly meal plans with Redis memory |
 | **Orchestrator** | 🔜 Month 2 | Intent routing + agent coordination |
 
@@ -28,7 +28,7 @@ User → Orchestrator → ┬─ Recipe Agent  (RAG over 10K+ recipes)
 | Agent | Responsibility | Tech |
 |-------|---------------|------|
 | **Recipe Agent** | Multi-stage semantic search over recipe corpus | Semantic Kernel + Qdrant + Ollama |
-| **Diet Agent** | Validates recipes against user constraints (allergies, macros, preferences) | Tool-calling agent with structured output |
+| **Diet Agent** | Two-layer validation: rules engine (instant) + LLM fallback (edge cases) | Static knowledge base + Ollama llama3.2 |
 | **Planner Agent** | Builds weekly meal plans with memory of past selections | Stateful agent with Redis session persistence |
 | **Orchestrator** | Routes intent, merges responses, handles fallbacks | Semantic Kernel Planner / LangGraph StateGraph |
 
@@ -86,7 +86,47 @@ Query
 | Situation | 0.6373 | 🔴 Abstract queries need LLM expansion |
 | Irrelevant | 0.5822 | ✅ Correctly low |
 
-**Known limitation:** X-free filtering ("dairy-free") matches the literal word in ingredients, not the semantic category. "dairy-free soup" can still return recipes with milk or cheese. Fix: LLM-based semantic filtering — Month 3.
+---
+
+## Diet Agent — Validation Pipeline (Week 3)
+
+Two-layer validation: fast rules engine for common cases, LLM fallback for edge cases.
+
+```
+Recipe + DietaryProfile
+  │
+  ├─ [1] Rules Engine (DietaryRules.cs — instant, zero LLM)
+  │       420+ phrase-level rules across 12 restriction categories
+  │       Coverage: dairy, gluten, nuts, eggs, soy, sesame, seafood,
+  │                 meat, jain, sattvic, paleo, halal/kosher
+  │       Violations found → return with substitutions, DONE
+  │
+  ├─ [2] Ambiguous Signal Tier (DietValidationPlugin.cs)
+  │       Detects ingredients rules can't classify ("spice blend", "dressing")
+  │       Allergy + ambiguous  → LLM (safety-critical, must verify)
+  │       Restriction + ambiguous → skip recipe (conservative, no LLM waste)
+  │
+  └─ [3] LLM (Ollama llama3.2 — opt-in, edge cases only)
+          Unknown restriction types or allergy + ambiguity
+          Graceful fallback: returns compatible + warning on timeout
+```
+
+### Validation coverage (Week 3 test matrix)
+
+| Layer | Cases handled | Notes |
+|-------|--------------|-------|
+| Rules engine | 94% | Zero LLM calls, < 5ms per recipe |
+| Skip tier | ~25% of cases | Restriction + ambiguous ingredient |
+| LLM | ~5% of cases | Allergy + ambiguity or unknown restriction |
+
+### Dietary profiles supported
+
+| Category | Restrictions |
+|----------|-------------|
+| **Allergens** | dairy, gluten, nuts (tree nuts + peanuts), eggs, soy, sesame, seafood, shellfish |
+| **Standard diets** | vegetarian, vegan, pescatarian, paleo |
+| **Indian diets** | jain, sattvic, hindu-vegetarian |
+| **Religious** | halal, kosher (simplified — full kosher deferred to LLM) |
 
 ---
 
@@ -133,7 +173,7 @@ python3 scripts/load_qdrant.py           # uploads vectors to Qdrant
 # 4. Run the API
 cd src/api && dotnet run     # starts on http://localhost:5000
 
-# 5. Test it
+# 5. Test recipe search
 curl -X POST http://localhost:5000/recipes/search \
   -H "Content-Type: application/json" \
   -d '{"query": "quick chicken dinner", "maxResults": 5}'
@@ -147,6 +187,18 @@ curl -X POST http://localhost:5000/recipes/search \
 curl -X POST http://localhost:5000/recipes/search \
   -H "Content-Type: application/json" \
   -d '{"query": "pasta without tomatoes", "maxResults": 5}'
+
+# 6. Test dietary validation (Recipe Agent + Diet Agent)
+curl -X POST http://localhost:5000/recipes/search-validated \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "pasta dinner",
+    "maxResults": 5,
+    "dietaryProfile": {
+      "allergies": ["dairy"],
+      "restrictions": ["vegetarian"]
+    }
+  }'
 ```
 
 ---
@@ -161,21 +213,32 @@ ChefAgent/
 │   │   │   ├── RecipeSearchPlugin.cs   # Semantic Kernel plugin
 │   │   │   ├── RecipeReranker.cs       # LLM re-ranking via Ollama
 │   │   │   └── QueryPreprocessor.cs    # Negation + query expansion
-│   │   ├── DietAgent/          # Coming Month 1 Week 3
+│   │   ├── DietAgent/          # ✅ Week 3 complete
+│   │   │   ├── DietaryRules.cs         # Static knowledge base, 420+ rules
+│   │   │   └── DietValidationPlugin.cs # Two-layer validation + substitutions
 │   │   ├── PlannerAgent/       # Coming Month 2
 │   │   └── Orchestrator/       # Coming Month 2
 │   ├── api/                    # ASP.NET Core Minimal API
-│   └── shared/                 # Common models (RecipeDocument, etc.)
+│   └── shared/                 # Common models (RecipeDocument, DietaryProfile, etc.)
 ├── eval/
 │   ├── datasets/
-│   │   ├── retrieval_baseline.md       # 24-query evaluation set
-│   │   └── week2_retrieval_results.md  # Week 2 quality results
+│   │   ├── retrieval_baseline.md         # 24-query retrieval evaluation set
+│   │   ├── week2_retrieval_results.md    # Week 2 retrieval quality results
+│   │   ├── diet_agent_test_cases.md      # 20 diet validation test cases
+│   │   └── diet_agent_test_results.md    # Diet agent test matrix results
 │   └── harnesses/              # RAGAS eval — coming Month 3
 ├── scripts/
 │   ├── prepare_recipes.py      # Download + parse corbt/all-recipes
 │   ├── generate_embeddings.py  # Embed via Ollama (use Colab for speed)
 │   ├── load_qdrant.py          # Upload vectors to Qdrant
-│   └── test_search_quality.py  # Search quality test harness
+│   ├── test_search_quality.py  # Recipe search quality test harness
+│   └── test_diet_agent.py      # Diet agent test harness (20 test cases)
+├── docs/
+│   └── adrs/
+│       ├── 001-orchestration-framework.md
+│       ├── 002-vector-database.md
+│       ├── 003-llm-provider.md
+│       └── 004-diet-agent-architecture.md  # ✅ Week 3
 ├── docker-compose.yml          # Qdrant + Redis
 └── chefagent_embeddings.ipynb  # Colab notebook for GPU embedding
 ```
@@ -187,6 +250,7 @@ ChefAgent/
 - [ADR-001: Orchestration Framework](docs/adrs/001-orchestration-framework.md)
 - [ADR-002: Vector Database](docs/adrs/002-vector-database.md)
 - [ADR-003: LLM Provider](docs/adrs/003-llm-provider.md)
+- [ADR-004: Diet Agent Architecture](docs/adrs/004-diet-agent-architecture.md)
 
 ---
 

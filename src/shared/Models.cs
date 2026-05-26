@@ -45,9 +45,23 @@ public record DietaryValidation
 {
     public required string RecipeId { get; init; }
     public bool IsCompatible { get; init; }
-    public List<string> Violations { get; init; } = [];
+    public List<ViolationDetail> Violations { get; init; } = [];
     public List<SubstitutionSuggestion> Substitutions { get; init; } = [];
     public string? Explanation { get; init; }
+}
+
+public record ViolationDetail
+{
+    public required string Ingredient { get; init; }
+    public required string Category { get; init; } // "dairy", "gluten", "nuts"
+    public required ValidationLayer DetectedBy { get; init; }
+    public string? MatchedRule { get; init; }
+}
+
+public enum ValidationLayer
+{
+    Rules,
+    Llm,
 }
 
 public record SubstitutionSuggestion
