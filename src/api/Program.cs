@@ -1,4 +1,6 @@
+using System.Text.Json.Serialization;
 using ChefAgent.Agents.Diet;
+using ChefAgent.Agents.Orchestrator;
 using ChefAgent.Agents.Recipe;
 using ChefAgent.Shared.Models;
 using Qdrant.Client;
@@ -23,6 +25,9 @@ builder.Services.AddHttpClient(
         client.Timeout = TimeSpan.FromMinutes(5);
     }
 );
+
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 // Recipe Agent
 builder.Services.AddSingleton(sp =>
@@ -77,6 +82,38 @@ builder.Services.AddSingleton(sp =>
     );
 });
 
+// Intent Router
+builder.Services.AddSingleton(sp =>
+{
+    var httpFactory = sp.GetRequiredService<IHttpClientFactory>();
+    var httpClient = httpFactory.CreateClient("Ollama");
+    var ollamaUrl = builder.Configuration["Ollama:Endpoint"] ?? "http://localhost:11434";
+    var chatModel = builder.Configuration["Ollama:ChatModel"] ?? "llama3.2";
+    return new IntentRouter(
+        httpClient,
+        ollamaUrl,
+        chatModel,
+        sp.GetRequiredService<ILogger<IntentRouter>>()
+    );
+});
+
+// Agent Orchestrator — depends on Recipe + Diet agents (already registered above)
+builder.Services.AddSingleton(sp =>
+{
+    var httpFactory = sp.GetRequiredService<IHttpClientFactory>();
+    var httpClient = httpFactory.CreateClient("Ollama");
+    var ollamaUrl = builder.Configuration["Ollama:Endpoint"] ?? "http://localhost:11434";
+    var chatModel = builder.Configuration["Ollama:ChatModel"] ?? "llama3.2";
+    return new AgentOrchestrator(
+        sp.GetRequiredService<RecipeSearchPlugin>(),
+        sp.GetRequiredService<DietValidationPlugin>(),
+        httpClient,
+        ollamaUrl,
+        chatModel,
+        sp.GetRequiredService<ILogger<AgentOrchestrator>>()
+    );
+});
+
 // CORS for React frontend
 builder.Services.AddCors(options =>
 {
@@ -113,7 +150,7 @@ app.MapGet(
                 llm = "Ollama",
                 memory = "Redis",
             },
-            agents = new[] { "recipe", "diet", "planner (coming soon)" },
+            agents = new[] { "recipe", "diet", "orchestrator", "planner (coming soon)" },
         }
 );
 
@@ -150,7 +187,6 @@ app.MapPost(
         DietValidationPlugin dietPlugin
     ) =>
     {
-        // Step 1: Recipe Agent — find candidates
         var results = await recipePlugin.SearchRecipesAsync(
             request.Query,
             request.MaxResults,
@@ -160,8 +196,6 @@ app.MapPost(
             request.Expand
         );
 
-        // Step 2: Diet Agent — validate each recipe against profile
-        // No profile = validation skipped, same results as /recipes/search
         var validated = new List<object>();
         foreach (var recipe in results)
         {
@@ -181,7 +215,6 @@ app.MapPost(
             );
         }
 
-        // Compatible recipes first, incompatible (with substitutions) after
         var sorted = validated.OrderByDescending(v => ((dynamic)v).dietary.isCompatible).ToList();
 
         return Results.Ok(
@@ -196,19 +229,31 @@ app.MapPost(
     }
 );
 
-// Chat endpoint — will wire to Orchestrator in Week 4
+// Chat endpoint — Orchestrator routes natural language to right agent(s)
 app.MapPost(
     "/chat",
-    (ChatRequest request) =>
+    async (ChatRequest request, IntentRouter intentRouter, AgentOrchestrator orchestrator) =>
     {
-        // TODO: Route through Orchestrator -> appropriate agent(s)
-        return Results.Ok(
-            new
-            {
-                message = $"Received: {request.Message}. Orchestrator coming in Week 4!",
-                intent = "unknown",
-            }
-        );
+        // Step 1: Classify intent + extract entities from message
+        // UseLlmClassification=false (default) → rules only, fast, no timeouts
+        // UseLlmClassification=true → LLM classification, smart but slow on CPU
+        ClassifiedIntent classified;
+        if (request.UseLlmClassification)
+        {
+            classified = await intentRouter.ClassifyAsync(request.Message, request.DietaryProfile);
+        }
+        else
+        {
+            // Rules-only path — instant, no LLM
+            classified = await intentRouter.ClassifyAsync(request.Message, request.DietaryProfile);
+            // If rules couldn't classify and LLM is disabled, stay Unknown
+            // AgentOrchestrator handles Unknown gracefully
+        }
+
+        // Step 2: Route to right agent(s) and build response
+        var response = await orchestrator.RouteAsync(classified);
+
+        return Results.Ok(response);
     }
 );
 
@@ -226,4 +271,9 @@ record RecipeSearchRequest(
     DietaryProfile? DietaryProfile = null
 );
 
-record ChatRequest(string Message, string? SessionId = null);
+record ChatRequest(
+    string Message,
+    string? SessionId = null, // unused in MVP, reserved for Month 2 Redis memory
+    DietaryProfile? DietaryProfile = null,
+    bool UseLlmClassification = false // false = rules only (fast), true = LLM (smart, slow on CPU)
+);

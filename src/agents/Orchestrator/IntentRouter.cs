@@ -1,14 +1,295 @@
 namespace ChefAgent.Agents.Orchestrator;
 
+using System.Text.RegularExpressions;
+using ChefAgent.Shared.Models;
+using Microsoft.Extensions.Logging;
+
 /// <summary>
-/// Routes user intent to the appropriate agent(s).
-/// 
-/// TODO (Week 4):
-/// - Intent classification: search / validate / plan / modify / general
-/// - Agent-to-agent communication via Semantic Kernel function chaining
-/// - Response merging and fallback handling
+/// Classifies user intent and extracts entities from natural language messages.
+///
+/// Rules-only for MVP — LLM classification deferred until labeled dataset exists.
+///
+/// Intent classification:
+///   ValidateDiet    : unambiguous signal phrases ("can I eat", "allergic to", ...)
+///   CreateMealPlan  : explicit meal plan phrases ("plan my week", "meal plan", ...)
+///   ModifyMealPlan  : modification phrases ("swap", "replace Tuesday", ...)
+///   GeneralQuestion : question phrases ("what is", "how do I", "explain", ...)
+///   SearchRecipe    : DEFAULT — everything else. Most common intent.
+///                     Logged as "rules-default" for future dataset collection.
+///
+/// Entity extraction (rules-based):
+///   - "allergic to X"     → allergies: ["X"]
+///   - "gluten-free X"     → restrictions: ["gluten-free"]
+///   - "vegan X"           → restrictions: ["vegan"]
+///   - etc.
+///
+/// Profile merging:
+///   Extracted profile (from message) + existing profile (from request DTO)
+///   are merged without duplicates — no information lost.
 /// </summary>
 public class IntentRouter
 {
-    // Placeholder — implementation coming in Week 4
+    private readonly ILogger<IntentRouter> _logger;
+
+    // ── Signal Word Sets ──────────────────────────────────────────────────────
+
+    private static readonly HashSet<string> ValidateDietSignals =
+    [
+        "can i eat",
+        "is this safe",
+        "safe for me",
+        "safe for",
+        "allergic to",
+        "check this recipe",
+        "does this contain",
+        "does this have",
+        "suitable for",
+        "okay for me",
+        "will this work for",
+        "is this okay",
+    ];
+
+    private static readonly HashSet<string> GeneralQuestionSignals =
+    [
+        "what is ",
+        "what are ",
+        "what does ",
+        "how do i ",
+        "how do you ",
+        "how to ",
+        "tell me about",
+        "explain ",
+        "what's the difference",
+        "why is ",
+        "why does ",
+    ];
+
+    private static readonly HashSet<string> MealPlanSignals =
+    [
+        "plan my week",
+        "meal plan",
+        "what should i eat this week",
+        "weekly plan",
+        "plan for the week",
+        "schedule meals",
+    ];
+
+    private static readonly HashSet<string> ModifyMealPlanSignals =
+    [
+        "swap ",
+        "replace tuesday",
+        "replace monday",
+        "replace wednesday",
+        "replace thursday",
+        "replace friday",
+        "switch tuesday",
+        "update my plan",
+        "different recipe for",
+    ];
+
+    public IntentRouter(
+        HttpClient httpClient, // reserved for Month 2 LLM classification
+        string ollamaUrl, // reserved for Month 2 LLM classification
+        string chatModel, // reserved for Month 2 LLM classification
+        ILogger<IntentRouter> logger
+    )
+    {
+        _logger = logger;
+    }
+
+    // ── Public API ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Classifies a user message and extracts entities.
+    /// Rules-only for MVP — no LLM calls.
+    /// "rules-default" in ClassifiedBy means SearchRecipe was assumed, not matched.
+    /// Collect these cases for future dataset labeling.
+    /// </summary>
+    public Task<ClassifiedIntent> ClassifyAsync(
+        string message,
+        DietaryProfile? existingProfile = null
+    )
+    {
+        var lower = message.ToLowerInvariant().Trim();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        var intent = ClassifyIntent(lower);
+        var extractedProfile = ExtractProfile(lower);
+        var mergedProfile = MergeProfiles(existingProfile, extractedProfile);
+        var classifiedBy = intent == UserIntent.SearchRecipe ? "rules-default" : "rules";
+
+        sw.Stop();
+        _logger.LogInformation(
+            "[IntentRouter] Message='{Msg}' Intent={Intent} Layer={Layer} Time={Ms}ms",
+            message,
+            intent,
+            classifiedBy,
+            sw.ElapsedMilliseconds
+        );
+
+        return Task.FromResult(
+            new ClassifiedIntent
+            {
+                Intent = intent,
+                SearchQuery = ExtractSearchQuery(lower, intent),
+                ExtractedProfile = extractedProfile,
+                MergedProfile = mergedProfile,
+                DeferredIntents = [],
+                DeferredMessage = null,
+                ClassifiedBy = classifiedBy,
+            }
+        );
+    }
+
+    // ── Intent Classification ─────────────────────────────────────────────────
+
+    private static UserIntent ClassifyIntent(string lower)
+    {
+        if (ValidateDietSignals.Any(s => lower.Contains(s)))
+            return UserIntent.ValidateDiet;
+
+        if (MealPlanSignals.Any(s => lower.Contains(s)))
+            return UserIntent.CreateMealPlan;
+
+        if (ModifyMealPlanSignals.Any(s => lower.Contains(s)))
+            return UserIntent.ModifyMealPlan;
+
+        if (GeneralQuestionSignals.Any(s => lower.Contains(s)))
+            return UserIntent.GeneralQuestion;
+
+        // Default — SearchRecipe is the most common intent.
+        // Natural language for recipe search is too varied for keyword rules.
+        // Log as "rules-default" — collect for future LLM classifier training.
+        return UserIntent.SearchRecipe;
+    }
+
+    // ── Entity Extraction ─────────────────────────────────────────────────────
+
+    private static DietaryProfile? ExtractProfile(string lower)
+    {
+        var allergies = new List<string>();
+        var restrictions = new List<string>();
+
+        // "allergic to X" — extract the allergen
+        var allergyMatch = Regex.Match(lower, @"allergic to (\w+)");
+        if (allergyMatch.Success)
+            allergies.Add(allergyMatch.Groups[1].Value);
+
+        // Explicit restriction terms embedded in the query
+        if (lower.Contains("gluten-free") || lower.Contains("gluten free"))
+            restrictions.Add("gluten-free");
+        if (lower.Contains("dairy-free") || lower.Contains("dairy free"))
+            restrictions.Add("dairy-free");
+        if (lower.Contains("nut-free") || lower.Contains("nut free"))
+            restrictions.Add("nuts");
+        if (lower.Contains("vegan"))
+            restrictions.Add("vegan");
+        if (lower.Contains("vegetarian"))
+            restrictions.Add("vegetarian");
+        if (lower.Contains("pescatarian"))
+            restrictions.Add("pescatarian");
+        if (lower.Contains("jain"))
+            restrictions.Add("jain");
+        if (lower.Contains("sattvic"))
+            restrictions.Add("sattvic");
+        if (lower.Contains("halal"))
+            restrictions.Add("halal");
+        if (lower.Contains("kosher"))
+            restrictions.Add("kosher");
+
+        if (allergies.Count == 0 && restrictions.Count == 0)
+            return null;
+
+        return new DietaryProfile { Allergies = allergies, Restrictions = restrictions };
+    }
+
+    private static string ExtractSearchQuery(string lower, UserIntent intent)
+    {
+        // Only clean queries for SearchRecipe — other intents use the full message
+        if (intent != UserIntent.SearchRecipe)
+            return lower;
+
+        var cleaned = lower
+            // Action words
+            .Replace("find me ", "")
+            .Replace("find ", "")
+            .Replace("search for ", "")
+            .Replace("show me ", "")
+            .Replace("i want ", "")
+            .Replace("i need ", "")
+            .Replace("suggest ", "")
+            .Replace("give me ", "")
+            .Replace("looking for ", "")
+            .Replace("what can i make with ", "")
+            .Replace("recipe for ", "")
+            .Replace("recipes for ", "")
+            .Replace("ideas for ", "")
+            // Dietary prefixes — already extracted into profile
+            .Replace("gluten-free ", "")
+            .Replace("gluten free ", "")
+            .Replace("dairy-free ", "")
+            .Replace("dairy free ", "")
+            .Replace("nut-free ", "")
+            .Replace("nut free ", "")
+            .Replace("vegan ", "")
+            .Replace("vegetarian ", "")
+            .Replace("pescatarian ", "")
+            .Replace("jain ", "")
+            .Replace("sattvic ", "")
+            .Replace("halal ", "")
+            .Replace("kosher ", "")
+            // Trailing filler
+            .Replace(" dinner", " ")
+            .Replace(" lunch", " ")
+            .Replace(" breakfast", " ")
+            .Replace(" recipe", " ")
+            .Replace(" ideas", " ")
+            .Replace(" tonight", " ")
+            .Trim();
+
+        // Fall back to original if cleaning removed everything
+        return string.IsNullOrWhiteSpace(cleaned) ? lower : cleaned;
+    }
+
+    // ── Profile Merging ───────────────────────────────────────────────────────
+
+    private static DietaryProfile? MergeProfiles(
+        DietaryProfile? existing,
+        DietaryProfile? extracted
+    )
+    {
+        if (existing is null && extracted is null)
+            return null;
+        if (existing is null)
+            return extracted;
+        if (extracted is null)
+            return existing;
+
+        return new DietaryProfile
+        {
+            Restrictions = existing
+                .Restrictions.Union(extracted.Restrictions, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            Allergies = existing
+                .Allergies.Union(extracted.Allergies, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+        };
+    }
+}
+
+/// <summary>
+/// Result of intent classification — intent + all extracted entities.
+/// ClassifiedBy values: "rules" | "rules-default" | "llm" (Month 2)
+/// "rules-default" means SearchRecipe was assumed, not explicitly matched.
+/// Collect these cases as training data for future LLM classifier.
+/// </summary>
+public record ClassifiedIntent
+{
+    public required UserIntent Intent { get; init; }
+    public required string SearchQuery { get; init; } // cleaned query for Recipe Agent
+    public DietaryProfile? ExtractedProfile { get; init; } // extracted from message only
+    public DietaryProfile? MergedProfile { get; init; } // extracted + existing combined
+    public List<UserIntent> DeferredIntents { get; init; } = [];
+    public string? DeferredMessage { get; init; }
+    public required string ClassifiedBy { get; init; } // "rules" | "rules-default"
 }

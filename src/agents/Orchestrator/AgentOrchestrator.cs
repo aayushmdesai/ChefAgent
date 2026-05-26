@@ -1,0 +1,496 @@
+namespace ChefAgent.Agents.Orchestrator;
+
+using System.Text;
+using System.Text.Json;
+using ChefAgent.Agents.Diet;
+using ChefAgent.Agents.Recipe;
+using ChefAgent.Shared.Models;
+using Microsoft.Extensions.Logging;
+
+/// <summary>
+/// Coordinates agent calls based on classified intent.
+/// Takes a ClassifiedIntent from IntentRouter and routes to the right agent(s),
+/// merges results, and builds a human-readable OrchestratorResponse.
+///
+/// Routing flows:
+///   SearchRecipe (no profile)   → Recipe Agent only
+///   SearchRecipe (with profile) → Recipe Agent → Diet Agent → sort compatible first
+///   ValidateDiet                → Diet Agent only
+///   CreateMealPlan              → placeholder (Month 2)
+///   ModifyMealPlan              → placeholder (Month 2)
+///   GeneralQuestion             → Ollama direct (conversational)
+///   Unknown                     → ask user to clarify
+///
+/// Failure handling:
+///   Recipe Agent fails          → helpful error, no recipes
+///   Diet Agent LLM timeout      → recipes returned without validation + warning
+///   Intent LLM timeout          → Unknown intent, ask to clarify
+///   All agents fail             → graceful error, never 500
+/// </summary>
+public class AgentOrchestrator
+{
+    private readonly RecipeSearchPlugin _recipeAgent;
+    private readonly DietValidationPlugin _dietAgent;
+    private readonly HttpClient _httpClient;
+    private readonly string _ollamaUrl;
+    private readonly string _chatModel;
+    private readonly ILogger<AgentOrchestrator> _logger;
+
+    public AgentOrchestrator(
+        RecipeSearchPlugin recipeAgent,
+        DietValidationPlugin dietAgent,
+        HttpClient httpClient,
+        string ollamaUrl,
+        string chatModel,
+        ILogger<AgentOrchestrator> logger
+    )
+    {
+        _recipeAgent = recipeAgent;
+        _dietAgent = dietAgent;
+        _httpClient = httpClient;
+        _ollamaUrl = ollamaUrl;
+        _chatModel = chatModel;
+        _logger = logger;
+    }
+
+    // ── Public API ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Main entry point. Takes a classified intent and routes to the right agent(s).
+    /// Always returns an OrchestratorResponse — never throws to the caller.
+    /// </summary>
+    public async Task<OrchestratorResponse> RouteAsync(ClassifiedIntent classified)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        _logger.LogInformation(
+            "[Orchestrator] Intent={Intent} ClassifiedBy={By} Query='{Query}' Profile={HasProfile}",
+            classified.Intent,
+            classified.ClassifiedBy,
+            classified.SearchQuery,
+            classified.MergedProfile is not null
+        );
+
+        var response = classified.Intent switch
+        {
+            UserIntent.SearchRecipe => await HandleSearchRecipeAsync(classified),
+            UserIntent.ValidateDiet => await HandleValidateDietAsync(classified),
+            UserIntent.CreateMealPlan => HandlePlaceholder("Meal planning", classified),
+            UserIntent.ModifyMealPlan => HandlePlaceholder("Meal plan modification", classified),
+            UserIntent.GeneralQuestion => await HandleGeneralQuestionAsync(classified),
+            _ => HandleUnknown(classified),
+        };
+
+        sw.Stop();
+        _logger.LogInformation(
+            "[Orchestrator] Intent={Intent} Time={Ms}ms Recipes={Count}",
+            classified.Intent,
+            sw.ElapsedMilliseconds,
+            response.Recipes.Count
+        );
+
+        return response;
+    }
+
+    // ── Intent Handlers ───────────────────────────────────────────────────────
+
+    private async Task<OrchestratorResponse> HandleSearchRecipeAsync(ClassifiedIntent classified)
+    {
+        // Step 1 — Recipe Agent
+        List<RecipeDocument> recipes;
+        try
+        {
+            recipes = await _recipeAgent.SearchRecipesAsync(classified.SearchQuery, maxResults: 5);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Recipe Agent failed for query '{Query}'", classified.SearchQuery);
+            return ErrorResponse(
+                classified,
+                "Sorry — I couldn't search for recipes right now. Please try again."
+            );
+        }
+
+        if (recipes.Count == 0)
+        {
+            return new OrchestratorResponse
+            {
+                Message =
+                    $"I couldn't find any recipes for \"{classified.SearchQuery}\". Try a different query.",
+                DetectedIntent = UserIntent.SearchRecipe,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+        }
+
+        // Step 2 — Diet Agent (only if profile present)
+        if (
+            classified.MergedProfile is null
+            || (
+                classified.MergedProfile.Allergies.Count == 0
+                && classified.MergedProfile.Restrictions.Count == 0
+            )
+        )
+        {
+            return new OrchestratorResponse
+            {
+                Message = BuildSearchMessage(recipes, classified, dietaryApplied: false),
+                DetectedIntent = UserIntent.SearchRecipe,
+                Recipes = recipes,
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+        }
+
+        // Validate each recipe against dietary profile
+        var validatedRecipes = new List<RecipeDocument>();
+        var dietaryResults = new List<(RecipeDocument Recipe, DietaryValidation Validation)>();
+        var dietaryUnavailable = false;
+
+        foreach (var recipe in recipes)
+        {
+            try
+            {
+                var validation = await _dietAgent.ValidateRecipeAsync(
+                    recipe,
+                    classified.MergedProfile
+                );
+                dietaryResults.Add((recipe, validation));
+
+                if (validation.IsCompatible)
+                    validatedRecipes.Add(recipe);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Diet Agent failed for recipe '{Title}' — including without validation",
+                    recipe.Title
+                );
+                dietaryUnavailable = true;
+                validatedRecipes.Add(recipe);
+            }
+        }
+
+        // Sort: compatible first, incompatible after
+        var sorted = dietaryResults
+            .OrderByDescending(r => r.Validation.IsCompatible)
+            .Select(r => r.Recipe)
+            .ToList();
+
+        var compatibleCount = dietaryResults.Count(r => r.Validation.IsCompatible);
+
+        return new OrchestratorResponse
+        {
+            Message = BuildSearchMessage(
+                sorted,
+                classified,
+                dietaryApplied: true,
+                compatibleCount: compatibleCount,
+                total: sorted.Count,
+                dietaryUnavailable: dietaryUnavailable
+            ),
+            DetectedIntent = UserIntent.SearchRecipe,
+            Recipes = sorted,
+            DietaryCheck = dietaryResults.Count > 0 ? dietaryResults[0].Validation : null,
+            Metadata = BuildMetadata(
+                classified,
+                dietaryApplied: true,
+                compatibleCount: compatibleCount,
+                dietaryUnavailable: dietaryUnavailable
+            ),
+        };
+    }
+
+    private async Task<OrchestratorResponse> HandleValidateDietAsync(ClassifiedIntent classified)
+    {
+        // ValidateDiet without a specific recipe — search first, then validate top result
+        if (
+            classified.MergedProfile is null
+            || (
+                classified.MergedProfile.Allergies.Count == 0
+                && classified.MergedProfile.Restrictions.Count == 0
+            )
+        )
+        {
+            return new OrchestratorResponse
+            {
+                Message =
+                    "I'd be happy to check a recipe for you — could you tell me which recipe and any dietary restrictions you have?",
+                DetectedIntent = UserIntent.ValidateDiet,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+        }
+
+        // Search for the recipe mentioned in the query
+        List<RecipeDocument> recipes;
+        try
+        {
+            recipes = await _recipeAgent.SearchRecipesAsync(classified.SearchQuery, maxResults: 1);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Recipe search failed during ValidateDiet for '{Query}'",
+                classified.SearchQuery
+            );
+            return ErrorResponse(classified, "Sorry — I couldn't find that recipe right now.");
+        }
+
+        if (recipes.Count == 0)
+        {
+            return new OrchestratorResponse
+            {
+                Message =
+                    $"I couldn't find a recipe matching \"{classified.SearchQuery}\" to validate.",
+                DetectedIntent = UserIntent.ValidateDiet,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+        }
+
+        var recipe = recipes[0];
+        DietaryValidation validation;
+
+        try
+        {
+            validation = await _dietAgent.ValidateRecipeAsync(recipe, classified.MergedProfile);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Diet Agent failed during ValidateDiet for '{Title}'",
+                recipe.Title
+            );
+            return new OrchestratorResponse
+            {
+                Message =
+                    $"Found \"{recipe.Title}\" but dietary validation is unavailable right now. Please review manually.",
+                DetectedIntent = UserIntent.ValidateDiet,
+                Recipes = [recipe],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+        }
+
+        var resultMessage = validation.IsCompatible
+            ? $"\"{recipe.Title}\" looks compatible with your dietary profile. {validation.Explanation}"
+            : $"\"{recipe.Title}\" has some issues for your profile. {validation.Explanation}";
+
+        if (!validation.IsCompatible && validation.Substitutions.Count > 0)
+        {
+            var subs = string.Join(
+                ", ",
+                validation
+                    .Substitutions.Take(2)
+                    .Select(s => $"{s.OriginalIngredient} → {s.SuggestedReplacement}")
+            );
+            resultMessage += $" Suggested swaps: {subs}.";
+        }
+
+        return new OrchestratorResponse
+        {
+            Message = resultMessage,
+            DetectedIntent = UserIntent.ValidateDiet,
+            Recipes = [recipe],
+            DietaryCheck = validation,
+            Metadata = BuildMetadata(classified, dietaryApplied: true),
+        };
+    }
+
+    private async Task<OrchestratorResponse> HandleGeneralQuestionAsync(ClassifiedIntent classified)
+    {
+        try
+        {
+            var answer = await AskOllamaAsync(classified.SearchQuery);
+            return new OrchestratorResponse
+            {
+                Message = answer,
+                DetectedIntent = UserIntent.GeneralQuestion,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Ollama failed for GeneralQuestion '{Query}'",
+                classified.SearchQuery
+            );
+            return new OrchestratorResponse
+            {
+                Message =
+                    "I couldn't answer that right now — my reasoning engine is unavailable. Try a recipe search instead.",
+                DetectedIntent = UserIntent.GeneralQuestion,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+        }
+    }
+
+    private static OrchestratorResponse HandlePlaceholder(
+        string featureName,
+        ClassifiedIntent classified
+    )
+    {
+        var deferredMsg =
+            classified.DeferredMessage
+            ?? $"{featureName} is coming in Month 2. Let me help you find a recipe for now.";
+
+        return new OrchestratorResponse
+        {
+            Message = deferredMsg,
+            DetectedIntent = classified.Intent,
+            Recipes = [],
+            Metadata = BuildMetadata(classified, dietaryApplied: false),
+        };
+    }
+
+    private static OrchestratorResponse HandleUnknown(ClassifiedIntent classified)
+    {
+        return new OrchestratorResponse
+        {
+            Message =
+                "I'm not sure what you're looking for. Try asking me to find a recipe, check if a dish is safe for your diet, or ask a cooking question.",
+            DetectedIntent = UserIntent.Unknown,
+            Recipes = [],
+            Metadata = BuildMetadata(classified, dietaryApplied: false),
+        };
+    }
+
+    // ── Response Message Templates ────────────────────────────────────────────
+
+    private static string BuildSearchMessage(
+        List<RecipeDocument> recipes,
+        ClassifiedIntent classified,
+        bool dietaryApplied,
+        int compatibleCount = 0,
+        int total = 0,
+        bool dietaryUnavailable = false
+    )
+    {
+        var sb = new StringBuilder();
+        var query = classified.SearchQuery;
+        var count = recipes.Count;
+
+        if (!dietaryApplied)
+        {
+            sb.Append($"Here are {count} recipes for \"{query}\".");
+        }
+        else
+        {
+            var profile = classified.MergedProfile;
+            var restrictions = profile?.Restrictions ?? [];
+            var allergies = profile?.Allergies ?? [];
+            var profileDesc = string.Join(", ", restrictions.Concat(allergies));
+
+            if (compatibleCount == count)
+            {
+                sb.Append($"Here are {count} {profileDesc}-friendly recipes for \"{query}\".");
+            }
+            else if (compatibleCount == 0)
+            {
+                sb.Append(
+                    $"Found {count} recipes for \"{query}\" but none fully matched your {profileDesc} profile."
+                );
+                sb.Append(" Check the details for substitution suggestions.");
+            }
+            else
+            {
+                sb.Append(
+                    $"Found {count} recipes for \"{query}\". {compatibleCount} are compatible with your {profileDesc} profile."
+                );
+                sb.Append(" The rest have notes — check the details for substitution suggestions.");
+            }
+
+            if (dietaryUnavailable)
+                sb.Append(
+                    " Note: dietary check was unavailable for some recipes — please review manually."
+                );
+        }
+
+        // Append deferred message if any
+        if (!string.IsNullOrEmpty(classified.DeferredMessage))
+        {
+            sb.Append($" {classified.DeferredMessage}");
+        }
+
+        return sb.ToString();
+    }
+
+    // ── Ollama Direct (GeneralQuestion) ───────────────────────────────────────
+
+    private async Task<string> AskOllamaAsync(string question)
+    {
+        var payload = new
+        {
+            model = _chatModel,
+            stream = false,
+            messages = new[]
+            {
+                new
+                {
+                    role = "system",
+                    content = "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences.",
+                },
+                new { role = "user", content = question },
+            },
+        };
+
+        var json = JsonSerializer.Serialize(payload);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync($"{_ollamaUrl}/api/chat", content);
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        return doc.RootElement.GetProperty("message").GetProperty("content").GetString()
+            ?? string.Empty;
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static OrchestratorResponse ErrorResponse(
+        ClassifiedIntent classified,
+        string message
+    ) =>
+        new()
+        {
+            Message = message,
+            DetectedIntent = classified.Intent,
+            Recipes = [],
+            Metadata = BuildMetadata(classified, dietaryApplied: false),
+        };
+
+    private static Dictionary<string, object> BuildMetadata(
+        ClassifiedIntent classified,
+        bool dietaryApplied,
+        int compatibleCount = 0,
+        bool dietaryUnavailable = false
+    )
+    {
+        var metadata = new Dictionary<string, object>
+        {
+            ["intentClassifiedBy"] = classified.ClassifiedBy,
+            ["dietaryValidationApplied"] = dietaryApplied,
+        };
+
+        if (dietaryApplied)
+            metadata["compatibleCount"] = compatibleCount;
+
+        if (dietaryUnavailable)
+            metadata["dietaryUnavailable"] = true;
+
+        if (classified.DeferredIntents.Count > 0)
+        {
+            metadata["deferredIntents"] = classified
+                .DeferredIntents.Select(i => i.ToString())
+                .ToList();
+            metadata["deferredMessage"] = classified.DeferredMessage ?? "";
+        }
+
+        return metadata;
+    }
+}
