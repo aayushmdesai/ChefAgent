@@ -93,7 +93,6 @@ public class AgentOrchestrator
     }
 
     // ── Intent Handlers ───────────────────────────────────────────────────────
-
     private async Task<OrchestratorResponse> HandleSearchRecipeAsync(ClassifiedIntent classified)
     {
         // Step 1 — Recipe Agent
@@ -112,7 +111,6 @@ public class AgentOrchestrator
         }
 
         if (recipes.Count == 0)
-        {
             return new OrchestratorResponse
             {
                 Message =
@@ -121,7 +119,6 @@ public class AgentOrchestrator
                 Recipes = [],
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
-        }
 
         // Step 2 — Diet Agent (only if profile present)
         if (
@@ -136,14 +133,13 @@ public class AgentOrchestrator
             {
                 Message = BuildSearchMessage(recipes, classified, dietaryApplied: false),
                 DetectedIntent = UserIntent.SearchRecipe,
-                Recipes = recipes,
+                Recipes = recipes.Select(r => new ValidatedRecipe { Recipe = r }).ToList(),
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
         }
 
-        // Validate each recipe against dietary profile
-        var validatedRecipes = new List<RecipeDocument>();
-        var dietaryResults = new List<(RecipeDocument Recipe, DietaryValidation Validation)>();
+        // Profile present → validate each recipe
+        var dietaryResults = new List<ValidatedRecipe>();
         var dietaryUnavailable = false;
 
         foreach (var recipe in recipes)
@@ -154,35 +150,31 @@ public class AgentOrchestrator
                     recipe,
                     classified.MergedProfile
                 );
-                dietaryResults.Add((recipe, validation));
-
-                if (validation.IsCompatible)
-                    validatedRecipes.Add(recipe);
+                dietaryResults.Add(new ValidatedRecipe { Recipe = recipe, Dietary = validation });
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(
                     ex,
-                    "Diet Agent failed for recipe '{Title}' — including without validation",
+                    "Diet Agent failed for '{Title}' — including without validation",
                     recipe.Title
                 );
                 dietaryUnavailable = true;
-                validatedRecipes.Add(recipe);
+                dietaryResults.Add(new ValidatedRecipe { Recipe = recipe, Dietary = null });
             }
         }
 
         // Sort: compatible first, incompatible after
         var sorted = dietaryResults
-            .OrderByDescending(r => r.Validation.IsCompatible)
-            .Select(r => r.Recipe)
+            .OrderByDescending(r => r.Dietary?.IsCompatible ?? false)
             .ToList();
 
-        var compatibleCount = dietaryResults.Count(r => r.Validation.IsCompatible);
+        var compatibleCount = sorted.Count(r => r.Dietary?.IsCompatible == true);
 
         return new OrchestratorResponse
         {
             Message = BuildSearchMessage(
-                sorted,
+                recipes,
                 classified,
                 dietaryApplied: true,
                 compatibleCount: compatibleCount,
@@ -191,7 +183,7 @@ public class AgentOrchestrator
             ),
             DetectedIntent = UserIntent.SearchRecipe,
             Recipes = sorted,
-            DietaryCheck = dietaryResults.Count > 0 ? dietaryResults[0].Validation : null,
+            
             Metadata = BuildMetadata(
                 classified,
                 dietaryApplied: true,
@@ -269,7 +261,7 @@ public class AgentOrchestrator
                 Message =
                     $"Found \"{recipe.Title}\" but dietary validation is unavailable right now. Please review manually.",
                 DetectedIntent = UserIntent.ValidateDiet,
-                Recipes = [recipe],
+                Recipes = [new ValidatedRecipe { Recipe = recipe, Dietary = null }],
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
         }
@@ -293,7 +285,7 @@ public class AgentOrchestrator
         {
             Message = resultMessage,
             DetectedIntent = UserIntent.ValidateDiet,
-            Recipes = [recipe],
+            Recipes = [new ValidatedRecipe { Recipe = recipe, Dietary = validation }],
             DietaryCheck = validation,
             Metadata = BuildMetadata(classified, dietaryApplied: true),
         };

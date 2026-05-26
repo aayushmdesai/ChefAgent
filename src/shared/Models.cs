@@ -64,6 +64,16 @@ public enum ValidationLayer
     Llm,
 }
 
+/// <summary>
+/// A recipe with its dietary validation attached.
+/// Used in OrchestratorResponse so the UI gets per-recipe dietary badges.
+/// </summary>
+public record ValidatedRecipe
+{
+    public required RecipeDocument Recipe { get; init; }
+    public DietaryValidation? Dietary { get; init; } // null = validation not run
+}
+
 public record SubstitutionSuggestion
 {
     public required string OriginalIngredient { get; init; }
@@ -110,8 +120,8 @@ public enum UserIntent
 public record OrchestratorResponse
 {
     public required string Message { get; init; }
-    public List<RecipeDocument> Recipes { get; init; } = [];
-    public DietaryValidation? DietaryCheck { get; init; }
+    public List<ValidatedRecipe> Recipes { get; init; } = []; // ← was List<RecipeDocument>
+    public DietaryValidation? DietaryCheck { get; init; } // keep for ValidateDiet intent
     public MealPlan? MealPlan { get; init; }
     public UserIntent DetectedIntent { get; init; }
     public Dictionary<string, object> Metadata { get; init; } = [];
