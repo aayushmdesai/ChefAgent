@@ -67,6 +67,8 @@ public class IntentRouter
     private static readonly HashSet<string> MealPlanSignals =
     [
         "plan my week",
+        "plan my meals for the week",
+        "plan my meals",
         "meal plan",
         "what should i eat this week",
         "weekly plan",
