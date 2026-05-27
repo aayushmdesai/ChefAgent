@@ -14,5 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../shared/ChefAgent.Shared.csproj" />
+    <ProjectReference Include="../RecipeAgent/ChefAgent.Agents.Recipe.csproj" />
+    <ProjectReference Include="../DietAgent/ChefAgent.Agents.Diet.csproj" />
   </ItemGroup>
 </Project>

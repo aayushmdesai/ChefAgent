@@ -18,6 +18,7 @@ namespace ChefAgent.Api;
 using System.Text.Json.Serialization;
 using ChefAgent.Agents.Diet;
 using ChefAgent.Agents.Orchestrator;
+using ChefAgent.Agents.PlannerAgent;
 using ChefAgent.Agents.Recipe;
 using Qdrant.Client;
 
@@ -32,6 +33,7 @@ public static class ServiceRegistration
         services.AddRecipeAgent(config);
         services.AddDietAgent(config);
         services.AddOrchestrator(config);
+        services.AddMealPlannerAgent(config);
         services.AddApiServices();
         return services;
     }
@@ -132,6 +134,21 @@ public static class ServiceRegistration
                 sp.GetRequiredService<ILogger<DietValidationPlugin>>()
             );
         });
+
+        return services;
+    }
+
+    // ── Meal Planner Agent ──────────────────────────────────────────
+    private static IServiceCollection AddMealPlannerAgent(
+        this IServiceCollection services,
+        IConfiguration config
+    )
+    {
+        services.AddSingleton(sp => new MealPlannerPlugin(
+            sp.GetRequiredService<RecipeSearchPlugin>(),
+            sp.GetRequiredService<DietValidationPlugin>(),
+            sp.GetRequiredService<ILogger<MealPlannerPlugin>>()
+        ));
 
         return services;
     }

@@ -18,6 +18,7 @@ namespace ChefAgent.Api;
 
 using ChefAgent.Agents.Diet;
 using ChefAgent.Agents.Orchestrator;
+using ChefAgent.Agents.PlannerAgent;
 using ChefAgent.Agents.Recipe;
 using ChefAgent.Shared.Models;
 
@@ -29,6 +30,14 @@ public static class Endpoints
         app.MapServiceInfo();
         app.MapRecipeSearch();
         app.MapRecipeSearchValidated();
+        // app.MapPost(
+        //     "/debug/plan",
+        //     async (MealPlannerPlugin planner) =>
+        //     {
+        //         var plan = await planner.GeneratePlanAsync();
+        //         return Results.Ok(plan);
+        //     }
+        // );
         app.MapChat();
         return app;
     }

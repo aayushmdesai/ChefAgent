@@ -183,7 +183,7 @@ public class AgentOrchestrator
             ),
             DetectedIntent = UserIntent.SearchRecipe,
             Recipes = sorted,
-            
+
             Metadata = BuildMetadata(
                 classified,
                 dietaryApplied: true,

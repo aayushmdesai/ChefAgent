@@ -81,24 +81,39 @@ public record SubstitutionSuggestion
     public string? Reason { get; init; }
 }
 
-/// <summary>
-/// A meal plan for a given time period.
-/// </summary>
-public record MealPlan
+public record MealSlot
 {
-    public required string Id { get; init; }
-    public required List<DayPlan> Days { get; init; }
-    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
-    public string? Notes { get; init; }
+    public required string SlotName { get; init; } // "dinner", "lunch", "breakfast"
+    public required RecipeDocument Recipe { get; init; }
+    public DietaryValidation? DietaryValidation { get; init; }
+    public string? ProteinCategory { get; init; } // "poultry", "beef", "fish", "vegetarian"
+    public string? CuisineTag { get; init; } // "italian", "mexican", "asian", etc.
 }
 
 public record DayPlan
 {
-    public required DayOfWeek Day { get; init; }
-    public RecipeDocument? Breakfast { get; init; }
-    public RecipeDocument? Lunch { get; init; }
-    public RecipeDocument? Dinner { get; init; }
-    public List<string> Snacks { get; init; } = [];
+    public required string Day { get; init; } // "Monday", "Tuesday", etc.
+    public required List<MealSlot> Slots { get; init; }
+}
+
+public record MealPlan
+{
+    public required string PlanId { get; init; } // Guid.NewGuid().ToString()
+    public required List<DayPlan> Days { get; init; }
+    public PlanConstraints? Constraints { get; init; }
+    public DietaryProfile? Profile { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public string Status { get; init; } = "draft"; // "draft" | "finalized"
+}
+
+public record PlanConstraints
+{
+    public List<string> MealSlots { get; init; } = ["dinner"]; // which meals to plan
+    public int? MaxStepsWeeknight { get; init; } // e.g. 5 — fewer steps Mon–Thu
+    public int? MaxStepsWeekend { get; init; } // e.g. 12 — more complex Fri–Sun
+    public int HouseholdSize { get; init; } = 2;
+    public bool AvoidProteinRepeat { get; init; } = true;
+    public bool AvoidCuisineRepeat { get; init; } = true;
 }
 
 /// <summary>
