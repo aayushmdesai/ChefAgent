@@ -62,7 +62,7 @@ public static class ServiceRegistration
             "Ollama",
             client =>
             {
-                client.Timeout = TimeSpan.FromMinutes(5);
+                client.Timeout = TimeSpan.FromMinutes(2);
             }
         );
 

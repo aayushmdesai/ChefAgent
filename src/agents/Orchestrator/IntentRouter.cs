@@ -71,6 +71,10 @@ public class IntentRouter
         "plan my dinners",
         "plan my lunches",
         "plan my breakfasts",
+        "plan my breakfast and lunch",
+        "plan my lunch and dinner",
+        "plan my breakfast and dinner",
+        "plan my breakfast, lunch",
         "plan my meals for the week",
         "plan my meals",
         "meal plan",
@@ -92,6 +96,24 @@ public class IntentRouter
         "update my plan",
         "different recipe for",
     ];
+
+    private static List<string> ExtractMealSlots(string lower)
+    {
+        var slots = new List<string>();
+
+        if (lower.Contains("breakfast"))
+            slots.Add("breakfast");
+        if (lower.Contains("lunch") || lower.Contains("lunches"))
+            slots.Add("lunch");
+        if (lower.Contains("dinner") || lower.Contains("dinners"))
+            slots.Add("dinner");
+
+        // "meals", "meal plan", "plan my week" with no specific slot = all three
+        if (slots.Count == 0)
+            slots = ["breakfast", "lunch", "dinner"];
+
+        return slots;
+    }
 
     public IntentRouter(
         HttpClient httpClient, // reserved for Month 2 LLM classification
@@ -125,11 +147,14 @@ public class IntentRouter
         var mergedProfile = MergeProfiles(existingProfile, extractedProfile);
         var classifiedBy = intent == UserIntent.SearchRecipe ? "rules-default" : "rules";
 
-        // Extract day and constraint for ModifyMealPlan
+        // Extract day,slot and constraint for ModifyMealPlan
         string? targetDay = null;
+        string? targetSlot = null;
         string? modifyConstraint = null;
         if (intent == UserIntent.ModifyMealPlan)
         {
+            var slots = new[] { "breakfast", "lunch", "dinner" };
+            targetSlot = slots.FirstOrDefault(s => lower.Contains(s)) ?? "dinner";
             var days = new[]
             {
                 "monday",
@@ -155,7 +180,7 @@ public class IntentRouter
             classifiedBy,
             sw.ElapsedMilliseconds
         );
-
+        var mealSlots = intent == UserIntent.CreateMealPlan ? ExtractMealSlots(lower) : ["dinner"];
         return Task.FromResult(
             new ClassifiedIntent
             {
@@ -165,6 +190,8 @@ public class IntentRouter
                 MergedProfile = mergedProfile,
                 SessionId = sessionId,
                 TargetDay = targetDay,
+                TargetSlot = targetSlot ?? "dinner",
+                MealSlots = mealSlots,
                 ModifyConstraint = modifyConstraint,
                 DeferredIntents = [],
                 DeferredMessage = null,
@@ -356,13 +383,15 @@ public class IntentRouter
 public record ClassifiedIntent
 {
     public required UserIntent Intent { get; init; }
-    public required string SearchQuery { get; init; } // cleaned query for Recipe Agent
-    public DietaryProfile? ExtractedProfile { get; init; } // extracted from message only
-    public DietaryProfile? MergedProfile { get; init; } // extracted + existing combined
-    public string? SessionId { get; set; } // for deferred intents that need to access session data
-    public string? TargetDay { get; set; } // for modify meal plan intents
+    public required string SearchQuery { get; init; }
+    public DietaryProfile? ExtractedProfile { get; init; }
+    public DietaryProfile? MergedProfile { get; init; }
+    public string? SessionId { get; set; }
+    public string? TargetDay { get; set; }
+    public string TargetSlot { get; set; } = "dinner";
     public string? ModifyConstraint { get; set; }
+    public List<string> MealSlots { get; init; } = ["dinner"];
     public List<UserIntent> DeferredIntents { get; init; } = [];
     public string? DeferredMessage { get; init; }
-    public required string ClassifiedBy { get; init; } // "rules" | "rules-default"
+    public required string ClassifiedBy { get; init; }
 }

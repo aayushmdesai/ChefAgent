@@ -314,7 +314,7 @@ public class AgentOrchestrator
 
         try
         {
-            var constraints = new PlanConstraints();
+            var constraints = new PlanConstraints { MealSlots = classified.MealSlots };
             var plan = await _plannerAgent.GeneratePlanAsync(classified.MergedProfile, constraints);
             await _sessionStore.SavePlanAsync(sessionId, plan);
 
@@ -324,6 +324,11 @@ public class AgentOrchestrator
                 sessionId
             );
 
+            var slotsDesc =
+                classified.MealSlots.Count == 3
+                    ? "full day (breakfast, lunch, and dinner)"
+                    : string.Join(" and ", classified.MealSlots);
+
             var profileDesc = classified.MergedProfile is null
                 ? ""
                 : $" tailored to your {string.Join(", ", classified.MergedProfile.Restrictions.Concat(classified.MergedProfile.Allergies))} profile";
@@ -331,7 +336,7 @@ public class AgentOrchestrator
             return new OrchestratorResponse
             {
                 Message =
-                    $"Here's your 7-day dinner plan{profileDesc}. You can ask me to swap any day — just say \"swap Tuesday to something with pasta\".",
+                    $"Here's your 7-day {slotsDesc} plan{profileDesc}. You can ask me to swap any day — just say \"swap Tuesday dinner to something with pasta\".",
                 DetectedIntent = UserIntent.CreateMealPlan,
                 Recipes = [],
                 MealPlan = plan,
@@ -381,7 +386,7 @@ public class AgentOrchestrator
             var (plan, message) = await _plannerAgent.ModifyPlanAsync(
                 sessionId,
                 targetDay,
-                "dinner",
+                classified.TargetSlot,
                 classified.ModifyConstraint
             );
 

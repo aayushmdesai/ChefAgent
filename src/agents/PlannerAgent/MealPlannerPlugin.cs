@@ -60,7 +60,6 @@ public class MealPlannerPlugin
         ["snack"] = ["healthy snack", "quick snack ideas", "fruit and nut snack"],
     };
 
-    // Protein keyword map for variety enforcement (Day 4)
     private static readonly Dictionary<string, string[]> ProteinKeywords = new()
     {
         ["poultry"] = ["chicken", "turkey", "duck", "hen"],
@@ -120,14 +119,13 @@ public class MealPlannerPlugin
         ["punjabi"] = ["butter chicken", "sarson da saag", "makki di roti", "lassi"],
     };
 
-    // Known ingredient phrases that match cuisine keywords but aren't cuisine indicators
     private static readonly HashSet<string> CuisineFalsePositives =
     [
-        "pasta ready", // "Contadina pasta ready" — canned sauce, not Italian dish
-        "pasta sauce", // same
-        "italian dressing", // salad dressing, not Italian cuisine
-        "italian mix", // seasoning packet
-        "soy sauce", // appears in American/fusion recipes, not just Asian
+        "pasta ready",
+        "pasta sauce",
+        "italian dressing",
+        "italian mix",
+        "soy sauce",
     ];
 
     public MealPlannerPlugin(
@@ -207,7 +205,6 @@ public class MealPlannerPlugin
         if (dayIndex == -1)
             throw new ArgumentException($"Unknown day '{targetDay}'. Use Monday–Sunday.");
 
-        // Build search query from constraint
         var query = BuildModifyQuery(targetDay, targetSlot, constraint);
         var isWeeknight = IsWeeknight(targetDay);
         var maxSteps =
@@ -227,14 +224,25 @@ public class MealPlannerPlugin
             constraint ?? "none"
         );
 
+        // Get current recipe title to avoid returning the same recipe
+        var currentTitle = plan
+            .Days.FirstOrDefault(d => d.Day == targetDay)
+            ?.Slots.FirstOrDefault(s => s.SlotName == targetSlot)
+            ?.Recipe.Title;
+
         var candidates = await _recipeSearch.SearchRecipesAsync(
             query,
             maxResults: 5,
             maxSteps: maxSteps
         );
 
-        // Pass the full plan so variety selection can check all neighbors, not just plannedSoFar
-        var newRecipe = SelectWithVarietyForModify(candidates, plan, targetDay, targetSlot);
+        var newRecipe = SelectWithVarietyForModify(
+            candidates,
+            plan,
+            targetDay,
+            targetSlot,
+            currentTitle
+        );
 
         DietaryValidation? validation = null;
         if (plan.Profile is not null)
@@ -270,7 +278,7 @@ public class MealPlannerPlugin
         return (updatedPlan, message);
     }
 
-    // --- Private helpers ---
+    // ── Private helpers ────────────────────────────────────────────────────────
 
     private async Task<MealSlot> GenerateSlotAsync(
         string day,
@@ -283,17 +291,14 @@ public class MealPlannerPlugin
     {
         var dayIndex = Array.IndexOf(Days, day);
         var queries = SlotQueries.GetValueOrDefault(slotName, SlotQueries["dinner"]);
-        var query = queries[dayIndex % queries.Length]; // rotate queries by day
-
+        var query = queries[dayIndex % queries.Length];
         var maxSteps = isWeeknight ? constraints.MaxStepsWeeknight : constraints.MaxStepsWeekend;
 
-        // Fetch a few extra candidates so variety selection has room to pick
         var candidates = await _recipeSearch.SearchRecipesAsync(
             query,
             maxResults: 5,
             maxSteps: maxSteps
         );
-
         var recipe = SelectWithVariety(candidates, plannedSoFar, constraints);
 
         DietaryValidation? validation = null;
@@ -325,7 +330,6 @@ public class MealPlannerPlugin
         PlanConstraints constraints
     )
     {
-        // Collect protein/cuisine used in the last 2 days
         var recentProteins = plannedSoFar
             .TakeLast(2)
             .SelectMany(d => d.Slots)
@@ -344,16 +348,13 @@ public class MealPlannerPlugin
         {
             var protein = InferProteinCategory(candidate);
             var cuisine = InferCuisineTag(candidate);
-
             if (constraints.AvoidProteinRepeat && recentProteins.Contains(protein))
                 continue;
             if (constraints.AvoidCuisineRepeat && recentCuisines.Contains(cuisine))
                 continue;
-
             return candidate;
         }
 
-        // Fallback — no variety winner, take best match
         _logger.LogDebug("Variety fallback — returning top candidate");
         return candidates[0];
     }
@@ -361,11 +362,13 @@ public class MealPlannerPlugin
     private static string BuildModifyQuery(string day, string slot, string? constraint)
     {
         if (string.IsNullOrWhiteSpace(constraint))
-            return SlotQueries.GetValueOrDefault(slot, SlotQueries["dinner"])[0];
+        {
+            var queries = SlotQueries.GetValueOrDefault(slot, SlotQueries["dinner"]);
+            var dayIndex = Array.IndexOf(Days, day);
+            // Offset by 3 to get a meaningfully different query than the original
+            return queries[(dayIndex + 3) % queries.Length];
+        }
 
-        // "something with pasta" → "pasta dinner"
-        // "something simpler"   → "simple quick dinner"
-        // "something Italian"   → "italian dinner"
         var cleaned = constraint
             .Replace("something with", "", StringComparison.OrdinalIgnoreCase)
             .Replace("something", "", StringComparison.OrdinalIgnoreCase)
@@ -379,10 +382,10 @@ public class MealPlannerPlugin
         List<RecipeDocument> candidates,
         MealPlan plan,
         string targetDay,
-        string targetSlot
+        string targetSlot,
+        string? excludeTitle = null
     )
     {
-        // For modify: check both previous AND next day (not just lookback)
         var neighborDays = plan
             .Days.Where(d => d.Day != targetDay)
             .OrderBy(d => Math.Abs(Array.IndexOf(Days, d.Day) - Array.IndexOf(Days, targetDay)))
@@ -402,19 +405,29 @@ public class MealPlannerPlugin
 
         foreach (var candidate in candidates)
         {
+            // Always skip the current recipe
+            if (
+                excludeTitle is not null
+                && candidate.Title.Equals(excludeTitle, StringComparison.OrdinalIgnoreCase)
+            )
+                continue;
+
             var protein = InferProteinCategory(candidate);
             var cuisine = InferCuisineTag(candidate);
-
             if (neighborProteins.Contains(protein))
                 continue;
             if (neighborCuisines.Contains(cuisine))
                 continue;
-
             return candidate;
         }
 
-        _logger.LogDebug("Modify variety fallback — returning top candidate");
-        return candidates[0];
+        // Fallback — at least return something different from current
+        var different = candidates.FirstOrDefault(c =>
+            !c.Title.Equals(excludeTitle, StringComparison.OrdinalIgnoreCase)
+        );
+
+        _logger.LogDebug("Modify variety fallback — returning first different candidate");
+        return different ?? candidates[0];
     }
 
     private static string BuildModifyMessage(
@@ -446,6 +459,7 @@ public class MealPlannerPlugin
         var falsePositive = CuisineFalsePositives.FirstOrDefault(fp => ingredients.Contains(fp));
         if (falsePositive is not null)
             return null;
+
         var text = $"{title} {ingredients}";
         foreach (var (tag, keywords) in CuisineKeywords)
             if (keywords.Any(k => text.Contains(k)))

@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import RecipeCard from "./RecipeCard";
+import MealPlanView from "./MealPlanView";
 
-export default function ChatMessages({ messages, loading }) {
+export default function ChatMessages({ messages, loading, onSwapDay }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -13,9 +14,7 @@ export default function ChatMessages({ messages, loading }) {
       {messages.map((msg) => (
         <div key={msg.id}>
           {/* Message bubble */}
-          <div
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
+          <div className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 msg.role === "user"
@@ -45,6 +44,13 @@ export default function ChatMessages({ messages, loading }) {
               )}
             </div>
           </div>
+
+          {/* Meal plan view */}
+          {msg.mealPlan && (
+            <div className="mt-2 max-w-2xl">
+              <MealPlanView plan={msg.mealPlan} onSwapDay={onSwapDay} />
+            </div>
+          )}
 
           {/* Recipe cards */}
           {msg.recipes && msg.recipes.length > 0 && (
