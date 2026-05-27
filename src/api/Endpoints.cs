@@ -32,6 +32,71 @@ public static class Endpoints
         app.MapRecipeSearch();
         app.MapRecipeSearchValidated();
         app.MapChat();
+
+        app.MapPost(
+            "/debug/plan-persist/{sessionId}",
+            async (string sessionId, MealPlannerPlugin planner, SessionStore store) =>
+            {
+                var plan = await planner.GeneratePlanAsync();
+                await store.SavePlanAsync(sessionId, plan);
+                return Results.Ok(
+                    new
+                    {
+                        sessionId,
+                        planId = plan.PlanId,
+                        days = plan.Days.Count,
+                    }
+                );
+            }
+        );
+        app.MapGet(
+            "/debug/plan-persist/{sessionId}",
+            async (string sessionId, SessionStore store) =>
+            {
+                var plan = await store.GetPlanAsync(sessionId);
+                if (plan is null)
+                    return Results.NotFound(new { message = "No plan found" });
+                return Results.Ok(plan); // return full plan, not summary
+            }
+        );
+
+        app.MapPost(
+            "/debug/plan-modify/{sessionId}/{day}",
+            async (string sessionId, string day, MealPlannerPlugin planner, HttpRequest request) =>
+            {
+                var constraint = request.Query.ContainsKey("constraint")
+                    ? request.Query["constraint"].ToString()
+                    : null;
+                try
+                {
+                    var (plan, message) = await planner.ModifyPlanAsync(
+                        sessionId,
+                        day,
+                        "dinner",
+                        constraint
+                    );
+                    var updatedDay = plan.Days.First(d => d.Day == day);
+                    return Results.Ok(
+                        new
+                        {
+                            message,
+                            day = updatedDay.Day,
+                            recipe = updatedDay.Slots[0].Recipe.Title,
+                            protein = updatedDay.Slots[0].ProteinCategory,
+                            cuisine = updatedDay.Slots[0].CuisineTag,
+                        }
+                    );
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.NotFound(new { error = ex.Message });
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { error = ex.Message });
+                }
+            }
+        );
         return app;
     }
 
