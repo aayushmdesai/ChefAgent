@@ -2,6 +2,7 @@ namespace ChefAgent.Agents.PlannerAgent;
 
 using ChefAgent.Agents.Diet;
 using ChefAgent.Agents.Recipe;
+using ChefAgent.Shared;
 using ChefAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -11,6 +12,7 @@ public class MealPlannerPlugin
     private readonly RecipeSearchPlugin _recipeSearch;
     private readonly DietValidationPlugin _dietValidation;
     private readonly ILogger<MealPlannerPlugin> _logger;
+    private readonly SessionStore _sessionStore;
 
     private static readonly string[] Days =
     [
@@ -70,21 +72,75 @@ public class MealPlannerPlugin
 
     private static readonly Dictionary<string, string[]> CuisineKeywords = new()
     {
-        ["italian"] = ["pasta", "pizza", "risotto", "lasagna", "parmesan", "marinara"],
-        ["mexican"] = ["taco", "burrito", "enchilada", "salsa", "tortilla", "guacamole"],
-        ["asian"] = ["stir fry", "fried rice", "soy sauce", "teriyaki", "noodle", "ramen", "curry"],
-        ["american"] = ["burger", "bbq", "casserole", "meatloaf", "mac and cheese"],
+        ["italian"] =
+        [
+            "pasta",
+            "pizza",
+            "risotto",
+            "lasagna",
+            "parmesan",
+            "marinara",
+            "fettuccine",
+            "linguine",
+        ],
+        ["mexican"] =
+        [
+            "taco",
+            "burrito",
+            "enchilada",
+            "salsa",
+            "tortilla",
+            "guacamole",
+            "quesadilla",
+            "tamale",
+        ],
+        ["asian"] =
+        [
+            "stir fry",
+            "fried rice",
+            "teriyaki",
+            "noodle",
+            "ramen",
+            "curry",
+            "dumpling",
+            "wok",
+        ],
+        ["american"] =
+        [
+            "burger",
+            "bbq",
+            "casserole",
+            "meatloaf",
+            "mac and cheese",
+            "pot pie",
+            "chowder",
+        ],
+        ["indian"] = ["masala", "tikka", "biryani", "dal", "paneer", "naan", "chutney", "samosa"],
+        ["gujarati"] = ["dhokla", "thepla", "undhiyu", "kadhi", "fafda"],
+        ["punjabi"] = ["butter chicken", "sarson da saag", "makki di roti", "lassi"],
     };
+
+    // Known ingredient phrases that match cuisine keywords but aren't cuisine indicators
+    private static readonly HashSet<string> CuisineFalsePositives =
+    [
+        "pasta ready", // "Contadina pasta ready" — canned sauce, not Italian dish
+        "pasta sauce", // same
+        "italian dressing", // salad dressing, not Italian cuisine
+        "italian mix", // seasoning packet
+        "soy sauce", // appears in American/fusion recipes, not just Asian
+    ];
 
     public MealPlannerPlugin(
         RecipeSearchPlugin recipeSearch,
         DietValidationPlugin dietValidation,
-        ILogger<MealPlannerPlugin> logger
+        ILogger<MealPlannerPlugin> logger,
+        SessionStore sessionStore
     )
     {
         _recipeSearch = recipeSearch;
         _dietValidation = dietValidation;
         _logger = logger;
+        _sessionStore = sessionStore;
     }
 
     [KernelFunction("generate_meal_plan")]
@@ -132,6 +188,86 @@ public class MealPlannerPlugin
             Constraints = constraints,
             Profile = profile,
         };
+    }
+
+    public async Task<(MealPlan Plan, string Message)> ModifyPlanAsync(
+        string sessionId,
+        string targetDay,
+        string targetSlot = "dinner",
+        string? constraint = null
+    )
+    {
+        var plan =
+            await _sessionStore.GetPlanAsync(sessionId)
+            ?? throw new InvalidOperationException(
+                $"No plan found for session '{sessionId}'. Generate a plan first."
+            );
+
+        var dayIndex = Array.IndexOf(Days, targetDay);
+        if (dayIndex == -1)
+            throw new ArgumentException($"Unknown day '{targetDay}'. Use Monday–Sunday.");
+
+        // Build search query from constraint
+        var query = BuildModifyQuery(targetDay, targetSlot, constraint);
+        var isWeeknight = IsWeeknight(targetDay);
+        var maxSteps =
+            constraint?.Contains("simpler", StringComparison.OrdinalIgnoreCase) == true
+                ? 5
+                : (
+                    isWeeknight
+                        ? plan.Constraints?.MaxStepsWeeknight
+                        : plan.Constraints?.MaxStepsWeekend
+                );
+
+        _logger.LogInformation(
+            "Modifying {Day} {Slot} — query: '{Query}', constraint: '{Constraint}'",
+            targetDay,
+            targetSlot,
+            query,
+            constraint ?? "none"
+        );
+
+        var candidates = await _recipeSearch.SearchRecipesAsync(
+            query,
+            maxResults: 5,
+            maxSteps: maxSteps
+        );
+
+        // Pass the full plan so variety selection can check all neighbors, not just plannedSoFar
+        var newRecipe = SelectWithVarietyForModify(candidates, plan, targetDay, targetSlot);
+
+        DietaryValidation? validation = null;
+        if (plan.Profile is not null)
+            validation = await _dietValidation.ValidateRecipeAsync(newRecipe, plan.Profile);
+
+        var newSlot = new MealSlot
+        {
+            SlotName = targetSlot,
+            Recipe = newRecipe,
+            DietaryValidation = validation,
+            ProteinCategory = InferProteinCategory(newRecipe),
+            CuisineTag = InferCuisineTag(newRecipe),
+        };
+
+        // Immutable update — map over days and slots
+        var updatedDays = plan
+            .Days.Select(d =>
+                d.Day != targetDay
+                    ? d
+                    : d with
+                    {
+                        Slots = d
+                            .Slots.Select(s => s.SlotName != targetSlot ? s : newSlot)
+                            .ToList(),
+                    }
+            )
+            .ToList();
+
+        var updatedPlan = plan with { Days = updatedDays };
+        await _sessionStore.SavePlanAsync(sessionId, updatedPlan);
+
+        var message = BuildModifyMessage(targetDay, targetSlot, newRecipe.Title, constraint);
+        return (updatedPlan, message);
     }
 
     // --- Private helpers ---
@@ -222,6 +358,76 @@ public class MealPlannerPlugin
         return candidates[0];
     }
 
+    private static string BuildModifyQuery(string day, string slot, string? constraint)
+    {
+        if (string.IsNullOrWhiteSpace(constraint))
+            return SlotQueries.GetValueOrDefault(slot, SlotQueries["dinner"])[0];
+
+        // "something with pasta" → "pasta dinner"
+        // "something simpler"   → "simple quick dinner"
+        // "something Italian"   → "italian dinner"
+        var cleaned = constraint
+            .Replace("something with", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("something", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("simpler", "simple quick", StringComparison.OrdinalIgnoreCase)
+            .Trim();
+
+        return $"{cleaned} {slot}".Trim();
+    }
+
+    private RecipeDocument SelectWithVarietyForModify(
+        List<RecipeDocument> candidates,
+        MealPlan plan,
+        string targetDay,
+        string targetSlot
+    )
+    {
+        // For modify: check both previous AND next day (not just lookback)
+        var neighborDays = plan
+            .Days.Where(d => d.Day != targetDay)
+            .OrderBy(d => Math.Abs(Array.IndexOf(Days, d.Day) - Array.IndexOf(Days, targetDay)))
+            .Take(2);
+
+        var neighborProteins = neighborDays
+            .SelectMany(d => d.Slots)
+            .Select(s => s.ProteinCategory)
+            .Where(p => p is not null)
+            .ToHashSet();
+
+        var neighborCuisines = neighborDays
+            .SelectMany(d => d.Slots)
+            .Select(s => s.CuisineTag)
+            .Where(c => c is not null)
+            .ToHashSet();
+
+        foreach (var candidate in candidates)
+        {
+            var protein = InferProteinCategory(candidate);
+            var cuisine = InferCuisineTag(candidate);
+
+            if (neighborProteins.Contains(protein))
+                continue;
+            if (neighborCuisines.Contains(cuisine))
+                continue;
+
+            return candidate;
+        }
+
+        _logger.LogDebug("Modify variety fallback — returning top candidate");
+        return candidates[0];
+    }
+
+    private static string BuildModifyMessage(
+        string day,
+        string slot,
+        string recipeTitle,
+        string? constraint
+    )
+    {
+        var constraintNote = string.IsNullOrWhiteSpace(constraint) ? "" : $" ({constraint})";
+        return $"Swapped {day}'s {slot} to {recipeTitle}{constraintNote}.";
+    }
+
     private static string? InferProteinCategory(RecipeDocument recipe)
     {
         var text =
@@ -234,8 +440,13 @@ public class MealPlannerPlugin
 
     private static string? InferCuisineTag(RecipeDocument recipe)
     {
-        var text =
-            $"{recipe.Title} {string.Join(" ", recipe.Ingredients ?? [])}".ToLowerInvariant();
+        var ingredients = string.Join(" ", recipe.Ingredients ?? []).ToLowerInvariant();
+        var title = recipe.Title.ToLowerInvariant();
+
+        var falsePositive = CuisineFalsePositives.FirstOrDefault(fp => ingredients.Contains(fp));
+        if (falsePositive is not null)
+            return null;
+        var text = $"{title} {ingredients}";
         foreach (var (tag, keywords) in CuisineKeywords)
             if (keywords.Any(k => text.Contains(k)))
                 return tag;

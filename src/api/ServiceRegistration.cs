@@ -20,7 +20,9 @@ using ChefAgent.Agents.Diet;
 using ChefAgent.Agents.Orchestrator;
 using ChefAgent.Agents.PlannerAgent;
 using ChefAgent.Agents.Recipe;
+using ChefAgent.Shared;
 using Qdrant.Client;
+using StackExchange.Redis;
 
 public static class ServiceRegistration
 {
@@ -29,6 +31,7 @@ public static class ServiceRegistration
         IConfiguration config
     )
     {
+        services.AddRedis(config);
         services.AddInfrastructure(config);
         services.AddRecipeAgent(config);
         services.AddDietAgent(config);
@@ -68,6 +71,20 @@ public static class ServiceRegistration
             options.SerializerOptions.Converters.Add(new JsonStringEnumConverter())
         );
 
+        return services;
+    }
+
+    // ── Redis ────────────────────────────────────────
+    private static IServiceCollection AddRedis(
+        this IServiceCollection services,
+        IConfiguration config
+    )
+    {
+        var connectionString = config["Redis:ConnectionString"] ?? "localhost:6379";
+        services.AddSingleton<IConnectionMultiplexer>(
+            ConnectionMultiplexer.Connect(connectionString)
+        );
+        services.AddSingleton<SessionStore>();
         return services;
     }
 
@@ -147,7 +164,8 @@ public static class ServiceRegistration
         services.AddSingleton(sp => new MealPlannerPlugin(
             sp.GetRequiredService<RecipeSearchPlugin>(),
             sp.GetRequiredService<DietValidationPlugin>(),
-            sp.GetRequiredService<ILogger<MealPlannerPlugin>>()
+            sp.GetRequiredService<ILogger<MealPlannerPlugin>>(),
+            sp.GetRequiredService<SessionStore>()
         ));
 
         return services;
