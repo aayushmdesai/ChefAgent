@@ -203,6 +203,8 @@ public static class ServiceRegistration
             return new AgentOrchestrator(
                 sp.GetRequiredService<RecipeSearchPlugin>(),
                 sp.GetRequiredService<DietValidationPlugin>(),
+                sp.GetRequiredService<MealPlannerPlugin>(),
+                sp.GetRequiredService<SessionStore>(),
                 httpClient,
                 ollamaUrl,
                 chatModel,

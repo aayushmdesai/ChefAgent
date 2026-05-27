@@ -67,6 +67,10 @@ public class IntentRouter
     private static readonly HashSet<string> MealPlanSignals =
     [
         "plan my week",
+        "plan my dinners for the week",
+        "plan my dinners",
+        "plan my lunches",
+        "plan my breakfasts",
         "plan my meals for the week",
         "plan my meals",
         "meal plan",
@@ -109,8 +113,9 @@ public class IntentRouter
     /// </summary>
     public Task<ClassifiedIntent> ClassifyAsync(
         string message,
-        DietaryProfile? existingProfile = null
-    )
+        DietaryProfile? existingProfile = null,
+        string? sessionId = null
+    ) // ← add
     {
         var lower = message.ToLowerInvariant().Trim();
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -119,6 +124,28 @@ public class IntentRouter
         var extractedProfile = ExtractProfile(lower);
         var mergedProfile = MergeProfiles(existingProfile, extractedProfile);
         var classifiedBy = intent == UserIntent.SearchRecipe ? "rules-default" : "rules";
+
+        // Extract day and constraint for ModifyMealPlan
+        string? targetDay = null;
+        string? modifyConstraint = null;
+        if (intent == UserIntent.ModifyMealPlan)
+        {
+            var days = new[]
+            {
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday",
+            };
+            var matched = days.FirstOrDefault(d => lower.Contains(d));
+            targetDay = matched is not null
+                ? char.ToUpper(matched[0]) + matched[1..] // "tuesday" → "Tuesday"
+                : null;
+            modifyConstraint = ExtractModifyConstraint(lower);
+        }
 
         sw.Stop();
         _logger.LogInformation(
@@ -136,6 +163,9 @@ public class IntentRouter
                 SearchQuery = ExtractSearchQuery(lower, intent),
                 ExtractedProfile = extractedProfile,
                 MergedProfile = mergedProfile,
+                SessionId = sessionId,
+                TargetDay = targetDay,
+                ModifyConstraint = modifyConstraint,
                 DeferredIntents = [],
                 DeferredMessage = null,
                 ClassifiedBy = classifiedBy,
@@ -247,6 +277,12 @@ public class IntentRouter
             .Replace(" recipe", " ")
             .Replace(" ideas", " ")
             .Replace(" tonight", " ")
+            .Replace(" dinners", " ")
+            .Replace(" dinner", " ")
+            .Replace(" lunches", " ")
+            .Replace(" lunch", " ")
+            .Replace(" breakfasts", " ")
+            .Replace(" breakfast", " ")
             .Trim();
 
         // Fall back to original if cleaning removed everything
@@ -254,6 +290,38 @@ public class IntentRouter
     }
 
     // ── Profile Merging ───────────────────────────────────────────────────────
+
+    private static string? ExtractModifyConstraint(string lower)
+    {
+        // "swap tuesday to something with pasta" → "pasta"
+        // "change wednesday to italian"         → "italian"
+        // "swap friday to something simpler"    → "simpler"
+        var patterns = new[] { "to something with ", "to something ", "to ", "with " };
+        foreach (var pattern in patterns)
+        {
+            var idx = lower.IndexOf(pattern, StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0)
+            {
+                var after = lower[(idx + pattern.Length)..].Trim();
+                // Strip day names that leaked into the constraint
+                var days = new[]
+                {
+                    "monday",
+                    "tuesday",
+                    "wednesday",
+                    "thursday",
+                    "friday",
+                    "saturday",
+                    "sunday",
+                };
+                foreach (var d in days)
+                    after = after.Replace(d, "").Trim();
+                if (!string.IsNullOrWhiteSpace(after))
+                    return after;
+            }
+        }
+        return null;
+    }
 
     private static DietaryProfile? MergeProfiles(
         DietaryProfile? existing,
@@ -291,6 +359,9 @@ public record ClassifiedIntent
     public required string SearchQuery { get; init; } // cleaned query for Recipe Agent
     public DietaryProfile? ExtractedProfile { get; init; } // extracted from message only
     public DietaryProfile? MergedProfile { get; init; } // extracted + existing combined
+    public string? SessionId { get; set; } // for deferred intents that need to access session data
+    public string? TargetDay { get; set; } // for modify meal plan intents
+    public string? ModifyConstraint { get; set; }
     public List<UserIntent> DeferredIntents { get; init; } = [];
     public string? DeferredMessage { get; init; }
     public required string ClassifiedBy { get; init; } // "rules" | "rules-default"

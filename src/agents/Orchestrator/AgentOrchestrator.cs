@@ -3,7 +3,9 @@ namespace ChefAgent.Agents.Orchestrator;
 using System.Text;
 using System.Text.Json;
 using ChefAgent.Agents.Diet;
+using ChefAgent.Agents.PlannerAgent;
 using ChefAgent.Agents.Recipe;
+using ChefAgent.Shared;
 using ChefAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 
@@ -31,6 +33,8 @@ public class AgentOrchestrator
 {
     private readonly RecipeSearchPlugin _recipeAgent;
     private readonly DietValidationPlugin _dietAgent;
+    private readonly MealPlannerPlugin _plannerAgent;
+    private readonly SessionStore _sessionStore;
     private readonly HttpClient _httpClient;
     private readonly string _ollamaUrl;
     private readonly string _chatModel;
@@ -39,6 +43,8 @@ public class AgentOrchestrator
     public AgentOrchestrator(
         RecipeSearchPlugin recipeAgent,
         DietValidationPlugin dietAgent,
+        MealPlannerPlugin plannerAgent,
+        SessionStore sessionStore,
         HttpClient httpClient,
         string ollamaUrl,
         string chatModel,
@@ -48,6 +54,8 @@ public class AgentOrchestrator
         _recipeAgent = recipeAgent;
         _dietAgent = dietAgent;
         _httpClient = httpClient;
+        _sessionStore = sessionStore;
+        _plannerAgent = plannerAgent;
         _ollamaUrl = ollamaUrl;
         _chatModel = chatModel;
         _logger = logger;
@@ -75,8 +83,8 @@ public class AgentOrchestrator
         {
             UserIntent.SearchRecipe => await HandleSearchRecipeAsync(classified),
             UserIntent.ValidateDiet => await HandleValidateDietAsync(classified),
-            UserIntent.CreateMealPlan => HandlePlaceholder("Meal planning", classified),
-            UserIntent.ModifyMealPlan => HandlePlaceholder("Meal plan modification", classified),
+            UserIntent.CreateMealPlan => await HandleCreateMealPlanAsync(classified),
+            UserIntent.ModifyMealPlan => await HandleModifyMealPlanAsync(classified),
             UserIntent.GeneralQuestion => await HandleGeneralQuestionAsync(classified),
             _ => HandleUnknown(classified),
         };
@@ -289,6 +297,124 @@ public class AgentOrchestrator
             DietaryCheck = validation,
             Metadata = BuildMetadata(classified, dietaryApplied: true),
         };
+    }
+
+    private async Task<OrchestratorResponse> HandleCreateMealPlanAsync(ClassifiedIntent classified)
+    {
+        var sessionId = classified.SessionId;
+        if (string.IsNullOrEmpty(sessionId))
+            return new OrchestratorResponse
+            {
+                Message =
+                    "I need a session ID to save your meal plan. Please include one in your request.",
+                DetectedIntent = UserIntent.CreateMealPlan,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+
+        try
+        {
+            var constraints = new PlanConstraints();
+            var plan = await _plannerAgent.GeneratePlanAsync(classified.MergedProfile, constraints);
+            await _sessionStore.SavePlanAsync(sessionId, plan);
+
+            _logger.LogInformation(
+                "[Orchestrator] Meal plan {PlanId} generated for session {SessionId}",
+                plan.PlanId,
+                sessionId
+            );
+
+            var profileDesc = classified.MergedProfile is null
+                ? ""
+                : $" tailored to your {string.Join(", ", classified.MergedProfile.Restrictions.Concat(classified.MergedProfile.Allergies))} profile";
+
+            return new OrchestratorResponse
+            {
+                Message =
+                    $"Here's your 7-day dinner plan{profileDesc}. You can ask me to swap any day — just say \"swap Tuesday to something with pasta\".",
+                DetectedIntent = UserIntent.CreateMealPlan,
+                Recipes = [],
+                MealPlan = plan,
+                Metadata = BuildMetadata(
+                    classified,
+                    dietaryApplied: classified.MergedProfile is not null
+                ),
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Planner Agent failed for session {SessionId}", sessionId);
+            return ErrorResponse(
+                classified,
+                "Sorry — I couldn't generate your meal plan right now. Please try again."
+            );
+        }
+    }
+
+    private async Task<OrchestratorResponse> HandleModifyMealPlanAsync(ClassifiedIntent classified)
+    {
+        var sessionId = classified.SessionId;
+        if (string.IsNullOrEmpty(sessionId))
+            return new OrchestratorResponse
+            {
+                Message =
+                    "I need a session ID to find your existing plan. Please include one in your request.",
+                DetectedIntent = UserIntent.ModifyMealPlan,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+
+        // Extract target day from the classified intent — fall back to asking
+        var targetDay = classified.TargetDay;
+        if (string.IsNullOrEmpty(targetDay))
+            return new OrchestratorResponse
+            {
+                Message =
+                    "Which day would you like to swap? Say something like \"swap Tuesday\" or \"change Wednesday to pasta\".",
+                DetectedIntent = UserIntent.ModifyMealPlan,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+
+        try
+        {
+            var (plan, message) = await _plannerAgent.ModifyPlanAsync(
+                sessionId,
+                targetDay,
+                "dinner",
+                classified.ModifyConstraint
+            );
+
+            return new OrchestratorResponse
+            {
+                Message = message,
+                DetectedIntent = UserIntent.ModifyMealPlan,
+                Recipes = [],
+                MealPlan = plan,
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new OrchestratorResponse
+            {
+                Message =
+                    "I couldn't find your meal plan. Try generating one first by saying \"plan my dinners for the week\".",
+                DetectedIntent = UserIntent.ModifyMealPlan,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+        }
+        catch (ArgumentException ex)
+        {
+            return new OrchestratorResponse
+            {
+                Message = ex.Message,
+                DetectedIntent = UserIntent.ModifyMealPlan,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+        }
     }
 
     private async Task<OrchestratorResponse> HandleGeneralQuestionAsync(ClassifiedIntent classified)
