@@ -263,7 +263,7 @@ public class AgentOrchestrator
               || classified.Intent == UserIntent.SearchRecipe)
             ? UserIntent.ValidateDiet
             : classified.Intent,
-                    };
+                };
             }
         }
 

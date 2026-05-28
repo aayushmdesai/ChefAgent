@@ -185,31 +185,34 @@ public static class Endpoints
     }
     
     // ── Chat (Orchestrator — natural language) ────────────────
-
-    private static void MapChat(this WebApplication app)
+private static void MapChat(this WebApplication app)
+{
+    app.MapPost("/chat", async (
+        ChatRequest request,
+        IntentRouter intentRouter,
+        AgentOrchestrator orchestrator,
+        SessionStore sessionStore) =>
     {
-        app.MapPost(
-            "/chat",
-            async (
-                ChatRequest request,
-                IntentRouter intentRouter,
-                AgentOrchestrator orchestrator
-            ) =>
+        // Load history for LLM entity extraction context
+        List<ConversationEntry>? history = null;
+        if (!string.IsNullOrEmpty(request.SessionId))
+        {
+            try
             {
-                // Step 1: Classify intent + extract entities
-                // Rules-only for MVP (UseLlmClassification=false default)
-                // Month 2: pass UseLlmClassification=true for LLM-powered classification
-                var classified = await intentRouter.ClassifyAsync(
-                    request.Message,
-                    request.DietaryProfile,
-                    request.SessionId
-                );
-
-                // Step 2: Route to right agent(s) and build response
-                var response = await orchestrator.RouteAsync(classified);
-
-                return Results.Ok(response);
+                history = await sessionStore.GetHistoryAsync(
+                    request.SessionId, limit: 6);
             }
-        );
-    }
+            catch { /* non-critical — proceed without history */ }
+        }
+
+        var classified = await intentRouter.ClassifyAsync(
+            request.Message,
+            request.DietaryProfile,
+            request.SessionId,
+            history);           // ← pass history
+
+        var response = await orchestrator.RouteAsync(classified);
+        return Results.Ok(response);
+    });
 }
+    }
