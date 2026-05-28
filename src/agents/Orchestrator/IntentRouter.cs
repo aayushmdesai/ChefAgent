@@ -186,6 +186,7 @@ public class IntentRouter
             {
                 Intent = intent,
                 SearchQuery = ExtractSearchQuery(lower, intent),
+                OriginalMessage = message,
                 ExtractedProfile = extractedProfile,
                 MergedProfile = mergedProfile,
                 SessionId = sessionId,
@@ -301,6 +302,7 @@ public class IntentRouter
             .Replace(" dinner", " ")
             .Replace(" lunch", " ")
             .Replace(" breakfast", " ")
+            .Replace(" recipes", " ") 
             .Replace(" recipe", " ")
             .Replace(" ideas", " ")
             .Replace(" tonight", " ")
@@ -384,6 +386,7 @@ public record ClassifiedIntent
 {
     public required UserIntent Intent { get; init; }
     public required string SearchQuery { get; init; }
+    public string OriginalMessage { get; init; } = string.Empty;
     public DietaryProfile? ExtractedProfile { get; init; }
     public DietaryProfile? MergedProfile { get; init; }
     public string? SessionId { get; set; }

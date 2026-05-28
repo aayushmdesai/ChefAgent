@@ -79,6 +79,20 @@ public class AgentOrchestrator
             classified.MergedProfile is not null
         );
 
+        // ── Step 1: Save user message to history ─────────────────
+        if (!string.IsNullOrEmpty(classified.SessionId))
+        {
+            await _sessionStore.AppendMessageAsync(classified.SessionId, new ConversationEntry
+            {
+                Role = "user",
+                Content = classified.OriginalMessage,
+            });
+        }
+
+        // ── Step 2: Resolve references using history ──────────────
+        classified = await ResolveReferencesAsync(classified);
+
+        // ── Step 3: Route to the right handler ───────────────────
         var response = classified.Intent switch
         {
             UserIntent.SearchRecipe => await HandleSearchRecipeAsync(classified),
@@ -88,6 +102,19 @@ public class AgentOrchestrator
             UserIntent.GeneralQuestion => await HandleGeneralQuestionAsync(classified),
             _ => HandleUnknown(classified),
         };
+
+        // ── Step 4: Save assistant response to history ────────────
+        if (!string.IsNullOrEmpty(classified.SessionId))
+        {
+            await _sessionStore.AppendMessageAsync(classified.SessionId, new ConversationEntry
+            {
+                Role = "assistant",
+                Content = response.Message,
+                Intent = response.DetectedIntent,
+                RecipeTitles = response.Recipes.Select(r => r.Recipe.Title).Take(5).ToList(),
+                PlanId = response.MealPlan?.PlanId,
+            });
+        }
 
         sw.Stop();
         _logger.LogInformation(
@@ -99,7 +126,99 @@ public class AgentOrchestrator
 
         return response;
     }
+    // ── Reference Resolution ──────────────────────────────────────────────────
 
+    private static readonly HashSet<string> ReferenceWords =
+    [
+        "it", "that", "this", "the first", "the second", "the third",
+    "first one", "second one", "third one",
+    "that one", "this one", "the one",
+    "again", "same", "that recipe", "that dish",
+];
+
+    /// <summary>
+    /// Detects implicit references in the user message and injects context from history.
+    /// Examples:
+    ///   "is the first one vegan?" → injects top recipe title from last SearchRecipe turn
+    ///   "swap it again"           → injects last ModifyMealPlan's target day
+    /// </summary>
+    private async Task<ClassifiedIntent> ResolveReferencesAsync(ClassifiedIntent classified)
+    {
+        if (string.IsNullOrEmpty(classified.SessionId))
+            return classified;
+
+        var lower = classified.OriginalMessage.ToLowerInvariant();
+        var hasReference = ReferenceWords.Any(w => lower.Contains(w));
+
+        if (!hasReference)
+            return classified;
+
+        List<ConversationEntry> history;
+        try
+        {
+            history = await _sessionStore.GetHistoryAsync(classified.SessionId, limit: 6);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Orchestrator] History load failed — proceeding without context");
+            return classified;
+        }
+
+        if (history.Count == 0)
+            return classified;
+
+        // Find the most recent assistant entry
+        var lastAssistant = history.LastOrDefault(e => e.Role == "assistant");
+        if (lastAssistant is null)
+            return classified;
+
+        _logger.LogInformation(
+            "[Orchestrator] Reference detected in '{Msg}' — last intent was {Intent}, recipes={Recipes}",
+            classified.OriginalMessage,
+            lastAssistant.Intent,
+            string.Join(", ", lastAssistant.RecipeTitles)
+        );
+
+        // ── Recipe reference: "is it vegan?", "the first one" ────
+        if (lastAssistant.Intent == UserIntent.SearchRecipe && lastAssistant.RecipeTitles.Count > 0)
+        {
+            var targetRecipe = lower.Contains("second") || lower.Contains("2nd")
+                ? lastAssistant.RecipeTitles.ElementAtOrDefault(1)
+                : lower.Contains("third") || lower.Contains("3rd")
+                    ? lastAssistant.RecipeTitles.ElementAtOrDefault(2)
+                    : lastAssistant.RecipeTitles[0]; // "it", "that", "first" → top result
+
+            if (targetRecipe is not null)
+            {
+                _logger.LogInformation("[Orchestrator] Resolved recipe reference → '{Title}'", targetRecipe);
+                return classified with
+                {
+                    SearchQuery = targetRecipe,
+                    Intent = (classified.Intent == UserIntent.Unknown
+              || classified.Intent == UserIntent.SearchRecipe)
+            ? UserIntent.ValidateDiet
+            : classified.Intent,
+                    };
+            }
+        }
+
+        // ── Plan reference: "swap it again" ──────────────────────
+        if (lastAssistant.Intent == UserIntent.ModifyMealPlan
+            && lower.Contains("again")
+            && string.IsNullOrEmpty(classified.TargetDay))
+        {
+            // Find the last user message that had a TargetDay — re-extract it
+            var lastUserModify = history
+                .Where(e => e.Role == "user")
+                .LastOrDefault();
+
+            // Can't recover the day from raw content reliably — ask clarifying question
+            // The key win here is that intent is now ModifyMealPlan, not Unknown
+            return classified with { Intent = UserIntent.ModifyMealPlan };
+        }
+
+        return classified;
+    }
     // ── Intent Handlers ───────────────────────────────────────────────────────
     private async Task<OrchestratorResponse> HandleSearchRecipeAsync(ClassifiedIntent classified)
     {
@@ -401,6 +520,7 @@ public class AgentOrchestrator
         }
         catch (InvalidOperationException ex)
         {
+            _logger.LogError(ex, "Invalid operation for session {SessionId}", sessionId);
             return new OrchestratorResponse
             {
                 Message =

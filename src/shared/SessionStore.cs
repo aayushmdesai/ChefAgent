@@ -18,6 +18,45 @@ public class SessionStore
     {
         _db = redis.GetDatabase();
     }
+    // ── History ───────────────────────────────────────────────
+
+    private const int MaxHistoryEntries = 20;
+
+    public async Task AppendMessageAsync(string sessionId, ConversationEntry entry)
+    {
+        var key = HistoryKey(sessionId);
+        var json = JsonSerializer.Serialize(entry, JsonOptions);
+
+        // Redis list — new messages pushed to the right
+        await _db.ListRightPushAsync(key, json);
+
+        // Trim to sliding window — keep only the last MaxHistoryEntries
+        await _db.ListTrimAsync(key, -MaxHistoryEntries, -1);
+
+        // Refresh TTL on every append so active sessions don't expire mid-conversation
+        await _db.KeyExpireAsync(key, DefaultTTL);
+    }
+
+    public async Task<List<ConversationEntry>> GetHistoryAsync(string sessionId, int limit = 10)
+    {
+        var key = HistoryKey(sessionId);
+
+        // Fetch from the right (most recent) — LRANGE with negative indices
+        var entries = await _db.ListRangeAsync(key, -limit, -1);
+
+        if (entries.Length == 0)
+            return [];
+
+        var result = new List<ConversationEntry>(entries.Length);
+        foreach (var entry in entries)
+        {
+            if (entry.IsNull) continue;
+            var deserialized = JsonSerializer.Deserialize<ConversationEntry>(entry!, JsonOptions);
+            if (deserialized is not null)
+                result.Add(deserialized);
+        }
+        return result;
+    }
 
     // ── Plan ─────────────────────────────────────────────────
 
@@ -60,9 +99,9 @@ public class SessionStore
         return JsonSerializer.Deserialize<DietaryProfile>(json!, JsonOptions);
     }
 
-    // ── Key helpers ───────────────────────────────────────────
+        // ── Key helpers ───────────────────────────────────────────
 
-    private static string PlanKey(string sessionId) => $"session:{sessionId}:plan";
-
+    private static string PlanKey(string sessionId)    => $"session:{sessionId}:plan";
     private static string ProfileKey(string sessionId) => $"session:{sessionId}:profile";
+    private static string HistoryKey(string sessionId) => $"session:{sessionId}:history";
 }
