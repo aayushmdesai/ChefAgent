@@ -123,6 +123,7 @@ public enum UserIntent
 {
     SearchRecipe,
     ValidateDiet,
+    GetMealPlan,
     CreateMealPlan,
     ModifyMealPlan,
     GeneralQuestion,

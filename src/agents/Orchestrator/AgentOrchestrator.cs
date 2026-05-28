@@ -108,6 +108,7 @@ public class AgentOrchestrator
         {
             UserIntent.SearchRecipe => await HandleSearchRecipeAsync(classified),
             UserIntent.ValidateDiet => await HandleValidateDietAsync(classified),
+            UserIntent.GetMealPlan     => await HandleGetMealPlanAsync(classified),
             UserIntent.CreateMealPlan => await HandleCreateMealPlanAsync(classified),
             UserIntent.ModifyMealPlan => await HandleModifyMealPlanAsync(classified),
             UserIntent.GeneralQuestion => await HandleGeneralQuestionAsync(classified),
@@ -538,7 +539,42 @@ public class AgentOrchestrator
             );
         }
     }
+    private async Task<OrchestratorResponse> HandleGetMealPlanAsync(ClassifiedIntent classified)
+    {
+        var sessionId = classified.SessionId;
+        if (string.IsNullOrEmpty(sessionId))
+            return new OrchestratorResponse
+            {
+                Message = "I need a session ID to find your plan.",
+                DetectedIntent = UserIntent.GetMealPlan,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
 
+        var plan = await _sessionStore.GetPlanAsync(sessionId);
+        if (plan is null)
+            return new OrchestratorResponse
+            {
+                Message = "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
+                DetectedIntent = UserIntent.GetMealPlan,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+
+        var slotCount = plan.Days.FirstOrDefault()?.Slots.Count ?? 1;
+        var slotDesc = slotCount == 1 ? "dinner"
+            : slotCount == 2 ? "two meals per day"
+            : "full day (breakfast, lunch, and dinner)";
+
+        return new OrchestratorResponse
+        {
+            Message = $"Here is your current {slotDesc} plan.",
+            DetectedIntent = UserIntent.GetMealPlan,
+            Recipes = [],
+            MealPlan = plan,
+            Metadata = BuildMetadata(classified, dietaryApplied: false),
+        };
+    }
     private async Task<OrchestratorResponse> HandleModifyMealPlanAsync(ClassifiedIntent classified)
     {
         var sessionId = classified.SessionId;

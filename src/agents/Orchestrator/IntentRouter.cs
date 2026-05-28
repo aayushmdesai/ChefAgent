@@ -96,7 +96,59 @@ public class IntentRouter
         "update my plan",
         "different recipe for",
     ];
+    private static readonly HashSet<string> GetMealPlanSignals =
+    [
+        "show me my plan",
+        "what is my plan",
+        "my meal plan",
+        "what am i eating",
+        "what is for dinner this week",
+        "what is for dinner tonight",
+        "show my plan",
+        "get my plan",
+        "view my plan",
+        "my plan",
+        "my weekly plan",
+    ];
+    // ── Contraction Normalization ─────────────────────────────────────────────
+/// Expands common contractions before signal word matching.
+/// Handles the most common cases — not exhaustive.
+/// LLM classifier (Month 2) handles arbitrary phrasing.
+/// Runs once on lowercased input — all signal sets benefit automatically.
 
+/// <summary>
+/// Expands common contractions before signal word matching.
+/// Runs once on the lowercased input — all signal sets benefit automatically.
+/// </summary>
+private static string NormalizeContractions(string lower) => lower
+    .Replace("whats", "what is")      
+    .Replace("what's", "what is")
+    .Replace("hows", "how is")
+    .Replace("how's", "how is")
+    .Replace("whos", "who is")
+    .Replace("who's", "who is")
+    .Replace("thats", "that is")
+    .Replace("that's", "that is")
+    .Replace("its ", "it is ")          
+    .Replace("it's", "it is")
+    .Replace("i'm", "i am")
+    .Replace("im ", "i am ")            
+    .Replace("cant", "cannot")
+    .Replace("can't", "cannot")
+    .Replace("dont", "do not")
+    .Replace("don't", "do not")
+    .Replace("doesnt", "does not")
+    .Replace("doesn't", "does not")
+    .Replace("wont", "will not")
+    .Replace("won't", "will not")
+    .Replace("isnt", "is not")
+    .Replace("isn't", "is not")
+    .Replace("wouldnt", "would not")
+    .Replace("wouldn't", "would not")
+    .Replace("shouldnt", "should not")
+    .Replace("shouldn't", "should not")
+    .Replace("couldnt", "could not")
+    .Replace("couldn't", "could not");
     private static List<string> ExtractMealSlots(string lower)
     {
         var slots = new List<string>();
@@ -137,13 +189,14 @@ public class IntentRouter
         string message,
         DietaryProfile? existingProfile = null,
         string? sessionId = null
-    ) // ← add
+    ) 
     {
         var lower = message.ToLowerInvariant().Trim();
+        var normalized = NormalizeContractions(lower); 
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
-        var intent = ClassifyIntent(lower);
-        var extractedProfile = ExtractProfile(lower);
+        var intent = ClassifyIntent(normalized);
+        var extractedProfile = ExtractProfile(normalized);
         var mergedProfile = MergeProfiles(existingProfile, extractedProfile);
         var classifiedBy = intent == UserIntent.SearchRecipe ? "rules-default" : "rules";
 
@@ -207,6 +260,9 @@ public class IntentRouter
     {
         if (ValidateDietSignals.Any(s => lower.Contains(s)))
             return UserIntent.ValidateDiet;
+
+        if (GetMealPlanSignals.Any(s => lower.Contains(s)))  
+            return UserIntent.GetMealPlan;
 
         if (MealPlanSignals.Any(s => lower.Contains(s)))
             return UserIntent.CreateMealPlan;
