@@ -3,51 +3,39 @@ set -e
 
 echo "=== ChefAgent Setup ==="
 
-# 1. Start all infrastructure (Qdrant + Redis + Ollama + API)
+# 1. Start all services
 echo "→ Starting Docker services..."
 docker compose up -d --build
-echo "✓ Docker services started"
+echo "✓ Services started"
 
-# 2. Wait for Ollama to be ready
+# 2. Wait for Ollama
 echo "→ Waiting for Ollama..."
-until curl -s http://localhost:11434 > /dev/null; do
-  sleep 2
-done
+until curl -s http://localhost:11434 > /dev/null; do sleep 2; done
 echo "✓ Ollama ready"
 
-# 3. Pull models (skips if already pulled — stored in ollama-data volume)
-echo "→ Pulling Ollama models (this takes a few minutes on first run)..."
+# 3. Pull models
+echo "→ Pulling Ollama models..."
 docker compose exec ollama ollama pull nomic-embed-text
 docker compose exec ollama ollama pull llama3.2
 echo "✓ Models ready"
 
-# 4. Python dependencies
-echo "→ Installing Python dependencies..."
-pip install -r scripts/requirements.txt --quiet
-echo "✓ Python ready"
-
-# 5. Load vectors into Qdrant (only if file exists)
+# 4. Load vectors
 if [ -f "data/embeddings/recipe_vectors.jsonl" ]; then
   echo "→ Loading vectors into Qdrant..."
-  python3 scripts/load_qdrant.py
+  sleep 10
+  python3 scripts/pipeline/load_qdrant.py
   echo "✓ Vectors loaded"
 else
-  echo "⚠  data/embeddings/recipe_vectors.jsonl not found"
-  echo "   Upload the file then run: python3 scripts/load_qdrant.py"
+  echo "⚠  Upload data/embeddings/recipe_vectors.jsonl then run: make reload-vectors"
 fi
 
-# 6. Frontend dependencies
-echo "→ Installing frontend dependencies..."
+# 5. Python + frontend deps
+pip install -r scripts/requirements.txt --quiet
 cd src/frontend && npm install --silent && cd ../..
-echo "✓ Frontend ready"
 
 echo ""
-echo "=== Setup complete ==="
-echo ""
-echo "API already running via Docker:  http://localhost:5100"
-echo "Health check:                    curl http://localhost:5100/health"
-echo ""
-echo "To run frontend dev server:      cd src/frontend && npm run dev"
-echo "To rebuild API after changes:    docker compose up --build api"
-echo "To view logs:                    docker compose logs api -f"
-echo "To reload vectors:               python3 scripts/load_qdrant.py"
+echo "=== Ready ==="
+echo "API:      http://localhost:5100"
+echo "Health:   make health"
+echo "Vectors:  make check-vectors"
+echo "Frontend: make frontend"
