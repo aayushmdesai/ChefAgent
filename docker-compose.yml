@@ -13,19 +13,26 @@ services:
       - Ollama__ChatModel=llama3.2
       - Ollama__EmbeddingModel=nomic-embed-text
       - Redis__ConnectionString=redis:6379
-      - Langfuse__Endpoint=http://langfuse:3000
     depends_on:
-      - qdrant
-      - redis
-      - ollama
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_started
 
   qdrant:
     image: qdrant/qdrant:v1.12.1
     ports:
-      - "6333:6333"   # REST API
-      - "6334:6334"   # gRPC
+      - "6333:6333"
+      - "6334:6334"
     volumes:
       - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   ollama:
     image: ollama/ollama:latest
@@ -33,9 +40,8 @@ services:
       - "11434:11434"
     volumes:
       - ollama-data:/root/.ollama
-    # After first `docker compose up`, run:
-    #   docker compose exec ollama ollama pull llama3.2
-    #   docker compose exec ollama ollama pull nomic-embed-text
+    # Models persist in ollama-data volume — only pulled once
+    # setup.sh handles pulling on first run
 
   redis:
     image: redis:7-alpine
@@ -43,30 +49,16 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Uncomment when ready for observability (Month 3)
-  # langfuse:
-  #   image: langfuse/langfuse:latest
-  #   ports:
-  #     - "3100:3000"
-  #   environment:
-  #     - DATABASE_URL=postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
-  #     - NEXTAUTH_SECRET=your-secret-here
-  #     - NEXTAUTH_URL=http://localhost:3100
-  #   depends_on:
-  #     - langfuse-db
-  #
-  # langfuse-db:
-  #   image: postgres:16-alpine
-  #   environment:
-  #     - POSTGRES_USER=langfuse
-  #     - POSTGRES_PASSWORD=langfuse
-  #     - POSTGRES_DB=langfuse
-  #   volumes:
-  #     - langfuse-db-data:/var/lib/postgresql/data
+  # Langfuse — uncomment in Month 3
+  # langfuse: ...
 
 volumes:
   qdrant-data:
   ollama-data:
   redis-data:
-  # langfuse-db-data:

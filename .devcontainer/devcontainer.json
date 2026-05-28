@@ -1,0 +1,29 @@
+{
+  "name": "ChefAgent",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:8.0",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" },
+    "ghcr.io/devcontainers/features/python:1": { "version": "3.11" }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "forwardPorts": [5100, 5173, 6333, 6379, 11434],
+  "portsAttributes": {
+    "5100": { "label": "ChefAgent API", "onAutoForward": "notify" },
+    "5173": { "label": "React UI",      "onAutoForward": "openBrowser" },
+    "6333": { "label": "Qdrant REST",   "onAutoForward": "silent" },
+    "6379": { "label": "Redis",         "onAutoForward": "silent" },
+    "11434": { "label": "Ollama",       "onAutoForward": "silent" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
+        "ms-python.python",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  }
+}
