@@ -1,4 +1,4 @@
-.PHONY: up down build logs reload-vectors frontend
+.PHONY: up down build logs reload-vectors frontend pull-models health
 
 up:
 	docker compose up -d
@@ -13,7 +13,7 @@ logs:
 	docker compose logs api -f
 
 reload-vectors:
-	python3 scripts/load_qdrant.py
+	python3 scripts/pipeline/load_qdrant.py
 
 frontend:
 	cd src/frontend && npm run dev
@@ -23,4 +23,5 @@ pull-models:
 	docker compose exec ollama ollama pull llama3.2
 
 health:
-	curl -s http://localhost:5100/health
+	curl -sf http://localhost:5100/health && echo " ✓ API healthy" || echo " ✗ API not reachable"
+

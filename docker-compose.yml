@@ -14,8 +14,7 @@ services:
       - Ollama__EmbeddingModel=nomic-embed-text
       - Redis__ConnectionString=redis:6379
     depends_on:
-      qdrant:
-        condition: service_healthy
+      
       redis:
         condition: service_healthy
       ollama:
@@ -28,11 +27,6 @@ services:
       - "6334:6334"
     volumes:
       - qdrant-data:/qdrant/storage
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   ollama:
     image: ollama/ollama:latest
@@ -40,8 +34,6 @@ services:
       - "11434:11434"
     volumes:
       - ollama-data:/root/.ollama
-    # Models persist in ollama-data volume — only pulled once
-    # setup.sh handles pulling on first run
 
   redis:
     image: redis:7-alpine
@@ -54,9 +46,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # Langfuse — uncomment in Month 3
-  # langfuse: ...
 
 volumes:
   qdrant-data:
