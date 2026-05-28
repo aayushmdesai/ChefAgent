@@ -219,12 +219,12 @@ public static class ServiceRegistration
 
     private static IServiceCollection AddApiServices(this IServiceCollection services)
     {
-        // CORS — allow React dev server on 3000 and Vite on 5173
+        // CORS — allow React dev 
         services.AddCors(options =>
         {
             options.AddDefaultPolicy(policy =>
                 policy
-                    .WithOrigins("http://localhost:3000", "http://localhost:5173")
+                    .AllowAnyOrigin()
                     .AllowAnyHeader()
                     .AllowAnyMethod()
             );

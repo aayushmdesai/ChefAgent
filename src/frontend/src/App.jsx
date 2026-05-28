@@ -2,9 +2,19 @@ import { useState, useRef } from "react";
 import ChatInput from "./components/ChatInput";
 import ChatMessages from "./components/ChatMessages";
 import ProfileSidebar from "./components/ProfileSidebar";
+function getApiUrl() {
+  const hostname = window.location.hostname;
 
-const API_URL = "http://localhost:5000/chat";
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:5100/chat';
+  }
 
+  const url = `${window.location.protocol}//${hostname.replace('-5173', '-5100')}/chat`;
+  console.log('API URL:', url);  // ← add this
+  return url;
+}
+
+const API_URL = getApiUrl();
 // Generate a stable session ID for this browser session
 function getSessionId() {
   let id = sessionStorage.getItem("chefagent-session");
@@ -64,13 +74,14 @@ export default function App() {
           metadata: data.metadata,
         },
       ]);
-    } catch {
+    } catch (err) {
+      console.error("API error:", err);
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 1,
           role: "assistant",
-          text: "Sorry — couldn't reach the API. Make sure the server is running on localhost:5000.",
+          text: `Error: ${err.message}`,
           recipes: [],
         },
       ]);

@@ -10,7 +10,7 @@ services:
       - Qdrant__Endpoint=http://qdrant:6334
       - Qdrant__CollectionName=recipes
       - Ollama__Endpoint=http://ollama:11434
-      - Ollama__ChatModel=llama3.2
+      - Ollama__ChatModel=llama3.2:1b
       - Ollama__EmbeddingModel=nomic-embed-text
       - Redis__ConnectionString=redis:6379
     depends_on:

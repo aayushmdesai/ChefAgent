@@ -1,4 +1,4 @@
-.PHONY: up down build logs reload-vectors frontend pull-models health
+.PHONY: up down build logs reload-vectors frontend pull-models health check-vectors fresh
 
 up:
 	docker compose up -d
@@ -16,7 +16,7 @@ reload-vectors:
 	python3 scripts/pipeline/load_qdrant.py
 
 frontend:
-	cd src/frontend && npm run dev
+	cd src/frontend && npm install --silent && npm run dev
 
 pull-models:
 	docker compose exec ollama ollama pull nomic-embed-text
@@ -25,7 +25,9 @@ pull-models:
 health:
 	curl -sf http://localhost:5100/health && echo " ✓ API healthy" || echo " ✗ API not reachable"
 
-# Full rebuild — use when Dockerfile changed or starting fresh
+check-vectors:
+	curl -s http://localhost:6333/collections/recipes | jq '{status: .result.status, points: .result.points_count}'
+
 fresh:
 	docker compose down -v
 	docker compose up -d --build

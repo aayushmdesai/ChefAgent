@@ -9,8 +9,8 @@
   "postCreateCommand": "bash .devcontainer/setup.sh",
   "forwardPorts": [5100, 5173, 6333, 6379, 11434],
   "portsAttributes": {
-    "5100": { "label": "ChefAgent API", "onAutoForward": "notify" },
-    "5173": { "label": "React UI",      "onAutoForward": "openBrowser" },
+    "5100": { "label": "ChefAgent API", "onAutoForward": "notify", "visibility": "public" },
+    "5173": { "label": "React UI", "onAutoForward": "openBrowser", "visibility": "public" },
     "6333": { "label": "Qdrant REST",   "onAutoForward": "silent" },
     "6379": { "label": "Redis",         "onAutoForward": "silent" },
     "11434": { "label": "Ollama",       "onAutoForward": "silent" }
