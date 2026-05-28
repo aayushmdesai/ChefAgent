@@ -31,6 +31,7 @@ public static class Endpoints
         app.MapServiceInfo();
         app.MapRecipeSearch();
         app.MapRecipeSearchValidated();
+        app.MapProfile();
         app.MapChat();
 
         return app;
@@ -159,6 +160,30 @@ public static class Endpoints
         );
     }
 
+    // ── Profile ───────────────────────────────────────────────
+
+    private static void MapProfile(this WebApplication app)
+    {
+        // GET — frontend loads this on page startup to restore sidebar toggles
+        app.MapGet("/profile/{sessionId}", async (string sessionId, SessionStore store) =>
+        {
+            var profile = await store.GetProfileAsync(sessionId);
+            return profile is null
+                ? Results.NotFound(new { message = "No profile found for this session." })
+                : Results.Ok(profile);
+        });
+
+        // POST — sidebar toggle changes call this directly (not bundled with /chat)
+        app.MapPost("/profile/{sessionId}", async (
+            string sessionId,
+            DietaryProfile profile,
+            SessionStore store) =>
+        {
+            await store.SaveProfileAsync(sessionId, profile);
+            return Results.Ok(new { saved = true, sessionId });
+        });
+    }
+    
     // ── Chat (Orchestrator — natural language) ────────────────
 
     private static void MapChat(this WebApplication app)

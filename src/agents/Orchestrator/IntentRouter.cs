@@ -241,7 +241,7 @@ public class IntentRouter
         if (lower.Contains("dairy-free") || lower.Contains("dairy free"))
             restrictions.Add("dairy-free");
         if (lower.Contains("nut-free") || lower.Contains("nut free"))
-            restrictions.Add("nuts");
+            restrictions.Add("nut-free");
         if (lower.Contains("vegan"))
             restrictions.Add("vegan");
         if (lower.Contains("vegetarian"))

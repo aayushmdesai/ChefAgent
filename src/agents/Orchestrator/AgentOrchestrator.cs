@@ -89,10 +89,21 @@ public class AgentOrchestrator
             });
         }
 
-        // ── Step 2: Resolve references using history ──────────────
+        // ── Step 2: Load + merge + persist profile ────────────────
+        if (!string.IsNullOrEmpty(classified.SessionId))
+        {
+            var mergedProfile = await LoadAndMergeProfileAsync(
+                classified.SessionId,
+                classified.MergedProfile);
+
+            if (mergedProfile is not null)
+                classified = classified with { MergedProfile = mergedProfile };
+        }
+
+        // ── Step 3: Resolve references using history ──────────────
         classified = await ResolveReferencesAsync(classified);
 
-        // ── Step 3: Route to the right handler ───────────────────
+        // ── Step 4: Route to the right handler ───────────────────
         var response = classified.Intent switch
         {
             UserIntent.SearchRecipe => await HandleSearchRecipeAsync(classified),
@@ -103,7 +114,7 @@ public class AgentOrchestrator
             _ => HandleUnknown(classified),
         };
 
-        // ── Step 4: Save assistant response to history ────────────
+        // ── Step 5: Save assistant response to history ────────────
         if (!string.IsNullOrEmpty(classified.SessionId))
         {
             await _sessionStore.AppendMessageAsync(classified.SessionId, new ConversationEntry
@@ -134,7 +145,60 @@ public class AgentOrchestrator
     "first one", "second one", "third one",
     "that one", "this one", "the one",
     "again", "same", "that recipe", "that dish",
-];
+    ];
+    // ── Profile Persistence ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Loads stored profile from Redis, merges with request profile (union, request wins),
+    /// saves merged profile back. Returns the merged profile.
+    /// </summary>
+    private async Task<DietaryProfile?> LoadAndMergeProfileAsync(
+        string sessionId,
+        DietaryProfile? requestProfile)
+    {
+        DietaryProfile? storedProfile = null;
+        try
+        {
+            storedProfile = await _sessionStore.GetProfileAsync(sessionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Orchestrator] Failed to load profile for session {SessionId}", sessionId);
+        }
+
+        // Nothing to merge — no stored, no request
+        if (storedProfile is null && requestProfile is null)
+            return null;
+
+        // Only one side exists — use it directly, still save to ensure TTL refresh
+        var merged = storedProfile is null ? requestProfile!
+            : requestProfile is null ? storedProfile
+            : new DietaryProfile
+            {
+                // Union merge — request wins on conflicts via Concat order + Distinct
+                Restrictions = requestProfile.Restrictions
+                    .Union(storedProfile.Restrictions, StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                Allergies = requestProfile.Allergies
+                    .Union(storedProfile.Allergies, StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                CuisinePreferences = requestProfile.CuisinePreferences
+                    .Union(storedProfile.CuisinePreferences, StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+            };
+
+        // Save merged back — this is what persists for future turns
+        try
+        {
+            await _sessionStore.SaveProfileAsync(sessionId, merged);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Orchestrator] Failed to save merged profile for session {SessionId}", sessionId);
+        }
+
+        return merged;
+    }
 
     /// <summary>
     /// Detects implicit references in the user message and injects context from history.
