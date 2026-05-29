@@ -3,6 +3,7 @@ using ChefAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 
 namespace ChefAgent.Shared;
+
 public class OutputGuard
 {
     private readonly ILogger<OutputGuard> _logger;
