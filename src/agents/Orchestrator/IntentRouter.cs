@@ -490,6 +490,7 @@ var prompt =
                 .GetProperty("content")
                 .GetString() ?? string.Empty;
 
+            _logger.LogInformation("[IntentRouter] LLM raw response: {Raw}", raw);
             // Strip markdown fences if present
             raw = raw.Trim();
             if (raw.StartsWith("```")) raw = raw[(raw.IndexOf('\n') + 1)..];

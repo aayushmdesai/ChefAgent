@@ -5,6 +5,7 @@ echo "=== ChefAgent Setup ==="
 
 # 1. Start all services
 echo "→ Starting Docker services..."
+dotnet tool install csharpier --global
 docker compose up -d --build
 echo "✓ Services started"
 
