@@ -39,6 +39,7 @@ public class AgentOrchestrator
     private readonly string _ollamaUrl;
     private readonly string _chatModel;
     private readonly CircuitBreaker _circuitBreaker;
+    private readonly GuardrailAuditLog _audit;
     private readonly ILogger<AgentOrchestrator> _logger;
 
     // Agent loop cap — in HandleCreateMealPlanAsync
@@ -55,6 +56,7 @@ public class AgentOrchestrator
         string ollamaUrl,
         string chatModel,
         CircuitBreaker circuitBreaker,
+        GuardrailAuditLog audit,
         ILogger<AgentOrchestrator> logger
     )
     {
@@ -66,6 +68,7 @@ public class AgentOrchestrator
         _ollamaUrl = ollamaUrl;
         _chatModel = chatModel;
         _circuitBreaker = circuitBreaker;
+        _audit = audit;
         _logger = logger;
     }
 
@@ -132,6 +135,8 @@ public class AgentOrchestrator
             UserIntent.GeneralQuestion => await HandleGeneralQuestionAsync(classified),
             _ => HandleUnknown(classified),
         };
+        // Step 4.5: Append confidence disclaimers
+        response = AppendConfidenceDisclaimer(response, classified);
 
         // ── Step 5: Save assistant response to history ────────────
         if (!string.IsNullOrEmpty(classified.SessionId))
@@ -948,6 +953,41 @@ public class AgentOrchestrator
             Confidence = ResponseConfidence.Low,
             Metadata = BuildMetadata(classified, dietaryApplied: false),
         };
+
+    private OrchestratorResponse AppendConfidenceDisclaimer(
+        OrchestratorResponse response,
+        ClassifiedIntent classified
+    )
+    {
+        if (response.Confidence == ResponseConfidence.Low)
+        {
+            _audit.Record(
+                "low_confidence_response",
+                classified.SessionId ?? "unknown",
+                classified.Intent.ToString()
+            );
+            var disclaimer =
+                " Note: I'm less certain about these results — you might want to double-check.";
+            return response with { Message = response.Message + disclaimer };
+        }
+
+        if (
+            classified.MergedProfile?.Allergies.Count > 0
+            && response.Confidence == ResponseConfidence.Medium
+            && response.Recipes.Any(r =>
+                r.Dietary?.Violations.Any(v => v.DetectedBy == ValidationLayer.Llm) == true
+            )
+        )
+        {
+            var allergens = string.Join(", ", classified.MergedProfile.Allergies);
+            _audit.Record("allergy_warning", classified.SessionId ?? "unknown", allergens);
+            var warning =
+                $" ⚠️ This recipe was checked by AI — please verify ingredients for your {allergens} allergy before cooking.";
+            return response with { Message = response.Message + warning };
+        }
+
+        return response;
+    }
 
     private static Dictionary<string, object> BuildMetadata(
         ClassifiedIntent classified,

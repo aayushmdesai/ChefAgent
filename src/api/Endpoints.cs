@@ -28,6 +28,10 @@ public static class Endpoints
     public static WebApplication MapChefAgentEndpoints(this WebApplication app)
     {
         app.MapHealthChecks("/health");
+        app.MapGet(
+            "/admin/guardrails",
+            (GuardrailAuditLog audit) => Results.Ok(audit.GetRecent(50))
+        );
         app.MapServiceInfo();
         app.MapRecipeSearch();
         app.MapRecipeSearchValidated();
@@ -196,18 +200,62 @@ public static class Endpoints
                 ChatRequest request,
                 IntentRouter intentRouter,
                 AgentOrchestrator orchestrator,
-                SessionStore sessionStore
+                SessionStore sessionStore,
+                RateLimiter rateLimiter,
+                GuardrailAuditLog audit
             ) =>
             {
                 // First line inside the /chat handler, before IntentRouter
                 var validation = InputGuard.Validate(request.Message);
                 if (!validation.IsValid)
                 {
+                    audit.Record(
+                        "injection_blocked",
+                        request.SessionId ?? "unknown",
+                        request.Message
+                    );
                     return Results.Ok(
                         new OrchestratorResponse
                         {
                             Message = validation.RejectionReason!,
                             DetectedIntent = UserIntent.Unknown,
+                        }
+                    );
+                }
+                // Rate limiting
+                if (!rateLimiter.IsAllowed(request.SessionId))
+                {
+                    audit.Record("rate_limited", request.SessionId ?? "unknown");
+                    return Results.Json(
+                        new OrchestratorResponse
+                        {
+                            Message =
+                                "You're sending requests too quickly. Please wait a moment and try again.",
+                            DetectedIntent = UserIntent.Unknown,
+                            Confidence = ResponseConfidence.High,
+                        },
+                        statusCode: 429
+                    );
+                }
+                // Repeated query detection
+                var repeatCount = rateLimiter.CheckRepeat(
+                    request.SessionId,
+                    validation.SanitizedMessage
+                );
+                if (repeatCount >= 3)
+                {
+                    audit.Record(
+                        "repeated_query",
+                        request.SessionId ?? "unknown",
+                        validation.SanitizedMessage
+                    );
+                    return Results.Ok(
+                        new OrchestratorResponse
+                        {
+                            Message =
+                                "I already answered that — would you like to try a different query?",
+                            DetectedIntent = UserIntent.Unknown,
+                            Confidence = ResponseConfidence.High,
                         }
                     );
                 }

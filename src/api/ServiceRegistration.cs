@@ -183,6 +183,8 @@ public static class ServiceRegistration
         IConfiguration config
     )
     {
+        services.AddSingleton<GuardrailAuditLog>();
+        services.AddSingleton<RateLimiter>();
         services.AddSingleton<CircuitBreaker>();
         services.AddSingleton<OutputGuard>();
         // IntentRouter — rules-based classifier, Month 2 will add LLM path
@@ -217,6 +219,7 @@ public static class ServiceRegistration
                 ollamaUrl,
                 chatModel,
                 sp.GetRequiredService<CircuitBreaker>(),
+                sp.GetRequiredService<GuardrailAuditLog>(),
                 sp.GetRequiredService<ILogger<AgentOrchestrator>>()
             );
         });

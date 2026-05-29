@@ -12,6 +12,7 @@ public enum CircuitState
 public class CircuitBreaker
 {
     private readonly ILogger<CircuitBreaker> _logger;
+    private readonly GuardrailAuditLog _audit;
     private readonly int _failureThreshold;
     private readonly TimeSpan _cooldown;
 
@@ -24,18 +25,17 @@ public class CircuitBreaker
 
     public CircuitBreaker(
         ILogger<CircuitBreaker> logger,
+        GuardrailAuditLog audit,
         int failureThreshold = 3,
         int cooldownSeconds = 60
     )
     {
         _logger = logger;
+        _audit = audit;
         _failureThreshold = failureThreshold;
         _cooldown = TimeSpan.FromSeconds(cooldownSeconds);
     }
 
-    /// <summary>
-    /// Check if LLM calls are allowed. If Open and cooldown expired, transitions to HalfOpen.
-    /// </summary>
     public bool IsAllowed()
     {
         lock (_lock)
@@ -49,19 +49,16 @@ public class CircuitBreaker
                 _logger.LogInformation(
                     "[CircuitBreaker] Cooldown expired — transitioning to HalfOpen (testing one call)"
                 );
-                return true; // allow one test call
+                return true;
             }
 
             if (State == CircuitState.HalfOpen)
-                return true; // already testing
+                return true;
 
-            return false; // Open, cooldown not expired
+            return false;
         }
     }
 
-    /// <summary>
-    /// Record a successful LLM call. Resets to Closed.
-    /// </summary>
     public void RecordSuccess()
     {
         lock (_lock)
@@ -71,6 +68,7 @@ public class CircuitBreaker
                 _logger.LogInformation(
                     "[CircuitBreaker] HalfOpen test succeeded — closing circuit"
                 );
+                _audit.Record("circuit_closed", "system", "HalfOpen test succeeded");
             }
 
             _consecutiveFailures = 0;
@@ -78,9 +76,6 @@ public class CircuitBreaker
         }
     }
 
-    /// <summary>
-    /// Record a failed LLM call. Trips to Open if threshold reached.
-    /// </summary>
     public void RecordFailure()
     {
         lock (_lock)
@@ -89,13 +84,13 @@ public class CircuitBreaker
 
             if (State == CircuitState.HalfOpen)
             {
-                // Test call failed — re-open
                 State = CircuitState.Open;
                 _openedAt = DateTime.UtcNow;
                 _logger.LogWarning(
                     "[CircuitBreaker] HalfOpen test failed — re-opening circuit for {Cooldown}s",
                     _cooldown.TotalSeconds
                 );
+                _audit.Record("circuit_opened", "system", "HalfOpen test failed — re-opened");
                 return;
             }
 
@@ -107,6 +102,11 @@ public class CircuitBreaker
                     "[CircuitBreaker] {Failures} consecutive failures — circuit OPEN, skipping LLM for {Cooldown}s",
                     _consecutiveFailures,
                     _cooldown.TotalSeconds
+                );
+                _audit.Record(
+                    "circuit_opened",
+                    "system",
+                    $"{_consecutiveFailures} consecutive failures"
                 );
             }
         }

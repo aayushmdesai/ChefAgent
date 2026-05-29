@@ -7,8 +7,7 @@ namespace ChefAgent.Shared;
 public class OutputGuard
 {
     private readonly ILogger<OutputGuard> _logger;
-
-    // Counters — observable via /health or logs, seed for Month 3 Langfuse
+    private readonly GuardrailAuditLog _audit;
     private int _llmRetryCount;
     private int _llmFallbackCount;
     private int _recipesSanitized;
@@ -17,9 +16,10 @@ public class OutputGuard
     public int LlmFallbackCount => _llmFallbackCount;
     public int RecipesSanitized => _recipesSanitized;
 
-    public OutputGuard(ILogger<OutputGuard> logger)
+    public OutputGuard(ILogger<OutputGuard> logger, GuardrailAuditLog audit)
     {
         _logger = logger;
+        _audit = audit;
     }
 
     // ── 1. JSON extraction + schema validation ───────────────────────
@@ -251,6 +251,7 @@ public class OutputGuard
             context
         );
         Interlocked.Increment(ref _llmRetryCount);
+        _audit.Record("llm_retry", "system", context);
 
         raw = await llmCall();
         result = validator(raw);
@@ -260,6 +261,7 @@ public class OutputGuard
         // Both failed — caller uses fallback
         _logger.LogWarning("[OutputGuard] Fallback in {Context} — both attempts failed", context);
         Interlocked.Increment(ref _llmFallbackCount);
+        _audit.Record("llm_fallback", "system", context);
         return null;
     }
 
