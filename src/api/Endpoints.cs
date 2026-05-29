@@ -165,54 +165,63 @@ public static class Endpoints
     private static void MapProfile(this WebApplication app)
     {
         // GET — frontend loads this on page startup to restore sidebar toggles
-        app.MapGet("/profile/{sessionId}", async (string sessionId, SessionStore store) =>
-        {
-            var profile = await store.GetProfileAsync(sessionId);
-            return profile is null
-                ? Results.NotFound(new { message = "No profile found for this session." })
-                : Results.Ok(profile);
-        });
+        app.MapGet(
+            "/profile/{sessionId}",
+            async (string sessionId, SessionStore store) =>
+            {
+                var profile = await store.GetProfileAsync(sessionId);
+                return profile is null
+                    ? Results.NotFound(new { message = "No profile found for this session." })
+                    : Results.Ok(profile);
+            }
+        );
 
         // POST — sidebar toggle changes call this directly (not bundled with /chat)
-        app.MapPost("/profile/{sessionId}", async (
-            string sessionId,
-            DietaryProfile profile,
-            SessionStore store) =>
-        {
-            await store.SaveProfileAsync(sessionId, profile);
-            return Results.Ok(new { saved = true, sessionId });
-        });
-    }
-    
-    // ── Chat (Orchestrator — natural language) ────────────────
-private static void MapChat(this WebApplication app)
-{
-    app.MapPost("/chat", async (
-        ChatRequest request,
-        IntentRouter intentRouter,
-        AgentOrchestrator orchestrator,
-        SessionStore sessionStore) =>
-    {
-        // Load history for LLM entity extraction context
-        List<ConversationEntry>? history = null;
-        if (!string.IsNullOrEmpty(request.SessionId))
-        {
-            try
+        app.MapPost(
+            "/profile/{sessionId}",
+            async (string sessionId, DietaryProfile profile, SessionStore store) =>
             {
-                history = await sessionStore.GetHistoryAsync(
-                    request.SessionId, limit: 6);
+                await store.SaveProfileAsync(sessionId, profile);
+                return Results.Ok(new { saved = true, sessionId });
             }
-            catch { /* non-critical — proceed without history */ }
-        }
-
-        var classified = await intentRouter.ClassifyAsync(
-            request.Message,
-            request.DietaryProfile,
-            request.SessionId,
-            history);           // ← pass history
-
-        var response = await orchestrator.RouteAsync(classified);
-        return Results.Ok(response);
-    });
-}
+        );
     }
+
+    // ── Chat (Orchestrator — natural language) ────────────────
+    private static void MapChat(this WebApplication app)
+    {
+        app.MapPost(
+            "/chat",
+            async (
+                ChatRequest request,
+                IntentRouter intentRouter,
+                AgentOrchestrator orchestrator,
+                SessionStore sessionStore
+            ) =>
+            {
+                // Load history for LLM entity extraction context
+                List<ConversationEntry>? history = null;
+                if (!string.IsNullOrEmpty(request.SessionId))
+                {
+                    try
+                    {
+                        history = await sessionStore.GetHistoryAsync(request.SessionId, limit: 6);
+                    }
+                    catch
+                    { /* non-critical — proceed without history */
+                    }
+                }
+
+                var classified = await intentRouter.ClassifyAsync(
+                    request.Message,
+                    request.DietaryProfile,
+                    request.SessionId,
+                    history
+                ); // ← pass history
+
+                var response = await orchestrator.RouteAsync(classified);
+                return Results.Ok(response);
+            }
+        );
+    }
+}

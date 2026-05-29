@@ -82,11 +82,10 @@ public class AgentOrchestrator
         // ── Step 1: Save user message to history ─────────────────
         if (!string.IsNullOrEmpty(classified.SessionId))
         {
-            await _sessionStore.AppendMessageAsync(classified.SessionId, new ConversationEntry
-            {
-                Role = "user",
-                Content = classified.OriginalMessage,
-            });
+            await _sessionStore.AppendMessageAsync(
+                classified.SessionId,
+                new ConversationEntry { Role = "user", Content = classified.OriginalMessage }
+            );
         }
 
         // ── Step 2: Load + merge + persist profile ────────────────
@@ -94,7 +93,8 @@ public class AgentOrchestrator
         {
             var mergedProfile = await LoadAndMergeProfileAsync(
                 classified.SessionId,
-                classified.MergedProfile);
+                classified.MergedProfile
+            );
 
             if (mergedProfile is not null)
                 classified = classified with { MergedProfile = mergedProfile };
@@ -108,7 +108,7 @@ public class AgentOrchestrator
         {
             UserIntent.SearchRecipe => await HandleSearchRecipeAsync(classified),
             UserIntent.ValidateDiet => await HandleValidateDietAsync(classified),
-            UserIntent.GetMealPlan     => await HandleGetMealPlanAsync(classified),
+            UserIntent.GetMealPlan => await HandleGetMealPlanAsync(classified),
             UserIntent.CreateMealPlan => await HandleCreateMealPlanAsync(classified),
             UserIntent.ModifyMealPlan => await HandleModifyMealPlanAsync(classified),
             UserIntent.GeneralQuestion => await HandleGeneralQuestionAsync(classified),
@@ -118,14 +118,17 @@ public class AgentOrchestrator
         // ── Step 5: Save assistant response to history ────────────
         if (!string.IsNullOrEmpty(classified.SessionId))
         {
-            await _sessionStore.AppendMessageAsync(classified.SessionId, new ConversationEntry
-            {
-                Role = "assistant",
-                Content = response.Message,
-                Intent = response.DetectedIntent,
-                RecipeTitles = response.Recipes.Select(r => r.Recipe.Title).Take(5).ToList(),
-                PlanId = response.MealPlan?.PlanId,
-            });
+            await _sessionStore.AppendMessageAsync(
+                classified.SessionId,
+                new ConversationEntry
+                {
+                    Role = "assistant",
+                    Content = response.Message,
+                    Intent = response.DetectedIntent,
+                    RecipeTitles = response.Recipes.Select(r => r.Recipe.Title).Take(5).ToList(),
+                    PlanId = response.MealPlan?.PlanId,
+                }
+            );
         }
 
         sw.Stop();
@@ -138,15 +141,29 @@ public class AgentOrchestrator
 
         return response;
     }
+
     // ── Reference Resolution ──────────────────────────────────────────────────
 
     private static readonly HashSet<string> ReferenceWords =
     [
-        "it", "that", "this", "the first", "the second", "the third",
-    "first one", "second one", "third one",
-    "that one", "this one", "the one",
-    "again", "same", "that recipe", "that dish",
+        "it",
+        "that",
+        "this",
+        "the first",
+        "the second",
+        "the third",
+        "first one",
+        "second one",
+        "third one",
+        "that one",
+        "this one",
+        "the one",
+        "again",
+        "same",
+        "that recipe",
+        "that dish",
     ];
+
     // ── Profile Persistence ───────────────────────────────────────────────────
 
     /// <summary>
@@ -155,7 +172,8 @@ public class AgentOrchestrator
     /// </summary>
     private async Task<DietaryProfile?> LoadAndMergeProfileAsync(
         string sessionId,
-        DietaryProfile? requestProfile)
+        DietaryProfile? requestProfile
+    )
     {
         DietaryProfile? storedProfile = null;
         try
@@ -164,7 +182,11 @@ public class AgentOrchestrator
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "[Orchestrator] Failed to load profile for session {SessionId}", sessionId);
+            _logger.LogWarning(
+                ex,
+                "[Orchestrator] Failed to load profile for session {SessionId}",
+                sessionId
+            );
         }
 
         // Nothing to merge — no stored, no request
@@ -172,19 +194,26 @@ public class AgentOrchestrator
             return null;
 
         // Only one side exists — use it directly, still save to ensure TTL refresh
-        var merged = storedProfile is null ? requestProfile!
+        var merged =
+            storedProfile is null ? requestProfile!
             : requestProfile is null ? storedProfile
             : new DietaryProfile
             {
                 // Union merge — request wins on conflicts via Concat order + Distinct
-                Restrictions = requestProfile.Restrictions
-                    .Union(storedProfile.Restrictions, StringComparer.OrdinalIgnoreCase)
+                Restrictions = requestProfile
+                    .Restrictions.Union(
+                        storedProfile.Restrictions,
+                        StringComparer.OrdinalIgnoreCase
+                    )
                     .ToList(),
-                Allergies = requestProfile.Allergies
-                    .Union(storedProfile.Allergies, StringComparer.OrdinalIgnoreCase)
+                Allergies = requestProfile
+                    .Allergies.Union(storedProfile.Allergies, StringComparer.OrdinalIgnoreCase)
                     .ToList(),
-                CuisinePreferences = requestProfile.CuisinePreferences
-                    .Union(storedProfile.CuisinePreferences, StringComparer.OrdinalIgnoreCase)
+                CuisinePreferences = requestProfile
+                    .CuisinePreferences.Union(
+                        storedProfile.CuisinePreferences,
+                        StringComparer.OrdinalIgnoreCase
+                    )
                     .ToList(),
             };
 
@@ -195,7 +224,11 @@ public class AgentOrchestrator
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "[Orchestrator] Failed to save merged profile for session {SessionId}", sessionId);
+            _logger.LogWarning(
+                ex,
+                "[Orchestrator] Failed to save merged profile for session {SessionId}",
+                sessionId
+            );
         }
 
         return merged;
@@ -225,7 +258,10 @@ public class AgentOrchestrator
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "[Orchestrator] History load failed — proceeding without context");
+            _logger.LogWarning(
+                ex,
+                "[Orchestrator] History load failed — proceeding without context"
+            );
             return classified;
         }
 
@@ -247,43 +283,54 @@ public class AgentOrchestrator
         // ── Recipe reference: "is it vegan?", "the first one" ────
         if (lastAssistant.Intent == UserIntent.SearchRecipe && lastAssistant.RecipeTitles.Count > 0)
         {
-            var targetRecipe = lower.Contains("second") || lower.Contains("2nd")
-                ? lastAssistant.RecipeTitles.ElementAtOrDefault(1)
+            var targetRecipe =
+                lower.Contains("second") || lower.Contains("2nd")
+                    ? lastAssistant.RecipeTitles.ElementAtOrDefault(1)
                 : lower.Contains("third") || lower.Contains("3rd")
                     ? lastAssistant.RecipeTitles.ElementAtOrDefault(2)
-                    : lastAssistant.RecipeTitles[0]; // "it", "that", "first" → top result
+                : lastAssistant.RecipeTitles[0]; // "it", "that", "first" → top result
 
             if (targetRecipe is not null)
             {
-                _logger.LogInformation("[Orchestrator] Resolved recipe reference → '{Title}'", targetRecipe);
+                _logger.LogInformation(
+                    "[Orchestrator] Resolved recipe reference → '{Title}'",
+                    targetRecipe
+                );
                 return classified with
                 {
                     SearchQuery = targetRecipe,
-                    Intent = (classified.Intent == UserIntent.Unknown
-              || classified.Intent == UserIntent.SearchRecipe)
-            ? UserIntent.ValidateDiet
-            : classified.Intent,
+                    Intent =
+                        (
+                            classified.Intent == UserIntent.Unknown
+                            || classified.Intent == UserIntent.SearchRecipe
+                        )
+                            ? UserIntent.ValidateDiet
+                            : classified.Intent,
                 };
             }
         }
 
         // ── Plan reference: "swap it again" ──────────────────────
-        if (lastAssistant.Intent == UserIntent.ModifyMealPlan
+        if (
+            lastAssistant.Intent == UserIntent.ModifyMealPlan
             && lower.Contains("again")
-            && string.IsNullOrEmpty(classified.TargetDay))
+            && string.IsNullOrEmpty(classified.TargetDay)
+        )
         {
             // Find the last user message that had a TargetDay — re-extract it
-            var lastUserModify = history
-                .Where(e => e.Role == "user")
-                .LastOrDefault();
+            var lastUserModify = history.Where(e => e.Role == "user").LastOrDefault();
 
             // Can't recover the day from raw content reliably — ask clarifying question
             // The key win here is that intent is now ModifyMealPlan, not Unknown
-            return classified with { Intent = UserIntent.ModifyMealPlan };
+            return classified with
+            {
+                Intent = UserIntent.ModifyMealPlan,
+            };
         }
 
         return classified;
     }
+
     // ── Intent Handlers ───────────────────────────────────────────────────────
     private async Task<OrchestratorResponse> HandleSearchRecipeAsync(ClassifiedIntent classified)
     {
@@ -539,6 +586,7 @@ public class AgentOrchestrator
             );
         }
     }
+
     private async Task<OrchestratorResponse> HandleGetMealPlanAsync(ClassifiedIntent classified)
     {
         var sessionId = classified.SessionId;
@@ -555,14 +603,16 @@ public class AgentOrchestrator
         if (plan is null)
             return new OrchestratorResponse
             {
-                Message = "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
+                Message =
+                    "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
                 DetectedIntent = UserIntent.GetMealPlan,
                 Recipes = [],
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
 
         var slotCount = plan.Days.FirstOrDefault()?.Slots.Count ?? 1;
-        var slotDesc = slotCount == 1 ? "dinner"
+        var slotDesc =
+            slotCount == 1 ? "dinner"
             : slotCount == 2 ? "two meals per day"
             : "full day (breakfast, lunch, and dinner)";
 
@@ -575,6 +625,7 @@ public class AgentOrchestrator
             Metadata = BuildMetadata(classified, dietaryApplied: false),
         };
     }
+
     private async Task<OrchestratorResponse> HandleModifyMealPlanAsync(ClassifiedIntent classified)
     {
         var sessionId = classified.SessionId;

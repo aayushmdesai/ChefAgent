@@ -748,16 +748,16 @@ public static class DietaryRules
         ["kosher"] = i => CheckHalal(i),
         // "-free" restriction variants — extracted by IntentRouter from "nut-free X", "dairy-free X", etc.
         // Delegate to the same checker as the corresponding allergy.
-        ["nut-free"]   = i => CheckAgainstSet(i, NutIngredients,   "nuts",   "nut-free"),
-        ["dairy-free"] = i => CheckAgainstSet(i, DairyIngredients, "dairy",  "dairy-free"),
+        ["nut-free"] = i => CheckAgainstSet(i, NutIngredients, "nuts", "nut-free"),
+        ["dairy-free"] = i => CheckAgainstSet(i, DairyIngredients, "dairy", "dairy-free"),
         ["gluten-free"] = i =>
         {
             var v = new List<ViolationDetail>();
             v.AddRange(CheckAgainstSet(i, GlutenIngredients, "gluten", "gluten-free"));
             return v;
         },
-        ["egg-free"]  = i => CheckAgainstSet(i, EggIngredients, "eggs", "egg-free"),
-        ["soy-free"]  = i => CheckAgainstSet(i, SoyIngredients, "soy",  "soy-free"),
+        ["egg-free"] = i => CheckAgainstSet(i, EggIngredients, "eggs", "egg-free"),
+        ["soy-free"] = i => CheckAgainstSet(i, SoyIngredients, "soy", "soy-free"),
     };
 
     private static readonly Dictionary<

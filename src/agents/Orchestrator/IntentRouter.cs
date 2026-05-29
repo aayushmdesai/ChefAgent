@@ -33,6 +33,7 @@ public class IntentRouter
     private readonly HttpClient _httpClient;
     private readonly string _ollamaUrl;
     private readonly string _chatModel;
+
     // ── Signal Word Sets ──────────────────────────────────────────────────────
 
     private static readonly HashSet<string> ValidateDietSignals =
@@ -50,23 +51,46 @@ public class IntentRouter
         "will this work for",
         "is this okay",
     ];
+
     // Implicit constraint signals — heuristic to detect when LLM extraction is needed.
     // Rules catch explicit vocabulary ("gluten-free", "vegan").
     // LLM catches natural language expressions of constraints.
     private static readonly HashSet<string> ImplicitConstraintSignals =
     [
-        "i cannot", "i can not", "i do not eat", "i dont eat",
-    "i am allergic", "i am intolerant", "i am sensitive",
-    "we cannot", "we do not eat", "we dont eat",
-    "no X for me", "avoid", "i need to avoid",
-    "i am trying", "i try to", "i have been",
-    "plant-based", "clean eating", "healthy eating",
-    "my doctor", "my diet", "intolerant", "sensitive to",
-    "i have a", "we have a",        // "i have a nut allergy"
-    "i follow", "we follow",        // "i follow a vegan diet"
-    "i eat", "i only eat",          // "i only eat fish"
-    "no dairy", "no gluten", "no nuts", "no meat",
-];
+        "i cannot",
+        "i can not",
+        "i do not eat",
+        "i dont eat",
+        "i am allergic",
+        "i am intolerant",
+        "i am sensitive",
+        "we cannot",
+        "we do not eat",
+        "we dont eat",
+        "no X for me",
+        "avoid",
+        "i need to avoid",
+        "i am trying",
+        "i try to",
+        "i have been",
+        "plant-based",
+        "clean eating",
+        "healthy eating",
+        "my doctor",
+        "my diet",
+        "intolerant",
+        "sensitive to",
+        "i have a",
+        "we have a", // "i have a nut allergy"
+        "i follow",
+        "we follow", // "i follow a vegan diet"
+        "i eat",
+        "i only eat", // "i only eat fish"
+        "no dairy",
+        "no gluten",
+        "no nuts",
+        "no meat",
+    ];
 
     private static readonly HashSet<string> GeneralQuestionSignals =
     [
@@ -129,45 +153,47 @@ public class IntentRouter
         "my plan",
         "my weekly plan",
     ];
+
     // ── Contraction Normalization ─────────────────────────────────────────────
     /// Expands common contractions before signal word matching.
     /// Handles the most common cases — not exhaustive.
     /// LLM classifier (Month 2) handles arbitrary phrasing.
     /// Runs once on lowercased input — all signal sets benefit automatically.
-
     /// <summary>
     /// Expands common contractions before signal word matching.
     /// Runs once on the lowercased input — all signal sets benefit automatically.
     /// </summary>
-    private static string NormalizeContractions(string lower) => lower
-        .Replace("whats", "what is")
-        .Replace("what's", "what is")
-        .Replace("hows", "how is")
-        .Replace("how's", "how is")
-        .Replace("whos", "who is")
-        .Replace("who's", "who is")
-        .Replace("thats", "that is")
-        .Replace("that's", "that is")
-        .Replace("its ", "it is ")
-        .Replace("it's", "it is")
-        .Replace("i'm", "i am")
-        .Replace("im ", "i am ")
-        .Replace("cant", "cannot")
-        .Replace("can't", "cannot")
-        .Replace("dont", "do not")
-        .Replace("don't", "do not")
-        .Replace("doesnt", "does not")
-        .Replace("doesn't", "does not")
-        .Replace("wont", "will not")
-        .Replace("won't", "will not")
-        .Replace("isnt", "is not")
-        .Replace("isn't", "is not")
-        .Replace("wouldnt", "would not")
-        .Replace("wouldn't", "would not")
-        .Replace("shouldnt", "should not")
-        .Replace("shouldn't", "should not")
-        .Replace("couldnt", "could not")
-        .Replace("couldn't", "could not");
+    private static string NormalizeContractions(string lower) =>
+        lower
+            .Replace("whats", "what is")
+            .Replace("what's", "what is")
+            .Replace("hows", "how is")
+            .Replace("how's", "how is")
+            .Replace("whos", "who is")
+            .Replace("who's", "who is")
+            .Replace("thats", "that is")
+            .Replace("that's", "that is")
+            .Replace("its ", "it is ")
+            .Replace("it's", "it is")
+            .Replace("i'm", "i am")
+            .Replace("im ", "i am ")
+            .Replace("cant", "cannot")
+            .Replace("can't", "cannot")
+            .Replace("dont", "do not")
+            .Replace("don't", "do not")
+            .Replace("doesnt", "does not")
+            .Replace("doesn't", "does not")
+            .Replace("wont", "will not")
+            .Replace("won't", "will not")
+            .Replace("isnt", "is not")
+            .Replace("isn't", "is not")
+            .Replace("wouldnt", "would not")
+            .Replace("wouldn't", "would not")
+            .Replace("shouldnt", "should not")
+            .Replace("shouldn't", "should not")
+            .Replace("couldnt", "could not")
+            .Replace("couldn't", "could not");
+
     private static List<string> ExtractMealSlots(string lower)
     {
         var slots = new List<string>();
@@ -187,10 +213,11 @@ public class IntentRouter
     }
 
     public IntentRouter(
-    HttpClient httpClient,
-    string ollamaUrl,
-    string chatModel,
-    ILogger<IntentRouter> logger)
+        HttpClient httpClient,
+        string ollamaUrl,
+        string chatModel,
+        ILogger<IntentRouter> logger
+    )
     {
         _httpClient = httpClient;
         _ollamaUrl = ollamaUrl;
@@ -207,10 +234,11 @@ public class IntentRouter
     /// Collect these cases for future dataset labeling.
     /// </summary>
     public async Task<ClassifiedIntent> ClassifyAsync(
-    string message,
-    DietaryProfile? existingProfile = null,
-    string? sessionId = null,
-    List<ConversationEntry>? history = null)
+        string message,
+        DietaryProfile? existingProfile = null,
+        string? sessionId = null,
+        List<ConversationEntry>? history = null
+    )
     {
         var lower = message.ToLowerInvariant().Trim();
         var normalized = NormalizeContractions(lower);
@@ -226,8 +254,7 @@ public class IntentRouter
         //   3. Existing profile doesn't already cover it
         if (extractedProfile is null && HasImplicitConstraintSignal(normalized))
         {
-            var llmProfile = await TryExtractProfileWithLlmAsync(
-                message, existingProfile, history);
+            var llmProfile = await TryExtractProfileWithLlmAsync(message, existingProfile, history);
 
             if (llmProfile is not null)
             {
@@ -235,7 +262,8 @@ public class IntentRouter
                 _logger.LogInformation(
                     "[IntentRouter] LLM extracted profile — restrictions: [{R}] allergies: [{A}]",
                     string.Join(", ", llmProfile.Restrictions),
-                    string.Join(", ", llmProfile.Allergies));
+                    string.Join(", ", llmProfile.Allergies)
+                );
             }
         }
 
@@ -252,24 +280,29 @@ public class IntentRouter
             targetSlot = slots.FirstOrDefault(s => lower.Contains(s)) ?? "dinner";
             var days = new[]
             {
-            "monday", "tuesday", "wednesday", "thursday",
-            "friday", "saturday", "sunday",
-        };
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday",
+            };
             var matched = days.FirstOrDefault(d => lower.Contains(d));
-            targetDay = matched is not null
-                ? char.ToUpper(matched[0]) + matched[1..]
-                : null;
+            targetDay = matched is not null ? char.ToUpper(matched[0]) + matched[1..] : null;
             modifyConstraint = ExtractModifyConstraint(lower);
         }
 
         sw.Stop();
         _logger.LogInformation(
             "[IntentRouter] Message='{Msg}' Intent={Intent} Layer={Layer} Time={Ms}ms",
-            message, intent, classifiedBy, sw.ElapsedMilliseconds);
+            message,
+            intent,
+            classifiedBy,
+            sw.ElapsedMilliseconds
+        );
 
-        var mealSlots = intent == UserIntent.CreateMealPlan
-            ? ExtractMealSlots(lower)
-            : ["dinner"];
+        var mealSlots = intent == UserIntent.CreateMealPlan ? ExtractMealSlots(lower) : ["dinner"];
 
         return new ClassifiedIntent
         {
@@ -288,6 +321,7 @@ public class IntentRouter
             ClassifiedBy = classifiedBy,
         };
     }
+
     // ── Intent Classification ─────────────────────────────────────────────────
 
     private static UserIntent ClassifyIntent(string lower)
@@ -361,16 +395,30 @@ public class IntentRouter
 
         var cleaned = lower
             // Action words
+            // Specific full phrases first — before generic prefix removal
+            .Replace("i cannot have dairy", "")
+            .Replace("i cannot have gluten", "")
+            .Replace("i cannot have nuts", "")
+            .Replace("i cannot have meat", "")
+            .Replace("i cannot have eggs", "")
+            .Replace("i cannot have soy", "")
+            .Replace("i can not have dairy", "")
+            .Replace("i can not have gluten", "")
+            .Replace("i do not eat meat", "")
+            .Replace("i do not eat dairy", "")
+            .Replace("i dont eat meat", "")
+            .Replace("i dont eat dairy", "")
+            // Generic prefix removal — catches remaining patterns
             .Replace("i cannot have ", "")
             .Replace("i can not have ", "")
             .Replace("i do not eat ", "")
             .Replace("i dont eat ", "")
             .Replace("i am allergic to ", "")
             .Replace("i am intolerant to ", "")
-            .Replace("no dairy ", "")
-            .Replace("no gluten ", "")
-            .Replace("no nuts ", "")
-            .Replace("no meat ", "")
+            .Replace("no dairy", "")
+            .Replace("no gluten", "")
+            .Replace("no nuts", "")
+            .Replace("no meat", "")
             .Replace(",", "")
             .Replace("find me ", "")
             .Replace("find ", "")
@@ -418,6 +466,7 @@ public class IntentRouter
         // Fall back to original if cleaning removed everything
         return string.IsNullOrWhiteSpace(cleaned) ? "dinner" : cleaned;
     }
+
     // ── LLM Entity Extraction ─────────────────────────────────────────────────
 
     private static bool HasImplicitConstraintSignal(string normalized) =>
@@ -432,73 +481,79 @@ public class IntentRouter
     private async Task<DietaryProfile?> TryExtractProfileWithLlmAsync(
         string message,
         DietaryProfile? existingProfile,
-        List<ConversationEntry>? history)
+        List<ConversationEntry>? history
+    )
     {
         try
         {
-            var historyText = history is not null && history.Count > 0
-                ? string.Join("\n", history.TakeLast(6).Select(e =>
-                    $"{e.Role}: {e.Content}"))
-                : "No prior conversation.";
+            var historyText =
+                history is not null && history.Count > 0
+                    ? string.Join("\n", history.TakeLast(6).Select(e => $"{e.Role}: {e.Content}"))
+                    : "No prior conversation.";
 
             var knownProfile = existingProfile is null
                 ? "None"
-                : $"restrictions: [{string.Join(", ", existingProfile.Restrictions)}], " +
-                  $"allergies: [{string.Join(", ", existingProfile.Allergies)}]";
+                : $"restrictions: [{string.Join(", ", existingProfile.Restrictions)}], "
+                    + $"allergies: [{string.Join(", ", existingProfile.Allergies)}]";
 
-            var outputFormat = """{"restrictions": ["vegetarian"], "allergies": ["nuts"], "uncertain": ["healthy"], "confidence": "high"}""";
-var emptyFormat  = """{"restrictions": [], "allergies": [], "uncertain": [], "confidence": "high"}""";
+            var outputFormat =
+                """{"restrictions": ["vegetarian"], "allergies": ["nuts"], "uncertain": ["healthy"], "confidence": "high"}""";
+            var emptyFormat =
+                """{"restrictions": [], "allergies": [], "uncertain": [], "confidence": "high"}""";
 
-var prompt =
-    $"You are a dietary constraint extractor. Extract ONLY NEW dietary " +
-    $"restrictions or allergies from the conversation below that are NOT " +
-    $"already in the known profile.\n\n" +
-    $"Known profile (do NOT re-extract these): {knownProfile}\n\n" +
-    $"Conversation history:\n{historyText}\n\n" +
-    $"Current message: {message}\n\n" +
-    $"Return ONLY valid JSON, no explanation, no markdown fences:\n" +
-    $"{outputFormat}\n\n" +
-    $"Use these exact restriction names where applicable:\n" +
-    $"vegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, " +
-    $"gluten-free, dairy-free, nut-free, egg-free, soy-free\n\n" +
-    $"If nothing new was expressed, return:\n{emptyFormat}";
+            var prompt =
+                $"You are a dietary constraint extractor. Extract ONLY NEW dietary "
+                + $"restrictions or allergies from the conversation below that are NOT "
+                + $"already in the known profile.\n\n"
+                + $"Known profile (do NOT re-extract these): {knownProfile}\n\n"
+                + $"Conversation history:\n{historyText}\n\n"
+                + $"Current message: {message}\n\n"
+                + $"Return ONLY valid JSON, no explanation, no markdown fences:\n"
+                + $"{outputFormat}\n\n"
+                + $"Use these exact restriction names where applicable:\n"
+                + $"vegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, "
+                + $"gluten-free, dairy-free, nut-free, egg-free, soy-free\n\n"
+                + $"If nothing new was expressed, return:\n{emptyFormat}";
             var payload = new
             {
                 model = _chatModel,
                 stream = false,
-                messages = new[]
-                {
-                new { role = "user", content = prompt },
-            },
+                messages = new[] { new { role = "user", content = prompt } },
             };
 
             var json = System.Text.Json.JsonSerializer.Serialize(payload);
             var content = new System.Net.Http.StringContent(
-                json, System.Text.Encoding.UTF8, "application/json");
+                json,
+                System.Text.Encoding.UTF8,
+                "application/json"
+            );
 
             // 90s timeout — LLM extraction is opt-in, caller already opted in
-            using var cts = new System.Threading.CancellationTokenSource(
-                TimeSpan.FromSeconds(90));
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(90));
             var response = await _httpClient.PostAsync(
-                $"{_ollamaUrl}/api/chat", content, cts.Token);
+                $"{_ollamaUrl}/api/chat",
+                content,
+                cts.Token
+            );
             response.EnsureSuccessStatusCode();
 
             var body = await response.Content.ReadAsStringAsync();
             using var doc = System.Text.Json.JsonDocument.Parse(body);
-            var raw = doc.RootElement
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString() ?? string.Empty;
+            var raw =
+                doc.RootElement.GetProperty("message").GetProperty("content").GetString()
+                ?? string.Empty;
 
             _logger.LogInformation("[IntentRouter] LLM raw response: {Raw}", raw);
             // Strip markdown fences if present
             raw = raw.Trim();
-            if (raw.StartsWith("```")) raw = raw[(raw.IndexOf('\n') + 1)..];
-            if (raw.EndsWith("```"))   raw = raw[..raw.LastIndexOf("```")].Trim();
+            if (raw.StartsWith("```"))
+                raw = raw[(raw.IndexOf('\n') + 1)..];
+            if (raw.EndsWith("```"))
+                raw = raw[..raw.LastIndexOf("```")].Trim();
 
             // Extract first JSON object only — LLM sometimes appends explanation after
             var braceStart = raw.IndexOf('{');
-            var braceEnd   = raw.LastIndexOf('}');
+            var braceEnd = raw.LastIndexOf('}');
             if (braceStart < 0 || braceEnd < 0 || braceEnd <= braceStart)
             {
                 _logger.LogWarning("[IntentRouter] LLM response had no valid JSON object");
@@ -509,42 +564,49 @@ var prompt =
             using var result = System.Text.Json.JsonDocument.Parse(raw);
             var root = result.RootElement;
 
-            var confidence = root.TryGetProperty("confidence", out var c)
-                ? c.GetString() : "low";
+            var confidence = root.TryGetProperty("confidence", out var c) ? c.GetString() : "low";
 
             // Low confidence → don't apply, log and return null
             if (confidence == "low")
             {
                 _logger.LogInformation(
-                    "[IntentRouter] LLM extraction confidence=low — not applying");
+                    "[IntentRouter] LLM extraction confidence=low — not applying"
+                );
                 return null;
             }
 
             var restrictions = root.TryGetProperty("restrictions", out var r)
-                ? r.EnumerateArray().Select(x => x.GetString()!).Where(s => !string.IsNullOrEmpty(s)).ToList()
+                ? r.EnumerateArray()
+                    .Select(x => x.GetString()!)
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToList()
                 : new List<string>();
 
             var allergies = root.TryGetProperty("allergies", out var a)
-                ? a.EnumerateArray().Select(x => x.GetString()!).Where(s => !string.IsNullOrEmpty(s)).ToList()
+                ? a.EnumerateArray()
+                    .Select(x => x.GetString()!)
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToList()
                 : new List<string>();
 
             if (restrictions.Count == 0 && allergies.Count == 0)
                 return null;
 
-            return new DietaryProfile
-            {
-                Restrictions = restrictions,
-                Allergies = allergies,
-            };
+            return new DietaryProfile { Restrictions = restrictions, Allergies = allergies };
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("[IntentRouter] LLM entity extraction timed out — proceeding without");
+            _logger.LogWarning(
+                "[IntentRouter] LLM entity extraction timed out — proceeding without"
+            );
             return null;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "[IntentRouter] LLM entity extraction failed — proceeding without");
+            _logger.LogWarning(
+                ex,
+                "[IntentRouter] LLM entity extraction failed — proceeding without"
+            );
             return null;
         }
     }

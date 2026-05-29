@@ -20,8 +20,10 @@ public class RecipeSearchPlugin
     private readonly string _ollamaUrl;
     private readonly string _embeddingModel;
     private readonly ILogger<RecipeSearchPlugin> _logger;
+
     // Optional reranker plugin for LLM-based candidate reordering.
     private readonly RecipeReranker? _reranker;
+
     // Optional preprocessor plugin for negation parsing and query expansion.
     private readonly QueryPreprocessor? _preprocessor;
 

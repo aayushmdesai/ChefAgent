@@ -142,16 +142,17 @@ public record OrchestratorResponse
     public UserIntent DetectedIntent { get; init; }
     public Dictionary<string, object> Metadata { get; init; } = [];
 }
+
 /// <summary>
 /// A single turn in the conversation history.
 /// Structured (Option B) so reference resolution works without LLM.
 /// </summary>
 public record ConversationEntry
 {
-    public required string Role { get; init; }          
-    public required string Content { get; init; }       
-    public UserIntent? Intent { get; init; }            
-    public List<string> RecipeTitles { get; init; } = []; 
-    public string? PlanId { get; init; }                
+    public required string Role { get; init; }
+    public required string Content { get; init; }
+    public UserIntent? Intent { get; init; }
+    public List<string> RecipeTitles { get; init; } = [];
+    public string? PlanId { get; init; }
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
 }

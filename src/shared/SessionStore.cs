@@ -18,6 +18,7 @@ public class SessionStore
     {
         _db = redis.GetDatabase();
     }
+
     // ── History ───────────────────────────────────────────────
 
     private const int MaxHistoryEntries = 20;
@@ -50,7 +51,8 @@ public class SessionStore
         var result = new List<ConversationEntry>(entries.Length);
         foreach (var entry in entries)
         {
-            if (entry.IsNull) continue;
+            if (entry.IsNull)
+                continue;
             var deserialized = JsonSerializer.Deserialize<ConversationEntry>(entry!, JsonOptions);
             if (deserialized is not null)
                 result.Add(deserialized);
@@ -99,9 +101,11 @@ public class SessionStore
         return JsonSerializer.Deserialize<DietaryProfile>(json!, JsonOptions);
     }
 
-        // ── Key helpers ───────────────────────────────────────────
+    // ── Key helpers ───────────────────────────────────────────
 
-    private static string PlanKey(string sessionId)    => $"session:{sessionId}:plan";
+    private static string PlanKey(string sessionId) => $"session:{sessionId}:plan";
+
     private static string ProfileKey(string sessionId) => $"session:{sessionId}:profile";
+
     private static string HistoryKey(string sessionId) => $"session:{sessionId}:history";
 }

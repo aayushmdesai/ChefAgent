@@ -219,14 +219,11 @@ public static class ServiceRegistration
 
     private static IServiceCollection AddApiServices(this IServiceCollection services)
     {
-        // CORS — allow React dev 
+        // CORS — allow React dev
         services.AddCors(options =>
         {
             options.AddDefaultPolicy(policy =>
-                policy
-                    .AllowAnyOrigin()
-                    .AllowAnyHeader()
-                    .AllowAnyMethod()
+                policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()
             );
         });
 
