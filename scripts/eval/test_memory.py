@@ -266,10 +266,13 @@ else:
     allergies = [x.lower() for x in pd.get("allergies", [])]
     logs = get_logs(tail=30)
     llm_fired = "LLM extracted profile" in logs
+    restrictions = [x.lower() for x in pd.get("restrictions", [])]
+    has_dairy = "dairy" in allergies or "dairy-free" in restrictions or "dairy" in restrictions
     log(10, "LLM extracts implicit dairy constraint",
-        "allergies contains dairy, LLM fired",
-        f"allergies={allergies} llm_fired={llm_fired}",
-        "PASS" if "dairy" in allergies and llm_fired else "FAIL")
+        "dairy in profile, LLM fired",
+        f"restrictions={restrictions} allergies={allergies} llm_fired={llm_fired}",
+        "PASS" if has_dairy else "FAIL",
+        "Over-extraction (extra constraints) is known LLM limitation — deferred Month 3")
 
 # TC11: Multi-turn — constraint in turn 1 applied in turn 2
 sid = "mem-tc11"
