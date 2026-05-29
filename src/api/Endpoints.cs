@@ -199,6 +199,18 @@ public static class Endpoints
                 SessionStore sessionStore
             ) =>
             {
+                // First line inside the /chat handler, before IntentRouter
+                var validation = InputGuard.Validate(request.Message);
+                if (!validation.IsValid)
+                {
+                    return Results.Ok(
+                        new OrchestratorResponse
+                        {
+                            Message = validation.RejectionReason!,
+                            DetectedIntent = UserIntent.Unknown,
+                        }
+                    );
+                }
                 // Load history for LLM entity extraction context
                 List<ConversationEntry>? history = null;
                 if (!string.IsNullOrEmpty(request.SessionId))
@@ -213,7 +225,7 @@ public static class Endpoints
                 }
 
                 var classified = await intentRouter.ClassifyAsync(
-                    request.Message,
+                    validation.SanitizedMessage,
                     request.DietaryProfile,
                     request.SessionId,
                     history

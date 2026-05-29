@@ -1,6 +1,7 @@
 namespace ChefAgent.Agents.Orchestrator;
 
 using System.Text.RegularExpressions;
+using ChefAgent.Shared;
 using ChefAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 
@@ -33,6 +34,7 @@ public class IntentRouter
     private readonly HttpClient _httpClient;
     private readonly string _ollamaUrl;
     private readonly string _chatModel;
+    private readonly CircuitBreaker _circuitBreaker;
 
     // ── Signal Word Sets ──────────────────────────────────────────────────────
 
@@ -216,12 +218,14 @@ public class IntentRouter
         HttpClient httpClient,
         string ollamaUrl,
         string chatModel,
+        CircuitBreaker circuitBreaker,
         ILogger<IntentRouter> logger
     )
     {
         _httpClient = httpClient;
         _ollamaUrl = ollamaUrl;
         _chatModel = chatModel;
+        _circuitBreaker = circuitBreaker;
         _logger = logger;
     }
 
@@ -484,6 +488,11 @@ public class IntentRouter
         List<ConversationEntry>? history
     )
     {
+        if (!_circuitBreaker.IsAllowed())
+        {
+            _logger.LogInformation("[IntentRouter] Circuit open — skipping LLM entity extraction");
+            return null;
+        }
         try
         {
             var historyText =
@@ -536,6 +545,7 @@ public class IntentRouter
                 cts.Token
             );
             response.EnsureSuccessStatusCode();
+            _circuitBreaker.RecordSuccess();
 
             var body = await response.Content.ReadAsStringAsync();
             using var doc = System.Text.Json.JsonDocument.Parse(body);
@@ -596,6 +606,7 @@ public class IntentRouter
         }
         catch (OperationCanceledException)
         {
+            _circuitBreaker.RecordFailure();
             _logger.LogWarning(
                 "[IntentRouter] LLM entity extraction timed out — proceeding without"
             );
@@ -603,6 +614,7 @@ public class IntentRouter
         }
         catch (Exception ex)
         {
+            _circuitBreaker.RecordFailure();
             _logger.LogWarning(
                 ex,
                 "[IntentRouter] LLM entity extraction failed — proceeding without"

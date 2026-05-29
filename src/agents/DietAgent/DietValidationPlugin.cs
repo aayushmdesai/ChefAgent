@@ -3,6 +3,7 @@ namespace ChefAgent.Agents.Diet;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ChefAgent.Shared;
 using ChefAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 
@@ -30,6 +31,7 @@ public class DietValidationPlugin
     private readonly HttpClient _httpClient;
     private readonly string _ollamaUrl;
     private readonly string _chatModel;
+    private readonly CircuitBreaker _circuitBreaker;
     private readonly ILogger<DietValidationPlugin> _logger;
 
     // ── Substitution Knowledge Base ───────────────────────────────────────────
@@ -179,12 +181,14 @@ public class DietValidationPlugin
         HttpClient httpClient,
         string ollamaUrl,
         string chatModel,
+        CircuitBreaker circuitBreaker,
         ILogger<DietValidationPlugin> logger
     )
     {
         _httpClient = httpClient;
         _ollamaUrl = ollamaUrl;
         _chatModel = chatModel;
+        _circuitBreaker = circuitBreaker;
         _logger = logger;
     }
 
@@ -434,7 +438,24 @@ public class DietValidationPlugin
 
         try
         {
+            if (!_circuitBreaker.IsAllowed())
+            {
+                _logger.LogInformation(
+                    "[DietAgent] Circuit open — skipping LLM validation for '{Title}'",
+                    recipe.Title
+                );
+                return new DietaryValidation
+                {
+                    RecipeId = recipe.Id,
+                    IsCompatible = true,
+                    Explanation =
+                        "Rules found no violations. Deep validation skipped (LLM unavailable). Please review manually.",
+                    // same shape as the existing catch block fallback
+                };
+            }
             var raw = await CallOllamaAsync(prompt);
+            _circuitBreaker.RecordSuccess();
+
             return ParseLlmValidation(recipe.Id, raw);
         }
         catch (Exception ex)
@@ -445,6 +466,8 @@ public class DietValidationPlugin
                 "LLM validation failed for recipe '{Title}' — returning compatible with warning",
                 recipe.Title
             );
+
+            _circuitBreaker.RecordFailure();
 
             return new DietaryValidation
             {
@@ -591,7 +614,16 @@ public class DietValidationPlugin
 
         try
         {
+            if (!_circuitBreaker.IsAllowed())
+            {
+                _logger.LogInformation(
+                    "[DietAgent] Circuit open — skipping LLM substitutions for '{Title}'",
+                    recipe.Title
+                );
+                return [];
+            }
             var raw = await CallOllamaAsync(prompt);
+            _circuitBreaker.RecordSuccess();
             var json = raw.Replace("```json", "").Replace("```", "").Trim();
             var items =
                 JsonSerializer.Deserialize<List<LlmSubstitutionItem>>(
@@ -610,6 +642,7 @@ public class DietValidationPlugin
         }
         catch (Exception ex)
         {
+            _circuitBreaker.RecordFailure();
             _logger.LogWarning(ex, "LLM substitution suggestion failed — returning empty list");
             return [];
         }

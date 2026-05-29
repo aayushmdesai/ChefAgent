@@ -100,7 +100,8 @@ public static class ServiceRegistration
             var qdrant = sp.GetRequiredService<QdrantClient>();
             var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
             var logger = sp.GetRequiredService<ILogger<RecipeSearchPlugin>>();
-
+            var outputGuard = sp.GetRequiredService<OutputGuard>();
+            var circuitBreaker = sp.GetRequiredService<CircuitBreaker>();
             var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
             var embeddingModel = config["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
             var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
@@ -113,10 +114,13 @@ public static class ServiceRegistration
                 embeddingModel,
                 collection,
                 logger,
+                outputGuard,
                 new RecipeReranker(
                     httpClient,
                     ollamaUrl,
                     chatModel,
+                    outputGuard,
+                    circuitBreaker,
                     sp.GetRequiredService<ILogger<RecipeReranker>>()
                 ),
                 new QueryPreprocessor(
@@ -148,6 +152,7 @@ public static class ServiceRegistration
                 httpClient,
                 ollamaUrl,
                 chatModel,
+                sp.GetRequiredService<CircuitBreaker>(),
                 sp.GetRequiredService<ILogger<DietValidationPlugin>>()
             );
         });
@@ -178,6 +183,8 @@ public static class ServiceRegistration
         IConfiguration config
     )
     {
+        services.AddSingleton<CircuitBreaker>();
+        services.AddSingleton<OutputGuard>();
         // IntentRouter — rules-based classifier, Month 2 will add LLM path
         services.AddSingleton(sp =>
         {
@@ -189,6 +196,7 @@ public static class ServiceRegistration
                 httpClient,
                 ollamaUrl,
                 chatModel,
+                sp.GetRequiredService<CircuitBreaker>(),
                 sp.GetRequiredService<ILogger<IntentRouter>>()
             );
         });
@@ -208,6 +216,7 @@ public static class ServiceRegistration
                 httpClient,
                 ollamaUrl,
                 chatModel,
+                sp.GetRequiredService<CircuitBreaker>(),
                 sp.GetRequiredService<ILogger<AgentOrchestrator>>()
             );
         });

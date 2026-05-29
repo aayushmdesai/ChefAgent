@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using ChefAgent.Shared;
 using ChefAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 
@@ -14,18 +15,24 @@ public class RecipeReranker
     private readonly HttpClient _httpClient;
     private readonly string _ollamaUrl;
     private readonly string _chatModel;
+    private readonly OutputGuard _outputGuard;
+    private readonly CircuitBreaker _circuitBreaker;
     private readonly ILogger<RecipeReranker> _logger;
 
     public RecipeReranker(
         HttpClient httpClient,
         string ollamaUrl,
         string chatModel,
+        OutputGuard outputGuard,
+        CircuitBreaker circuitBreaker,
         ILogger<RecipeReranker> logger
     )
     {
         _httpClient = httpClient;
         _ollamaUrl = ollamaUrl;
         _chatModel = chatModel;
+        _outputGuard = outputGuard;
+        _circuitBreaker = circuitBreaker;
         _logger = logger;
     }
 
@@ -43,7 +50,6 @@ public class RecipeReranker
         if (candidates.Count <= 1)
             return candidates;
 
-        // Build a ranking prompt and ask Ollama to score each candidate.
         var prompt = BuildPrompt(query, candidates);
 
         _logger.LogInformation(
@@ -51,27 +57,46 @@ public class RecipeReranker
             candidates.Count,
             query
         );
-
-        try
+        if (!_circuitBreaker.IsAllowed())
         {
-            var llmResponse = await CallOllamaAsync(prompt, ct);
-            var ranked = ParseRanking(llmResponse, candidates);
-
-            _logger.LogInformation(
-                "Re-ranking complete. Top result: {Title}",
-                ranked.FirstOrDefault()?.Title ?? "none"
-            );
-
-            return ranked.Take(topN).ToList();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "Re-ranking failed, falling back to original vector search order"
-            );
+            _logger.LogInformation("[AgentName] Circuit open — skipping LLM");
             return candidates.Take(topN).ToList();
         }
+        var rankings = await _outputGuard.CallWithRetryAsync(
+            llmCall: () => CallOllamaAsync(prompt, ct),
+            validator: raw => _outputGuard.ValidateRerankOutput(raw, candidates.Count),
+            context: "Reranker"
+        );
+        _circuitBreaker.RecordSuccess();
+
+        if (rankings is null)
+        {
+            _logger.LogWarning("Re-ranking failed after retry — using vector search order");
+            return candidates.Take(topN).ToList();
+        }
+
+        // Build ranked list from validated entries
+        var ranked = new List<RecipeDocument>();
+        foreach (var entry in rankings)
+        {
+            var recipe = candidates[entry.Index];
+            ranked.Add(recipe with { RelevanceScore = entry.Score });
+        }
+
+        // Append any candidates the LLM missed
+        var rankedIds = ranked.Select(r => r.Id).ToHashSet();
+        foreach (var candidate in candidates)
+        {
+            if (!rankedIds.Contains(candidate.Id))
+                ranked.Add(candidate with { RelevanceScore = 0.0 });
+        }
+
+        _logger.LogInformation(
+            "Re-ranking complete. Top result: {Title}",
+            ranked.FirstOrDefault()?.Title ?? "none"
+        );
+
+        return ranked.Take(topN).ToList();
     }
 
     private static string BuildPrompt(string query, List<RecipeDocument> candidates)
@@ -129,49 +154,6 @@ public class RecipeReranker
         var result = await response.Content.ReadFromJsonAsync<OllamaChatResponse>(ct);
         return result?.Message?.Content ?? "";
     }
-
-    private List<RecipeDocument> ParseRanking(string llmResponse, List<RecipeDocument> candidates)
-    {
-        // Strip markdown fences if the LLM wraps the JSON response in code blocks.
-        var json = llmResponse.Replace("```json", "").Replace("```", "").Trim();
-
-        var rankings = JsonSerializer.Deserialize<List<RankingEntry>>(
-            json,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-        );
-
-        if (rankings == null || rankings.Count == 0)
-            throw new InvalidOperationException("LLM returned empty ranking");
-
-        var ranked = new List<RecipeDocument>();
-
-        foreach (var entry in rankings)
-        {
-            if (entry.Index >= 0 && entry.Index < candidates.Count)
-            {
-                var recipe = candidates[entry.Index];
-                // Overwrite the vector score with the LLM relevance score
-                ranked.Add(recipe with { RelevanceScore = entry.Score });
-            }
-            else
-            {
-                _logger.LogWarning("LLM returned out-of-range index: {Index}", entry.Index);
-            }
-        }
-
-        // Append any candidates the LLM missed (preserving original order)
-        // Ensure any candidates omitted by the LLM are still present in the final ranked list.
-        var rankedIds = ranked.Select(r => r.Id).ToHashSet();
-        foreach (var candidate in candidates)
-        {
-            if (!rankedIds.Contains(candidate.Id))
-                ranked.Add(candidate with { RelevanceScore = 0.0 });
-        }
-
-        return ranked;
-    }
-
-    private record RankingEntry(int Index, double Score);
 
     private record OllamaChatResponse(OllamaChatMessage Message);
 

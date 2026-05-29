@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Net.Http.Json;
+using ChefAgent.Shared;
 using ChefAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -21,6 +22,8 @@ public class RecipeSearchPlugin
     private readonly string _embeddingModel;
     private readonly ILogger<RecipeSearchPlugin> _logger;
 
+    private readonly OutputGuard _outputGuard;
+
     // Optional reranker plugin for LLM-based candidate reordering.
     private readonly RecipeReranker? _reranker;
 
@@ -34,6 +37,7 @@ public class RecipeSearchPlugin
         string embeddingModel,
         string collectionName,
         ILogger<RecipeSearchPlugin> logger,
+        OutputGuard outputGuard,
         RecipeReranker? reranker = null,
         QueryPreprocessor? preprocessor = null
     )
@@ -46,6 +50,7 @@ public class RecipeSearchPlugin
         _logger = logger;
         _reranker = reranker;
         _preprocessor = preprocessor;
+        _outputGuard = outputGuard;
     }
 
     [KernelFunction("search_recipes")]
@@ -144,7 +149,6 @@ public class RecipeSearchPlugin
             limit: (ulong)fetchLimit,
             cancellationToken: cancellationToken
         );
-
         // 4. Map results to RecipeDocuments
         var results = searchResult
             .Select(point =>
@@ -163,6 +167,7 @@ public class RecipeSearchPlugin
                     RelevanceScore = point.Score,
                 };
             })
+            .Where(r => _outputGuard.IsRecipeSane(r, r.RelevanceScore)) // ← here, after mapping
             .ToList();
 
         // 5. Filter negation violations

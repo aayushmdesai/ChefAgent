@@ -38,7 +38,13 @@ public class AgentOrchestrator
     private readonly HttpClient _httpClient;
     private readonly string _ollamaUrl;
     private readonly string _chatModel;
+    private readonly CircuitBreaker _circuitBreaker;
     private readonly ILogger<AgentOrchestrator> _logger;
+
+    // Agent loop cap — in HandleCreateMealPlanAsync
+    // MealPlannerPlugin already does 7 recipe + 7 diet = 14 calls
+    // Cap is a safety net, not a normal path
+    private const int MaxAgentCallsPerRequest = 20;
 
     public AgentOrchestrator(
         RecipeSearchPlugin recipeAgent,
@@ -48,6 +54,7 @@ public class AgentOrchestrator
         HttpClient httpClient,
         string ollamaUrl,
         string chatModel,
+        CircuitBreaker circuitBreaker,
         ILogger<AgentOrchestrator> logger
     )
     {
@@ -58,6 +65,7 @@ public class AgentOrchestrator
         _plannerAgent = plannerAgent;
         _ollamaUrl = ollamaUrl;
         _chatModel = chatModel;
+        _circuitBreaker = circuitBreaker;
         _logger = logger;
     }
 
@@ -378,6 +386,7 @@ public class AgentOrchestrator
                     $"I couldn't find any recipes for \"{classified.SearchQuery}\". Try a different query.",
                 DetectedIntent = UserIntent.SearchRecipe,
                 Recipes = [],
+                Confidence = ResponseConfidence.High,
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
 
@@ -395,6 +404,7 @@ public class AgentOrchestrator
                 Message = BuildSearchMessage(recipes, classified, dietaryApplied: false),
                 DetectedIntent = UserIntent.SearchRecipe,
                 Recipes = recipes.Select(r => new ValidatedRecipe { Recipe = r }).ToList(),
+                Confidence = ResponseConfidence.High,
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
         }
@@ -444,7 +454,7 @@ public class AgentOrchestrator
             ),
             DetectedIntent = UserIntent.SearchRecipe,
             Recipes = sorted,
-
+            Confidence = dietaryUnavailable ? ResponseConfidence.Low : ResponseConfidence.Medium,
             Metadata = BuildMetadata(
                 classified,
                 dietaryApplied: true,
@@ -471,6 +481,7 @@ public class AgentOrchestrator
                     "I'd be happy to check a recipe for you — could you tell me which recipe and any dietary restrictions you have?",
                 DetectedIntent = UserIntent.ValidateDiet,
                 Recipes = [],
+                Confidence = ResponseConfidence.High,
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
         }
@@ -523,6 +534,7 @@ public class AgentOrchestrator
                     $"Found \"{recipe.Title}\" but dietary validation is unavailable right now. Please review manually.",
                 DetectedIntent = UserIntent.ValidateDiet,
                 Recipes = [new ValidatedRecipe { Recipe = recipe, Dietary = null }],
+                Confidence = ResponseConfidence.Low,
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
         }
@@ -548,6 +560,7 @@ public class AgentOrchestrator
             DetectedIntent = UserIntent.ValidateDiet,
             Recipes = [new ValidatedRecipe { Recipe = recipe, Dietary = validation }],
             DietaryCheck = validation,
+            Confidence = ResponseConfidence.Medium,
             Metadata = BuildMetadata(classified, dietaryApplied: true),
         };
     }
@@ -562,6 +575,7 @@ public class AgentOrchestrator
                     "I need a session ID to save your meal plan. Please include one in your request.",
                 DetectedIntent = UserIntent.CreateMealPlan,
                 Recipes = [],
+                Confidence = ResponseConfidence.High,
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
 
@@ -606,6 +620,9 @@ public class AgentOrchestrator
                 DetectedIntent = UserIntent.CreateMealPlan,
                 Recipes = [],
                 MealPlan = plan,
+                Confidence = classified.MergedProfile is not null
+                    ? ResponseConfidence.Medium
+                    : ResponseConfidence.High,
                 Metadata = BuildMetadata(
                     classified,
                     dietaryApplied: classified.MergedProfile is not null
@@ -631,6 +648,7 @@ public class AgentOrchestrator
                 Message = "I need a session ID to find your plan.",
                 DetectedIntent = UserIntent.GetMealPlan,
                 Recipes = [],
+                Confidence = ResponseConfidence.High,
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
 
@@ -655,6 +673,7 @@ public class AgentOrchestrator
                     "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
                 DetectedIntent = UserIntent.GetMealPlan,
                 Recipes = [],
+                Confidence = ResponseConfidence.High,
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
 
@@ -670,6 +689,7 @@ public class AgentOrchestrator
             DetectedIntent = UserIntent.GetMealPlan,
             Recipes = [],
             MealPlan = plan,
+            Confidence = ResponseConfidence.High,
             Metadata = BuildMetadata(classified, dietaryApplied: false),
         };
     }
@@ -684,6 +704,7 @@ public class AgentOrchestrator
                     "I need a session ID to find your existing plan. Please include one in your request.",
                 DetectedIntent = UserIntent.ModifyMealPlan,
                 Recipes = [],
+                Confidence = ResponseConfidence.High,
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
 
@@ -696,6 +717,7 @@ public class AgentOrchestrator
                     "Which day would you like to swap? Say something like \"swap Tuesday\" or \"change Wednesday to pasta\".",
                 DetectedIntent = UserIntent.ModifyMealPlan,
                 Recipes = [],
+                Confidence = ResponseConfidence.High,
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
 
@@ -714,6 +736,7 @@ public class AgentOrchestrator
                 DetectedIntent = UserIntent.ModifyMealPlan,
                 Recipes = [],
                 MealPlan = plan,
+                Confidence = ResponseConfidence.Medium,
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
         }
@@ -745,12 +768,28 @@ public class AgentOrchestrator
     {
         try
         {
+            if (!_circuitBreaker.IsAllowed())
+            {
+                _logger.LogInformation("[DietAgent] Circuit open — skipping LLM validation");
+                return new OrchestratorResponse
+                {
+                    Message =
+                        "I'm having trouble accessing my reasoning engine right now, so I can't answer that question. Try asking me to find a recipe or check a dish for your diet instead.",
+                    DetectedIntent = UserIntent.GeneralQuestion,
+                    Recipes = [],
+                    Confidence = ResponseConfidence.Low,
+                    Metadata = BuildMetadata(classified, dietaryApplied: false),
+                };
+            }
+
             var answer = await AskOllamaAsync(classified.SearchQuery);
+            _circuitBreaker.RecordSuccess();
             return new OrchestratorResponse
             {
                 Message = answer,
                 DetectedIntent = UserIntent.GeneralQuestion,
                 Recipes = [],
+                Confidence = ResponseConfidence.Medium,
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
         }
@@ -761,12 +800,14 @@ public class AgentOrchestrator
                 "Ollama failed for GeneralQuestion '{Query}'",
                 classified.SearchQuery
             );
+            _circuitBreaker.RecordFailure();
             return new OrchestratorResponse
             {
                 Message =
                     "I couldn't answer that right now — my reasoning engine is unavailable. Try a recipe search instead.",
                 DetectedIntent = UserIntent.GeneralQuestion,
                 Recipes = [],
+                Confidence = ResponseConfidence.Low,
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
         }
@@ -798,6 +839,7 @@ public class AgentOrchestrator
                 "I'm not sure what you're looking for. Try asking me to find a recipe, check if a dish is safe for your diet, or ask a cooking question.",
             DetectedIntent = UserIntent.Unknown,
             Recipes = [],
+            Confidence = ResponseConfidence.High,
             Metadata = BuildMetadata(classified, dietaryApplied: false),
         };
     }
@@ -903,6 +945,7 @@ public class AgentOrchestrator
             Message = message,
             DetectedIntent = classified.Intent,
             Recipes = [],
+            Confidence = ResponseConfidence.Low,
             Metadata = BuildMetadata(classified, dietaryApplied: false),
         };
 

@@ -140,7 +140,15 @@ public record OrchestratorResponse
     public DietaryValidation? DietaryCheck { get; init; } // keep for ValidateDiet intent
     public MealPlan? MealPlan { get; init; }
     public UserIntent DetectedIntent { get; init; }
+    public ResponseConfidence Confidence { get; init; } = ResponseConfidence.High;
     public Dictionary<string, object> Metadata { get; init; } = [];
+}
+
+public enum ResponseConfidence
+{
+    High, // rules-only path, all validations passed
+    Medium, // LLM involved, output parsed correctly
+    Low, // LLM fallback triggered, retry needed, or circuit breaker open
 }
 
 /// <summary>
