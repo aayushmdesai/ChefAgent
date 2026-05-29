@@ -82,10 +82,20 @@ public class AgentOrchestrator
         // ── Step 1: Save user message to history ─────────────────
         if (!string.IsNullOrEmpty(classified.SessionId))
         {
-            await _sessionStore.AppendMessageAsync(
-                classified.SessionId,
-                new ConversationEntry { Role = "user", Content = classified.OriginalMessage }
-            );
+            try
+            {
+                await _sessionStore.AppendMessageAsync(
+                    classified.SessionId,
+                    new ConversationEntry { Role = "user", Content = classified.OriginalMessage }
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "[Orchestrator] Failed to append user message — continuing stateless"
+                );
+            }
         }
 
         // ── Step 2: Load + merge + persist profile ────────────────
@@ -118,19 +128,31 @@ public class AgentOrchestrator
         // ── Step 5: Save assistant response to history ────────────
         if (!string.IsNullOrEmpty(classified.SessionId))
         {
-            await _sessionStore.AppendMessageAsync(
-                classified.SessionId,
-                new ConversationEntry
-                {
-                    Role = "assistant",
-                    Content = response.Message,
-                    Intent = response.DetectedIntent,
-                    RecipeTitles = response.Recipes.Select(r => r.Recipe.Title).Take(5).ToList(),
-                    PlanId = response.MealPlan?.PlanId,
-                }
-            );
+            try
+            {
+                await _sessionStore.AppendMessageAsync(
+                    classified.SessionId,
+                    new ConversationEntry
+                    {
+                        Role = "assistant",
+                        Content = response.Message,
+                        Intent = response.DetectedIntent,
+                        RecipeTitles = response
+                            .Recipes.Select(r => r.Recipe.Title)
+                            .Take(5)
+                            .ToList(),
+                        PlanId = response.MealPlan?.PlanId,
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "[Orchestrator] Failed to append assistant message — continuing stateless"
+                );
+            }
         }
-
         sw.Stop();
         _logger.LogInformation(
             "[Orchestrator] Intent={Intent} Time={Ms}ms Recipes={Count}",
@@ -547,7 +569,20 @@ public class AgentOrchestrator
         {
             var constraints = new PlanConstraints { MealSlots = classified.MealSlots };
             var plan = await _plannerAgent.GeneratePlanAsync(classified.MergedProfile, constraints);
-            await _sessionStore.SavePlanAsync(sessionId, plan);
+
+            try
+            {
+                await _sessionStore.SavePlanAsync(sessionId, plan);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "[Orchestrator] Failed to save plan {PlanId} — plan generated but not persisted",
+                    plan.PlanId
+                );
+                // Continue — return the plan to user even if Redis save failed
+            }
 
             _logger.LogInformation(
                 "[Orchestrator] Meal plan {PlanId} generated for session {SessionId}",
@@ -599,7 +634,20 @@ public class AgentOrchestrator
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
 
-        var plan = await _sessionStore.GetPlanAsync(sessionId);
+        MealPlan? plan = null;
+        try
+        {
+            plan = await _sessionStore.GetPlanAsync(sessionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "[Orchestrator] Failed to load plan for session {SessionId} — treating as no plan",
+                sessionId
+            );
+        }
+
         if (plan is null)
             return new OrchestratorResponse
             {
