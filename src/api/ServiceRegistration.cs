@@ -58,11 +58,13 @@ public static class ServiceRegistration
 
         // Ollama HTTP client — shared across all agents
         // Timeout is long because LLM inference on CPU can take 30+ seconds
+        // In AddInfrastructure — Ollama HTTP client
+        var ollamaTimeout = config.GetValue<int>("Ollama:TimeoutSeconds", 120);
         services.AddHttpClient(
             "Ollama",
             client =>
             {
-                client.Timeout = TimeSpan.FromMinutes(2);
+                client.Timeout = TimeSpan.FromSeconds(ollamaTimeout);
             }
         );
 
@@ -81,9 +83,13 @@ public static class ServiceRegistration
     )
     {
         var connectionString = config["Redis:ConnectionString"] ?? "localhost:6379";
-        services.AddSingleton<IConnectionMultiplexer>(
-            ConnectionMultiplexer.Connect(connectionString)
-        );
+        var options = ConfigurationOptions.Parse(connectionString);
+        options.ConnectTimeout = config.GetValue<int>("Redis:ConnectTimeoutMs", 2000);
+        options.SyncTimeout = config.GetValue<int>("Redis:SyncTimeoutMs", 2000);
+        options.AsyncTimeout = config.GetValue<int>("Redis:AsyncTimeoutMs", 2000);
+        options.AbortOnConnectFail = false;
+
+        services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(options));
         services.AddSingleton<SessionStore>();
         return services;
     }
@@ -184,8 +190,24 @@ public static class ServiceRegistration
     )
     {
         services.AddSingleton<GuardrailAuditLog>();
-        services.AddSingleton<RateLimiter>();
-        services.AddSingleton<CircuitBreaker>();
+        services.AddSingleton<RateLimiter>(sp =>
+        {
+            var config = sp.GetRequiredService<IConfiguration>();
+            return new RateLimiter(
+                sp.GetRequiredService<ILogger<RateLimiter>>(),
+                maxRequestsPerMinute: config.GetValue<int>("RateLimiter:PerSessionLimit", 30)
+            );
+        });
+        services.AddSingleton<CircuitBreaker>(sp =>
+        {
+            var config = sp.GetRequiredService<IConfiguration>();
+            return new CircuitBreaker(
+                sp.GetRequiredService<ILogger<CircuitBreaker>>(),
+                sp.GetRequiredService<GuardrailAuditLog>(),
+                failureThreshold: config.GetValue<int>("CircuitBreaker:FailureThreshold", 3),
+                cooldownSeconds: config.GetValue<int>("CircuitBreaker:CooldownSeconds", 60)
+            );
+        });
         services.AddSingleton<OutputGuard>();
         // IntentRouter — rules-based classifier, Month 2 will add LLM path
         services.AddSingleton(sp =>
