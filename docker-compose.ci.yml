@@ -1,0 +1,26 @@
+# docker-compose.ci.yml — CI-only compose file
+# Runs Redis + Qdrant only. Ollama excluded (model too large for CI).
+# The API runs via `dotnet run` in the CI job, not as a container.
+# Used by the health-check job in ci.yml.
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:6333/healthz || exit 1" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10

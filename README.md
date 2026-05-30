@@ -1,3 +1,5 @@
+![CI](https://github.com/aayushmdesai/ChefAgent/actions/workflows/ci.yml/badge.svg)
+
 # ChefAgent 🍳
 
 A multi-agent system where specialized AI agents collaborate to handle recipe search, dietary reasoning, and meal planning — built with production-grade orchestration, guardrails, and observability.

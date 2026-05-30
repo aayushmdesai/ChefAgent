@@ -7,16 +7,17 @@ on:
     branches: [main]
 
 jobs:
+  # ── Job 1: Build + Unit Tests ──────────────────────────────────────
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: "8.0.x"
 
       - name: Restore dependencies
         run: dotnet restore src/ChefAgent.sln
@@ -24,10 +25,69 @@ jobs:
       - name: Build
         run: dotnet build src/ChefAgent.sln --no-restore --configuration Release
 
-      - name: Test
-        run: dotnet test src/ChefAgent.sln --no-build --configuration Release --verbosity normal
+      - name: Unit Tests
+        run: |
+          dotnet test src/ChefAgent.sln \
+            --no-build \
+            --configuration Release \
+            --verbosity normal \
+            --logger "trx;LogFileName=test-results.trx" \
+            --collect:"XPlat Code Coverage"
 
-  # Uncomment when eval pipeline is ready (Month 3)
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: "**/*.trx"
+
+  # ── Job 2: Health Check ────────────────────────────────────────────
+  # Proves the system boots end-to-end (API + Redis + Qdrant).
+  # Ollama is excluded — pulling a 2GB model in CI is impractical.
+  # The API starts cleanly without Ollama (circuit breaker handles it).
+  health-check:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start infrastructure (Redis + Qdrant only)
+        run: |
+          docker compose -f docker-compose.ci.yml up -d
+          echo "Waiting for services..."
+          sleep 15
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore & build API
+        run: |
+          dotnet restore src/ChefAgent.sln
+          dotnet build src/api/ChefAgent.Api.csproj --configuration Release --no-restore
+
+      - name: Start API
+        run: |
+          dotnet run \
+            --project src/api/ChefAgent.Api.csproj \
+            --configuration Release \
+            --no-build \
+            -- --urls "http://localhost:5100" &
+          echo "Waiting for API to start..."
+          sleep 10
+
+      - name: Health check
+        run: |
+          curl -sf http://localhost:5100/health && echo "✓ API healthy" || (echo "✗ API not reachable" && exit 1)
+
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down
+
+  # ── Job 3: Eval (Month 3) ──────────────────────────────────────────
+  # Uncomment when RAGAS + Langfuse pipeline is ready
   # eval:
   #   runs-on: ubuntu-latest
   #   needs: build
@@ -41,6 +101,3 @@ jobs:
   #       run: pip install -r eval/requirements.txt
   #     - name: Run RAG evaluation
   #       run: python eval/harnesses/run_ragas.py
-  #       env:
-  #         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-  #         AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
