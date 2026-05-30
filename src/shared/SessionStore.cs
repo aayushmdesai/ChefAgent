@@ -83,8 +83,6 @@ public class SessionStore
         await _db.KeyDeleteAsync(PlanKey(sessionId));
     }
 
-    // ── Profile (stub — wired in Month 2) ────────────────────
-
     public async Task SaveProfileAsync(string sessionId, DietaryProfile profile)
     {
         var key = ProfileKey(sessionId);

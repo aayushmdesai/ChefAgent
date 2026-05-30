@@ -744,7 +744,6 @@ public static class DietaryRules
         ["sattvic"] = i => CheckSattvic(i),
         ["hindu-vegetarian"] = i => CheckHinduVegetarian(i),
         ["halal"] = i => CheckHalal(i),
-        // FIXME: Kosher requires meat/dairy separation (basar b'chalav), specific slaughter (shechita), and forbidden species beyond pork/shellfish — defer full Kosher logic to LLM
         ["kosher"] = i => CheckHalal(i),
         // "-free" restriction variants — extracted by IntentRouter from "nut-free X", "dairy-free X", etc.
         // Delegate to the same checker as the corresponding allergy.

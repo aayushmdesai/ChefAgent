@@ -18,8 +18,8 @@ using Microsoft.Extensions.Logging;
 ///   SearchRecipe (no profile)   → Recipe Agent only
 ///   SearchRecipe (with profile) → Recipe Agent → Diet Agent → sort compatible first
 ///   ValidateDiet                → Diet Agent only
-///   CreateMealPlan              → placeholder (Month 2)
-///   ModifyMealPlan              → placeholder (Month 2)
+///   CreateMealPlan              → Planner Agent (with profile if present)
+///   ModifyMealPlan              → Planner Agent (with profile if present)
 ///   GeneralQuestion             → Ollama direct (conversational)
 ///   Unknown                     → ask user to clarify
 ///
@@ -816,24 +816,6 @@ public class AgentOrchestrator
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
         }
-    }
-
-    private static OrchestratorResponse HandlePlaceholder(
-        string featureName,
-        ClassifiedIntent classified
-    )
-    {
-        var deferredMsg =
-            classified.DeferredMessage
-            ?? $"{featureName} is coming in Month 2. Let me help you find a recipe for now.";
-
-        return new OrchestratorResponse
-        {
-            Message = deferredMsg,
-            DetectedIntent = classified.Intent,
-            Recipes = [],
-            Metadata = BuildMetadata(classified, dietaryApplied: false),
-        };
     }
 
     private static OrchestratorResponse HandleUnknown(ClassifiedIntent classified)
