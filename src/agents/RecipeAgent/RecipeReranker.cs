@@ -139,7 +139,7 @@ public class RecipeReranker
         return sb.ToString();
     }
 
-    private async Task<string> CallOllamaAsync(string prompt, CancellationToken ct)
+    private async Task<string?> CallOllamaAsync(string prompt, CancellationToken ct)
     {
         var request = new
         {
