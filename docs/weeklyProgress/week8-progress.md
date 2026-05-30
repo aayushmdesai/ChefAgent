@@ -37,15 +37,15 @@ Week 8:     Prove it works
 
 7 scenarios testing every service outage and combination:
 
-| Scenario           | Services Down         | Test Cases |
-| ------------------ | --------------------- | ---------- |
-| 0: Baseline        | None                  | 5          |
-| 1: Qdrant down     | Qdrant                | 6          |
-| 2: Ollama down     | Ollama                | 6          |
-| 3: Redis down      | Redis                 | 6          |
-| 4: Qdrant + Ollama | Qdrant, Ollama        | 5          |
-| 5: Ollama + Redis  | Ollama, Redis         | 4          |
-| 6: All down        | Qdrant, Ollama, Redis | 4          |
+| Scenario | Services Down | Test Cases |
+|----------|--------------|------------|
+| 0: Baseline | None | 5 |
+| 1: Qdrant down | Qdrant | 6 |
+| 2: Ollama down | Ollama | 6 |
+| 3: Redis down | Redis | 6 |
+| 4: Qdrant + Ollama | Qdrant, Ollama | 5 |
+| 5: Ollama + Redis | Ollama, Redis | 4 |
+| 6: All down | Qdrant, Ollama, Redis | 4 |
 
 Each scenario tests: recipe search, diet validation, plan generation, plan retrieval, general questions, and recovery after restart.
 
@@ -57,15 +57,15 @@ Every service outage combination returns 200 with a user-friendly message. The s
 
 ### Degradation summary
 
-| Scenario       | Search      | Diet     | Plan Gen      | Plan Read   | General Q   | Profile      |
-| -------------- | ----------- | -------- | ------------- | ----------- | ----------- | ------------ |
-| baseline       | ✅ 19.1s    | ✅       | ✅ 1.08s      | ✅ 0.02s    | ✅ 100.4s   | ✅           |
-| qdrant↓        | ❌ 0.75s    | ✅       | ❌ 0.11s      | ✅ 0.01s    | ✅ 11.0s    | ✅           |
-| ollama↓        | ❌ 0.08s    | ✅ rules | ❌ 0.03s      | ✅ 0.01s    | ❌ 0.03s    | ✅           |
-| redis↓         | ✅ 23.8s ⚠️ | ✅       | ✅ unsaved ⚠️ | ❌ 30.0s ⚠️ | ✅ 47.1s ⚠️ | ❌ stateless |
-| qdrant+ollama↓ | ❌ 0.08s    | ✅ rules | ❌ 0.03s      | ✅ 0.01s    | ❌ 0.03s    | ✅           |
-| ollama+redis↓  | ❌ 23.4s ⚠️ | ✅ rules | ❌            | ❌ 30.0s ⚠️ | ❌ 24.0s ⚠️ | ❌           |
-| all↓           | ❌ 22.6s ⚠️ | ✅ rules | ❌            | ❌ 30.0s ⚠️ | ❌ 24.0s ⚠️ | ❌           |
+| Scenario | Search | Diet | Plan Gen | Plan Read | General Q | Profile |
+|----------|--------|------|----------|-----------|-----------|---------|
+| baseline | ✅ 19.1s | ✅ | ✅ 1.08s | ✅ 0.02s | ✅ 100.4s | ✅ |
+| qdrant↓ | ❌ 0.75s | ✅ | ❌ 0.11s | ✅ 0.01s | ✅ 11.0s | ✅ |
+| ollama↓ | ❌ 0.08s | ✅ rules | ❌ 0.03s | ✅ 0.01s | ❌ 0.03s | ✅ |
+| redis↓ | ✅ 23.8s ⚠️ | ✅ | ✅ unsaved ⚠️ | ❌ 30.0s ⚠️ | ✅ 47.1s ⚠️ | ❌ stateless |
+| qdrant+ollama↓ | ❌ 0.08s | ✅ rules | ❌ 0.03s | ✅ 0.01s | ❌ 0.03s | ✅ |
+| ollama+redis↓ | ❌ 23.4s ⚠️ | ✅ rules | ❌ | ❌ 30.0s ⚠️ | ❌ 24.0s ⚠️ | ❌ |
+| all↓ | ❌ 22.6s ⚠️ | ✅ rules | ❌ | ❌ 30.0s ⚠️ | ❌ 24.0s ⚠️ | ❌ |
 
 **⚠️ = Redis connection timeout dominates (~30s). Ollama failures are instant (circuit breaker).**
 
@@ -114,14 +114,14 @@ The most validating result from the matrix: **Ollama-down operations complete in
 
 ### Concepts learned
 
-| Concept                       | What It Means                                                                                                       |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Failure mode matrix           | Systematic testing of every service outage combination — not just individual failures, but the cross-product        |
-| Fast-fail asymmetry           | Circuit breaker gave Ollama 0.03s failure; Redis still waits 30s. Same problem, same fix needed                     |
-| Discovery latency vs behavior | The system _behaves_ correctly when Redis is down (Week 6). The problem is it takes 30s to _discover_ Redis is down |
-| Cross-cutting failures        | Some bugs only appear when testing full flows under partial outage — invisible to component tests                   |
-| Recovery verification         | Testing that services come back is as important as testing that they fail gracefully                                |
-| Rules engine as bedrock       | In-memory rules (diet validation, intent classification, input guard) work regardless of infrastructure state       |
+| Concept | What It Means |
+|---------|---------------|
+| Failure mode matrix | Systematic testing of every service outage combination — not just individual failures, but the cross-product |
+| Fast-fail asymmetry | Circuit breaker gave Ollama 0.03s failure; Redis still waits 30s. Same problem, same fix needed |
+| Discovery latency vs behavior | The system *behaves* correctly when Redis is down (Week 6). The problem is it takes 30s to *discover* Redis is down |
+| Cross-cutting failures | Some bugs only appear when testing full flows under partial outage — invisible to component tests |
+| Recovery verification | Testing that services come back is as important as testing that they fail gracefully |
+| Rules engine as bedrock | In-memory rules (diet validation, intent classification, input guard) work regardless of infrastructure state |
 
 ### Files created / changed
 
@@ -132,13 +132,13 @@ eval/datasets/failure_mode_matrix.md    # New: full results + degradation summar
 
 ### Fix path
 
-| Finding                                | Fix                                                               | Priority | Target  | Status               |
-| -------------------------------------- | ----------------------------------------------------------------- | -------- | ------- | -------------------- |
-| Redis timeout ~30s                     | `ConfigurationOptions` with 2s timeouts                           | **High** | Day 1   | ✅ Fixed (30s → 15s) |
-| Reference resolution fallthrough       | Guard: if history unavailable + query is reference-like → clarify | Low      | Month 3 | Backlog              |
-| "hello" misclassification              | Add greeting signals to IntentRouter                              | Low      | Month 3 | Backlog              |
-| Embedding requires Ollama              | Embedding cache or keyword fallback                               | Medium   | Month 3 | Backlog              |
-| Sequential plan gen amplifies failures | Parallel search + early termination                               | Medium   | Month 3 | Backlog              |
+| Finding | Fix | Priority | Target | Status |
+|---------|-----|----------|--------|--------|
+| Redis timeout ~30s | `ConfigurationOptions` with 2s timeouts | **High** | Day 1 | ✅ Fixed (30s → 15s) |
+| Reference resolution fallthrough | Guard: if history unavailable + query is reference-like → clarify | Low | Month 3 | Backlog |
+| "hello" misclassification | Add greeting signals to IntentRouter | Low | Month 3 | Backlog |
+| Embedding requires Ollama | Embedding cache or keyword fallback | Medium | Month 3 | Backlog |
+| Sequential plan gen amplifies failures | Parallel search + early termination | Medium | Month 3 | Backlog |
 
 ---
 
@@ -170,18 +170,10 @@ All constants now configurable in `appsettings.json`:
 
 ```json
 {
-  "Redis": {
-    "ConnectTimeoutMs": 2000,
-    "SyncTimeoutMs": 2000,
-    "AsyncTimeoutMs": 2000
-  },
+  "Redis": { "ConnectTimeoutMs": 2000, "SyncTimeoutMs": 2000, "AsyncTimeoutMs": 2000 },
   "Ollama": { "TimeoutSeconds": 120 },
   "CircuitBreaker": { "FailureThreshold": 3, "CooldownSeconds": 60 },
-  "RateLimiter": {
-    "PerSessionLimit": 30,
-    "GlobalLimit": 100,
-    "WindowSeconds": 60
-  }
+  "RateLimiter": { "PerSessionLimit": 30, "GlobalLimit": 100, "WindowSeconds": 60 }
 }
 ```
 
@@ -208,14 +200,14 @@ src/api/ServiceRegistration.cs          # Updated: ConfigurationOptions for Redi
 
 **44/50 passed. Zero 500 errors.**
 
-| Category                   | Passed | Avg Latency | Notes                                               |
-| -------------------------- | ------ | ----------- | --------------------------------------------------- |
-| Recipe Search              | 7/10   | 1.1s        | 3 dietary-keyword false positives                   |
-| Dietary Validation         | 8/8    | 10.4s       | TC15 (91s) — LLM query expansion triggered          |
-| Meal Planning              | 4/5    | 0.3s        | 3 unrecognized plan phrasings                       |
-| Meal Planning (Redis read) | 3/3    | 3.3s        | GetMealPlan instant                                 |
-| Guardrails                 | 8/8    | 0.1s        | All injection, rate limit, repeat, oversize — clean |
-| General / Edge Cases       | 10/10  | 3.3s        | Special chars, mixed case, unicode all handled      |
+| Category | Passed | Avg Latency | Notes |
+|----------|--------|-------------|-------|
+| Recipe Search | 7/10 | 1.1s | 3 dietary-keyword false positives |
+| Dietary Validation | 8/8 | 10.4s | TC15 (91s) — LLM query expansion triggered |
+| Meal Planning | 4/5 | 0.3s | 3 unrecognized plan phrasings |
+| Meal Planning (Redis read) | 3/3 | 3.3s | GetMealPlan instant |
+| Guardrails | 8/8 | 0.1s | All injection, rate limit, repeat, oversize — clean |
+| General / Edge Cases | 10/10 | 3.3s | Special chars, mixed case, unicode all handled |
 
 ### All 6 failures live in the IntentRouter — not error handling
 
@@ -229,11 +221,11 @@ TC05 and TC09 are debatable — the current behavior isn't wrong per se, it's in
 
 The IntentRouter rules handle canonical phrasings from Week 4 but not natural variations:
 
-| Query                                          | Expected       | Got          | Missing rule             |
-| ---------------------------------------------- | -------------- | ------------ | ------------------------ |
-| "change Friday to a vegetarian meal"           | ModifyMealPlan | SearchRecipe | "change X to" variant    |
+| Query | Expected | Got | Missing rule |
+|-------|----------|-----|-------------|
+| "change Friday to a vegetarian meal" | ModifyMealPlan | SearchRecipe | "change X to" variant |
 | "plan breakfast lunch and dinner for the week" | CreateMealPlan | SearchRecipe | multi-meal-type phrasing |
-| "make me a new plan"                           | CreateMealPlan | SearchRecipe | "make me a plan" variant |
+| "make me a new plan" | CreateMealPlan | SearchRecipe | "make me a plan" variant |
 
 ### What passed that's worth noting
 
@@ -253,13 +245,13 @@ The IntentRouter rules handle canonical phrasings from Week 4 but not natural va
 
 ### Fix paths
 
-| Failure                                                | Fix                                                               | Priority | Target  |
-| ------------------------------------------------------ | ----------------------------------------------------------------- | -------- | ------- |
-| TC03: "garlic and tomatoes" → ValidateDiet             | Tighten ValidateDiet rules, require explicit restriction keywords | Low      | Month 3 |
-| TC05/TC09: "without X" → ValidateDiet not SearchRecipe | Add "without X" search variant to SearchRecipe rules              | Low      | Month 3 |
-| TC23: "change X to" → not ModifyMealPlan               | Add "change [day] to" pattern to IntentRouter                     | Low      | Month 3 |
-| TC24/TC26: "plan breakfast…" / "make me a plan"        | Add plan phrasing variants to CreateMealPlan rules                | Low      | Month 3 |
-| TC25: "whats on monday?" → GeneralQuestion             | Parse day name + route to GetMealPlan with day filter             | Low      | Month 3 |
+| Failure | Fix | Priority | Target |
+|---------|-----|----------|--------|
+| TC03: "garlic and tomatoes" → ValidateDiet | Tighten ValidateDiet rules, require explicit restriction keywords | Low | Month 3 |
+| TC05/TC09: "without X" → ValidateDiet not SearchRecipe | Add "without X" search variant to SearchRecipe rules | Low | Month 3 |
+| TC23: "change X to" → not ModifyMealPlan | Add "change [day] to" pattern to IntentRouter | Low | Month 3 |
+| TC24/TC26: "plan breakfast…" / "make me a plan" | Add plan phrasing variants to CreateMealPlan rules | Low | Month 3 |
+| TC25: "whats on monday?" → GeneralQuestion | Parse day name + route to GetMealPlan with day filter | Low | Month 3 |
 
 ### Files created
 
@@ -282,13 +274,13 @@ eval/datasets/e2e_sweep_results.md    # New: full results + failure analysis
 
 ### Concepts learned
 
-| Concept                        | What It Means                                                                                                           |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Orthogonal test coverage       | Failure matrix ≠ e2e sweep — infrastructure resilience and functional correctness are tested separately                 |
-| Intent ambiguity               | "Pasta without dairy" is genuinely ambiguous — both SearchRecipe and ValidateDiet are defensible interpretations        |
-| False positive discrimination  | "Ignore the garlic" vs "ignore your instructions" — two-signal detection distinguishes culinary language from injection |
-| Canonical vs. natural phrasing | Rules handle "plan my dinners" but not "make me a plan" — vocabulary coverage is the gap, not logic                     |
-| Stable vs. correct             | 44/50 with zero 500s means the system is stable but not fully correct — that's a useful distinction to articulate       |
+| Concept | What It Means |
+|---------|---------------|
+| Orthogonal test coverage | Failure matrix ≠ e2e sweep — infrastructure resilience and functional correctness are tested separately |
+| Intent ambiguity | "Pasta without dairy" is genuinely ambiguous — both SearchRecipe and ValidateDiet are defensible interpretations |
+| False positive discrimination | "Ignore the garlic" vs "ignore your instructions" — two-signal detection distinguishes culinary language from injection |
+| Canonical vs. natural phrasing | Rules handle "plan my dinners" but not "make me a plan" — vocabulary coverage is the gap, not logic |
+| Stable vs. correct | 44/50 with zero 500s means the system is stable but not fully correct — that's a useful distinction to articulate |
 
 ---
 
@@ -298,17 +290,17 @@ eval/datasets/e2e_sweep_results.md    # New: full results + failure analysis
 
 ### Results summary
 
-| Operation                        | p50    | p95    | Notes                        |
-| -------------------------------- | ------ | ------ | ---------------------------- |
-| InputGuard (blocked)             | <0.01s | 0.03s  | Pure in-memory               |
-| GetMealPlan (Redis)              | <0.01s | 0.01s  | Redis GET only               |
-| ValidateDiet (rules)             | <0.01s | 0.01s  | Rules engine, no I/O         |
-| Search — warm embed              | 0.10s  | 0.13s  | Ollama embed + Qdrant        |
-| Search + diet validation         | 0.10s  | 0.30s  | Embed + rules                |
-| Chat — SearchRecipe              | ~0.14s | 0.18s  | +0.04s Orchestrator overhead |
-| CreateMealPlan (7 days)          | 0.85s  | 1.21s  | 7× sequential embed          |
-| Reference resolution (LLM)       | ~3.8s  | 4.18s  | LLM interprets history       |
-| GeneralQuestion (LLM)            | 6.97s  | 21.64s | llama3.2 CPU inference       |
+| Operation | p50 | p95 | Notes |
+|-----------|-----|-----|-------|
+| InputGuard (blocked) | <0.01s | 0.03s | Pure in-memory |
+| GetMealPlan (Redis) | <0.01s | 0.01s | Redis GET only |
+| ValidateDiet (rules) | <0.01s | 0.01s | Rules engine, no I/O |
+| Search — warm embed | 0.10s | 0.13s | Ollama embed + Qdrant |
+| Search + diet validation | 0.10s | 0.30s | Embed + rules |
+| Chat — SearchRecipe | ~0.14s | 0.18s | +0.04s Orchestrator overhead |
+| CreateMealPlan (7 days) | 0.85s | 1.21s | 7× sequential embed |
+| Reference resolution (LLM) | ~3.8s | 4.18s | LLM interprets history |
+| GeneralQuestion (LLM) | 6.97s | 21.64s | llama3.2 CPU inference |
 | Profile load + entity extraction | ~11.9s | 11.94s | LLM extraction, first access |
 
 ### Key finding: repeat detector skewed /chat measurements
@@ -320,29 +312,24 @@ This inadvertently revealed exactly where LLM calls live — operations that sta
 ### Top 3 bottlenecks
 
 **#1 — LLM inference (GeneralQuestion, entity extraction, reference resolution)**
-
 - p50 6.97s, p95 21.64s for GeneralQuestion
 - Profile entity extraction ~12s on first session access
 - Fix: cache entity extraction in Redis (high priority, low effort), GPU for inference
 
 **#2 — Profile entity extraction fires every first message (~12s)**
-
 - LLM extracts entities from profile on every new session's first message
 - Result not cached — re-extracts even if profile hasn't changed
 - Fix: store extracted entities in Redis alongside raw profile, only re-extract on profile change
 
 **#3 — Plan generation is sequential (but less bad than expected)**
-
 - 7-day plan: 0.85s on warm Codespaces — better than the feared 7-14s
 - Risk: cold start still 15-20s (model load on first embedding)
 - Fix: `Task.WhenAll` parallel search, startup warmup call
 
 ### Orchestrator overhead: 0.04s
-
 `/recipes/search` p50 = 0.10s → `/chat` SearchRecipe p50 = ~0.14s. The coordination layer (InputGuard, intent routing, profile load, response formatting) adds only 40ms. Not a bottleneck.
 
 ### Files created
-
 ```
 scripts/eval/profile_performance.py     # New: 18-operation latency profiler
 eval/datasets/performance_profile.md    # New: corrected profile with bottleneck analysis
@@ -356,12 +343,12 @@ eval/datasets/performance_profile.md    # New: corrected profile with bottleneck
 
 ### Concepts learned
 
-| Concept                      | What It Means                                                                                                                  |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Measurement design matters   | Reusing same session/query activates repeat detector — profiling tool must be designed to avoid the system's own optimizations |
-| Everything fast is in-memory | Rules engine, Redis reads, InputGuard all <0.01s. LLM is the only slow thing.                                                  |
-| Orchestrator is cheap        | 40ms overhead for full intent routing + profile load + response formatting — coordination is not the bottleneck                |
-| Cache before optimizing      | Entity extraction cache (low effort) gives more improvement than parallel plan generation (medium effort)                      |
+| Concept | What It Means |
+|---------|---------------|
+| Measurement design matters | Reusing same session/query activates repeat detector — profiling tool must be designed to avoid the system's own optimizations |
+| Everything fast is in-memory | Rules engine, Redis reads, InputGuard all <0.01s. LLM is the only slow thing. |
+| Orchestrator is cheap | 40ms overhead for full intent routing + profile load + response formatting — coordination is not the bottleneck |
+| Cache before optimizing | Entity extraction cache (low effort) gives more improvement than parallel plan generation (medium effort) |
 
 ---
 
@@ -378,23 +365,22 @@ eval/datasets/performance_profile.md    # New: corrected profile with bottleneck
 
 Consolidated 38 items from all 8 weeks of progress docs into one structured backlog:
 
-| Category              | Items  | High  | Medium | Low    |
-| --------------------- | ------ | ----- | ------ | ------ |
-| Intent Classification | 7      | 0     | 0      | 7      |
-| Search & Retrieval    | 5      | 0     | 3      | 2      |
-| Memory & Session      | 4      | 1     | 1      | 2      |
-| Planning              | 3      | 0     | 1      | 2      |
-| Dietary Validation    | 2      | 0     | 0      | 2      |
-| Guardrails            | 2      | 0     | 0      | 2      |
-| Infrastructure        | 6      | 4     | 1      | 1      |
-| Testing Gaps          | 7      | 4     | 0      | 3      |
-| Dataset               | 2      | 0     | 0      | 2      |
-| **Total**             | **38** | **9** | **6**  | **23** |
+| Category | Items | High | Medium | Low |
+|----------|-------|------|--------|-----|
+| Intent Classification | 7 | 0 | 0 | 7 |
+| Search & Retrieval | 5 | 0 | 3 | 2 |
+| Memory & Session | 4 | 1 | 1 | 2 |
+| Planning | 3 | 0 | 1 | 2 |
+| Dietary Validation | 2 | 0 | 0 | 2 |
+| Guardrails | 2 | 0 | 0 | 2 |
+| Infrastructure | 6 | 4 | 1 | 1 |
+| Testing Gaps | 7 | 4 | 0 | 3 |
+| Dataset | 2 | 0 | 0 | 2 |
+| **Total** | **38** | **9** | **6** | **23** |
 
 9 High priority items: 4 unit tests (Day 5), entity extraction cache, observability, cloud deploy, RAGAS, Langfuse — all Month 3.
 
 ### Files created / changed
-
 ```
 docs/tech-debt.md                       # New: 38-item consolidated backlog
 src/agents/Orchestrator/AgentOrchestrator.cs  # Stale comments removed
@@ -414,6 +400,79 @@ src/api/ChefAgent.Api.csproj            # Qdrant.Client updated to 1.18.1
 - [x] Day 1: Failure mode matrix — 36/36, zero 500s, Redis timeout fix (30s → 15s)
 - [x] Day 2: E2E sweep — 44/50, zero 500s, all 6 failures are IntentRouter classification gaps
 - [x] Day 3: Performance profiling — bottlenecks identified, entity extraction cache flagged as top fix
+- [x] Day 5: CI — 68 unit tests, health check stage, build badge, Node.js 24
+- [x] Days 6–7: Month 2 retrospective, CHANGELOG, v0.5.0
+
+---
+
+## Day 5 — CI Enhancement
+
+### What was built
+
+- `src/tests/ChefAgent.Tests.csproj` — xUnit test project with Moq
+- `InputGuardTests.cs` — 15 cases (length, injection, false positives)
+- `DietaryRulesTests.cs` — 19 cases across all dietary categories + helper methods
+- `IntentRouterTests.cs` — 14 active + 3 skipped (known gaps I-1, I-2, I-3 from tech-debt.md)
+- `CircuitBreakerTests.cs` — 11 cases (state transitions, threshold variations)
+- `.github/workflows/ci.yml` — updated with unit test stage + health check job
+- `docker-compose.ci.yml` — Redis + Qdrant only (no Ollama, too large for CI)
+- `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` — CI runs on Node.js 24
+
+### Results
+
+**68 passed, 3 skipped, 0 failed.** CI green. Build badge live on README.
+
+The 3 skipped tests are `[Fact(Skip = "I-1/I-2/I-3: ... Month 3")]` — they document the tech-debt backlog items directly in the test suite. They appear as skipped in CI output, not failed.
+
+### Key finding: GuardrailAuditLog not mockable with Moq
+
+`new Mock<GuardrailAuditLog>().Object` fails — Moq can't proxy a class without a parameterless constructor. Fix: instantiate it for real with a mocked `ILogger<GuardrailAuditLog>`. Pattern for future tests: mock interfaces and primitive dependencies; instantiate real objects when constructors are simple.
+
+### Key interview talking point
+
+**"How do you test a circuit breaker without waiting for real timeouts?"** Use `cooldownSeconds: 0` — the state machine transitions immediately. Revealed a subtle test design issue: with 0s cooldown, calling `IsAllowed()` after `RecordFailure()` immediately transitions back to HalfOpen (the cooldown is already expired). The correct assertion is `State == Open`, not `IsAllowed() == false`. The state is what matters; IsAllowed() is a side-effecting check.
+
+---
+
+## Days 6–7 — Month 2 Retrospective + v0.5.0
+
+### What was produced
+
+- `docs/month2-retrospective.md` — full retrospective covering Weeks 5–8
+- `CHANGELOG.md` — v0.1.0 through v0.5.0 with full changelog per release
+- `week8-progress.md` — this document, completed
+- `v0.5.0` tag
+
+### Month 2 by the numbers
+
+| Metric | Value |
+|--------|-------|
+| New agents | 1 (Planner) |
+| New intents | 3 (Create/Modify/GetMealPlan) |
+| Guardrail layers | 5 |
+| Failure matrix | 36/36, 0 × 500 |
+| E2E sweep | 44/50, 0 × 500 |
+| Unit tests | 68 passing |
+| Tech debt items | 38 |
+| Redis timeout fix | 30s → 15s |
+
+### The architectural thread across Month 2
+
+Every component built in Month 2 — the Planner Agent, session memory, guardrails, entity extraction, circuit breaker — follows the same principle established in Week 2:
+
+**Rules for the common case. LLM for the edge case. Fast by default, smart on demand.**
+
+Month 1 established it under hardware pressure. Month 2 proved it's also the right production architecture. The circuit breaker makes LLM failures instant. The rules engine makes diet validation free. The entity extractor only fires when rules don't suffice. The pattern compounds.
+
+---
+
+## Final Status: Week 8 Complete
+
+- [x] Day 1: Failure mode matrix — 36/36, zero 500s, Redis timeout fix (30s → 15s)
+- [x] Day 2: E2E sweep — 44/50, zero 500s, all 6 failures are IntentRouter classification gaps
+- [x] Day 3: Performance profiling — bottlenecks identified, entity extraction cache flagged
 - [x] Day 4: Tech debt sweep — 38 items consolidated, stale code cleaned, Qdrant.Client updated
-- [ ] Day 5: CI enhancement — unit tests, health check stage, build badge
-- [ ] Days 6–7: Month 2 retrospective, README update, architecture diagram, CHANGELOG, v0.5.0
+- [x] Day 5: CI — 68 unit tests, health check stage, build badge, Node.js 24
+- [x] Days 6–7: Month 2 retrospective, CHANGELOG, v0.5.0
+
+**Month 2 complete. The system is stateful, hardened, and systematically tested. Month 3 is evaluation, observability, and cloud deploy.**
