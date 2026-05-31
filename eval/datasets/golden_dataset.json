@@ -1,0 +1,602 @@
+[
+  {
+    "question": "chicken parmesan",
+    "ground_truth": "A recipe for chicken parmesan — breaded chicken breast topped with marinara sauce and melted mozzarella cheese, typically baked or pan-fried.",
+    "contexts": [],
+    "category": "exact_match"
+  },
+  {
+    "question": "beef stroganoff",
+    "ground_truth": "A recipe for beef stroganoff — tender strips of beef cooked in a creamy mushroom and sour cream sauce, typically served over egg noodles.",
+    "contexts": [],
+    "category": "exact_match"
+  },
+  {
+    "question": "chicken tikka masala",
+    "ground_truth": "A recipe for chicken tikka masala — marinated chicken pieces cooked in a spiced tomato and cream sauce, served with rice or naan.",
+    "contexts": [],
+    "category": "exact_match"
+  },
+  {
+    "question": "beef tacos",
+    "ground_truth": "A recipe for beef tacos — seasoned ground beef served in corn or flour tortillas with toppings such as cheese, lettuce, salsa, and sour cream.",
+    "contexts": [],
+    "category": "exact_match"
+  },
+  {
+    "question": "spaghetti carbonara",
+    "ground_truth": "A recipe for spaghetti carbonara — pasta coated in a creamy sauce made from eggs, Parmesan cheese, pancetta or bacon, and black pepper.",
+    "contexts": [],
+    "category": "exact_match"
+  },
+  {
+    "question": "caesar salad",
+    "ground_truth": "A recipe for Caesar salad — romaine lettuce tossed with Caesar dressing made from anchovies, garlic, lemon, and Parmesan, topped with croutons.",
+    "contexts": [],
+    "category": "exact_match"
+  },
+  {
+    "question": "banana bread",
+    "ground_truth": "A recipe for banana bread — a moist quick bread made with ripe mashed bananas, flour, eggs, butter, and sugar, baked in a loaf pan.",
+    "contexts": [],
+    "category": "exact_match"
+  },
+  {
+    "question": "chicken noodle soup",
+    "ground_truth": "A recipe for chicken noodle soup — a broth-based soup with cooked chicken pieces, egg noodles, carrots, celery, and onion.",
+    "contexts": [],
+    "category": "exact_match"
+  },
+  {
+    "question": "what can I make with chicken and garlic",
+    "ground_truth": "A recipe that uses chicken and garlic as primary ingredients, such as garlic butter chicken, roasted garlic chicken, or chicken with garlic sauce.",
+    "contexts": [],
+    "category": "by_ingredients"
+  },
+  {
+    "question": "recipes using ground beef and tomatoes",
+    "ground_truth": "A recipe that uses ground beef and tomatoes as main ingredients, such as bolognese, chili, stuffed peppers, or a beef and tomato stir fry.",
+    "contexts": [],
+    "category": "by_ingredients"
+  },
+  {
+    "question": "what can I cook with eggs and cheese",
+    "ground_truth": "A recipe that uses eggs and cheese as primary ingredients, such as a frittata, quiche, omelette, or cheesy scrambled eggs.",
+    "contexts": [],
+    "category": "by_ingredients"
+  },
+  {
+    "question": "dinner ideas with salmon and lemon",
+    "ground_truth": "A recipe featuring salmon as the main protein with lemon as a key flavoring, such as lemon butter salmon, baked lemon salmon, or pan-seared salmon with lemon sauce.",
+    "contexts": [],
+    "category": "by_ingredients"
+  },
+  {
+    "question": "recipes with leftover rice and vegetables",
+    "ground_truth": "A recipe that uses cooked rice and mixed vegetables, such as fried rice, rice pilaf, stuffed vegetables with rice, or a rice and vegetable casserole.",
+    "contexts": [],
+    "category": "by_ingredients"
+  },
+  {
+    "question": "what to make with potatoes and bacon",
+    "ground_truth": "A recipe that combines potatoes and bacon as primary ingredients, such as loaded potato soup, bacon and potato hash, potato gratin with bacon, or a potato and bacon casserole.",
+    "contexts": [],
+    "category": "by_ingredients"
+  },
+  {
+    "question": "meals using shrimp and pasta",
+    "ground_truth": "A recipe that pairs shrimp with pasta as the main components, such as shrimp scampi, shrimp alfredo, garlic butter shrimp pasta, or shrimp and marinara pasta.",
+    "contexts": [],
+    "category": "by_ingredients"
+  },
+  {
+    "question": "dinner with chicken breast and mushrooms",
+    "ground_truth": "A recipe featuring chicken breast and mushrooms as key ingredients, such as chicken marsala, creamy mushroom chicken, stuffed chicken with mushrooms, or chicken and mushroom stir fry.",
+    "contexts": [],
+    "category": "by_ingredients"
+  },
+  {
+    "question": "something with spinach and feta",
+    "ground_truth": "A recipe using spinach and feta cheese as featured ingredients, such as spanakopita, spinach and feta stuffed chicken, spinach feta omelette, or a Greek spinach pie.",
+    "contexts": [],
+    "category": "by_ingredients"
+  },
+  {
+    "question": "recipes using only pantry staples",
+    "ground_truth": "A recipe made from common pantry ingredients such as canned beans, pasta, rice, canned tomatoes, olive oil, and dried herbs — no fresh produce or meat required.",
+    "contexts": [],
+    "category": "by_ingredients"
+  },
+  {
+    "question": "vegetarian pasta",
+    "ground_truth": "A pasta recipe that contains no meat or seafood, using vegetables, cheese, or plant-based proteins as the main components.",
+    "contexts": [],
+    "category": "dietary"
+  },
+  {
+    "question": "gluten-free dinner",
+    "ground_truth": "A dinner recipe that contains no gluten — no wheat, barley, rye, or regular flour — suitable for someone with celiac disease or gluten intolerance.",
+    "contexts": [],
+    "category": "dietary"
+  },
+  {
+    "question": "vegan chocolate cake",
+    "ground_truth": "A chocolate cake recipe that contains no animal products — no eggs, dairy milk, butter, or honey — using plant-based substitutes throughout.",
+    "contexts": [],
+    "category": "dietary"
+  },
+  {
+    "question": "vegetarian indian food",
+    "ground_truth": "An Indian recipe that contains no meat or seafood, such as dal, chana masala, palak paneer, aloo gobi, or vegetable biryani.",
+    "contexts": [],
+    "category": "dietary"
+  },
+  {
+    "question": "low carb chicken dinner",
+    "ground_truth": "A chicken recipe that is low in carbohydrates — no pasta, rice, bread, or starchy vegetables as main components — suitable for a low-carb or keto diet.",
+    "contexts": [],
+    "category": "dietary"
+  },
+  {
+    "question": "kosher beef recipe",
+    "ground_truth": "A beef recipe that follows kosher dietary laws — no mixing of meat and dairy, using kosher-certified beef, prepared without forbidden ingredients.",
+    "contexts": [],
+    "category": "dietary"
+  },
+  {
+    "question": "halal chicken recipe",
+    "ground_truth": "A chicken recipe using halal-certified chicken, containing no pork products or alcohol in the ingredients or cooking process.",
+    "contexts": [],
+    "category": "dietary"
+  },
+  {
+    "question": "vegan breakfast ideas",
+    "ground_truth": "A breakfast recipe that contains no animal products — no eggs, dairy, or honey — such as oatmeal, smoothie bowls, avocado toast, or tofu scramble.",
+    "contexts": [],
+    "category": "dietary"
+  },
+  {
+    "question": "pescatarian dinner with fish",
+    "ground_truth": "A dinner recipe featuring fish or seafood as the protein, with no meat such as chicken, beef, or pork — suitable for a pescatarian diet.",
+    "contexts": [],
+    "category": "dietary"
+  },
+  {
+    "question": "vegetarian high protein meal",
+    "ground_truth": "A vegetarian recipe that is high in protein through ingredients such as legumes, tofu, tempeh, eggs, Greek yogurt, or cheese — containing no meat.",
+    "contexts": [],
+    "category": "dietary"
+  },
+  {
+    "question": "gluten-free dessert",
+    "ground_truth": "A dessert recipe that contains no gluten — no wheat flour, barley, or rye — using alternative flours such as almond flour, rice flour, or coconut flour.",
+    "contexts": [],
+    "category": "dietary"
+  },
+  {
+    "question": "plant-based burger",
+    "ground_truth": "A burger recipe made without meat, using plant-based patties from ingredients such as black beans, lentils, chickpeas, mushrooms, or commercial plant-based meat alternatives.",
+    "contexts": [],
+    "category": "dietary"
+  },
+  {
+    "question": "pasta without tomatoes",
+    "ground_truth": "A pasta recipe that does not include tomatoes, tomato sauce, tomato paste, or any tomato-based ingredient in any form.",
+    "contexts": [],
+    "category": "negation"
+  },
+  {
+    "question": "cookies without nuts",
+    "ground_truth": "A cookie recipe that contains no nuts of any kind — no walnuts, pecans, almonds, peanuts, cashews, or nut-derived ingredients.",
+    "contexts": [],
+    "category": "negation"
+  },
+  {
+    "question": "chicken recipe without cream",
+    "ground_truth": "A chicken recipe that does not use heavy cream, whipping cream, or cream-based sauces as an ingredient.",
+    "contexts": [],
+    "category": "negation"
+  },
+  {
+    "question": "soup without onions",
+    "ground_truth": "A soup recipe that does not include onions, shallots, or onion powder as ingredients.",
+    "contexts": [],
+    "category": "negation"
+  },
+  {
+    "question": "dessert without eggs",
+    "ground_truth": "A dessert recipe that does not use eggs or egg-derived products such as egg yolks or egg whites in any form.",
+    "contexts": [],
+    "category": "negation"
+  },
+  {
+    "question": "salad without lettuce",
+    "ground_truth": "A salad recipe that does not use any variety of lettuce — no romaine, iceberg, spinach used as a lettuce base, or mixed greens — using other vegetables or grains as the base.",
+    "contexts": [],
+    "category": "negation"
+  },
+  {
+    "question": "bread without yeast",
+    "ground_truth": "A bread recipe that does not use yeast as a leavening agent, using alternatives such as baking powder, baking soda, or no leavening at all — such as flatbreads or quick breads.",
+    "contexts": [],
+    "category": "negation"
+  },
+  {
+    "question": "stir fry without soy sauce",
+    "ground_truth": "A stir fry recipe that does not use soy sauce or tamari as an ingredient, using alternative seasonings such as coconut aminos, fish sauce, or oyster sauce.",
+    "contexts": [],
+    "category": "negation"
+  },
+  {
+    "question": "cake without butter",
+    "ground_truth": "A cake recipe that does not use butter, using alternative fats such as oil, applesauce, yogurt, or margarine instead.",
+    "contexts": [],
+    "category": "negation"
+  },
+  {
+    "question": "rice dish without garlic",
+    "ground_truth": "A rice recipe that does not include garlic or garlic powder as an ingredient.",
+    "contexts": [],
+    "category": "negation"
+  },
+  {
+    "question": "mexican dinner",
+    "ground_truth": "A Mexican or Tex-Mex recipe such as tacos, enchiladas, burritos, tamales, chiles rellenos, or similar dishes featuring Mexican culinary traditions and spices.",
+    "contexts": [],
+    "category": "cuisine"
+  },
+  {
+    "question": "thai soup",
+    "ground_truth": "A Thai soup recipe such as tom yum, tom kha gai, or a Thai curry soup featuring characteristic Thai ingredients such as lemongrass, galangal, kaffir lime leaves, or fish sauce.",
+    "contexts": [],
+    "category": "cuisine"
+  },
+  {
+    "question": "italian pasta dish",
+    "ground_truth": "An Italian pasta recipe such as carbonara, cacio e pepe, amatriciana, or pesto pasta featuring traditional Italian ingredients and cooking techniques.",
+    "contexts": [],
+    "category": "cuisine"
+  },
+  {
+    "question": "japanese dinner recipe",
+    "ground_truth": "A Japanese recipe such as teriyaki, ramen, miso soup, katsu, or sushi featuring traditional Japanese ingredients and cooking methods.",
+    "contexts": [],
+    "category": "cuisine"
+  },
+  {
+    "question": "indian curry",
+    "ground_truth": "An Indian curry recipe featuring a spiced sauce base with ingredients such as cumin, coriander, turmeric, garam masala, and ginger, with a protein or vegetable component.",
+    "contexts": [],
+    "category": "cuisine"
+  },
+  {
+    "question": "greek salad or mezze",
+    "ground_truth": "A Greek recipe such as a traditional Greek salad with feta and olives, hummus, tzatziki, or other mezze dishes featuring Mediterranean ingredients.",
+    "contexts": [],
+    "category": "cuisine"
+  },
+  {
+    "question": "chinese stir fry",
+    "ground_truth": "A Chinese stir fry recipe cooked over high heat with ingredients such as soy sauce, ginger, garlic, sesame oil, and a combination of vegetables and protein.",
+    "contexts": [],
+    "category": "cuisine"
+  },
+  {
+    "question": "french onion soup",
+    "ground_truth": "A recipe for French onion soup — caramelized onions in a rich beef broth topped with a crouton and melted Gruyère or Swiss cheese, baked until golden.",
+    "contexts": [],
+    "category": "cuisine"
+  },
+  {
+    "question": "slow cooker beef stew",
+    "ground_truth": "A beef stew recipe designed for a slow cooker or crock pot, with beef chunks, root vegetables, and broth cooked low and slow for several hours until tender.",
+    "contexts": [],
+    "category": "technique"
+  },
+  {
+    "question": "grilled chicken marinade",
+    "ground_truth": "A recipe for marinated chicken intended for grilling on a barbecue or grill pan, with a marinade of oil, acid, and seasonings applied before cooking.",
+    "contexts": [],
+    "category": "technique"
+  },
+  {
+    "question": "baked salmon recipe",
+    "ground_truth": "A salmon recipe where the fish is cooked in an oven by baking, with seasonings, herbs, or a glaze applied before or during cooking.",
+    "contexts": [],
+    "category": "technique"
+  },
+  {
+    "question": "pan fried pork chops",
+    "ground_truth": "A pork chop recipe cooked by pan frying in a skillet with oil or butter, producing a seared exterior and juicy interior.",
+    "contexts": [],
+    "category": "technique"
+  },
+  {
+    "question": "steamed vegetables with sauce",
+    "ground_truth": "A recipe where vegetables are cooked by steaming and served with a complementary sauce such as butter, soy, or tahini.",
+    "contexts": [],
+    "category": "technique"
+  },
+  {
+    "question": "roasted root vegetables",
+    "ground_truth": "A recipe where root vegetables such as carrots, parsnips, beets, or sweet potatoes are roasted in an oven at high heat until caramelized and tender.",
+    "contexts": [],
+    "category": "technique"
+  },
+  {
+    "question": "pressure cooker chicken soup",
+    "ground_truth": "A chicken soup recipe designed for a pressure cooker or Instant Pot, cooking the broth and chicken quickly under pressure.",
+    "contexts": [],
+    "category": "technique"
+  },
+  {
+    "question": "deep fried appetizers",
+    "ground_truth": "An appetizer recipe that is cooked by deep frying in hot oil, such as spring rolls, jalapeño poppers, fried calamari, or chicken wings.",
+    "contexts": [],
+    "category": "technique"
+  },
+  {
+    "question": "simple recipes under 5 ingredients",
+    "ground_truth": "A recipe that requires 5 or fewer distinct ingredients to prepare, excluding basic pantry staples such as salt, pepper, and oil.",
+    "contexts": [],
+    "category": "filtering"
+  },
+  {
+    "question": "quick dinner ready in 20 minutes",
+    "ground_truth": "A dinner recipe that can be prepared and cooked in 20 minutes or less from start to finish.",
+    "contexts": [],
+    "category": "filtering"
+  },
+  {
+    "question": "easy beginner recipes with few steps",
+    "ground_truth": "A recipe suitable for beginner cooks with a small number of simple preparation steps — ideally 5 or fewer — and no advanced cooking techniques required.",
+    "contexts": [],
+    "category": "filtering"
+  },
+  {
+    "question": "recipes with more than 10 ingredients",
+    "ground_truth": "A recipe that uses more than 10 distinct ingredients, indicating a complex or elaborate dish.",
+    "contexts": [],
+    "category": "filtering"
+  },
+  {
+    "question": "one pot meal",
+    "ground_truth": "A recipe where all components are cooked together in a single pot, pan, or baking dish — minimizing cleanup and combining all ingredients in one vessel.",
+    "contexts": [],
+    "category": "filtering"
+  },
+  {
+    "question": "meal prep recipe for the week",
+    "ground_truth": "A recipe suitable for batch cooking and meal preparation — one that stores well in the refrigerator for several days and can be portioned out for multiple meals.",
+    "contexts": [],
+    "category": "filtering"
+  },
+  {
+    "question": "budget friendly dinner under 10 dollars",
+    "ground_truth": "A dinner recipe that can be made with inexpensive ingredients — such as beans, lentils, rice, pasta, or affordable cuts of meat — keeping total cost low.",
+    "contexts": [],
+    "category": "filtering"
+  },
+  {
+    "question": "recipe with only 3 steps",
+    "ground_truth": "A recipe with a very small number of preparation steps — 3 or fewer — indicating a simple and straightforward cooking process.",
+    "contexts": [],
+    "category": "filtering"
+  },
+  {
+    "question": "something warm and comforting for a cold night",
+    "ground_truth": "A warm, hearty dish such as soup, stew, chili, casserole, or porridge that is served hot and evokes a feeling of comfort and satisfaction.",
+    "contexts": [],
+    "category": "situation"
+  },
+  {
+    "question": "impressive dinner for guests",
+    "ground_truth": "A dinner recipe suitable for serving to guests — visually appealing, flavorful, and presenting well on a plate — such as a roast, stuffed dish, or elegant pasta.",
+    "contexts": [],
+    "category": "situation"
+  },
+  {
+    "question": "something light for summer",
+    "ground_truth": "A light, refreshing recipe suitable for warm weather — such as a cold salad, chilled soup, grilled dish, or fresh fruit-based meal — not heavy or warming.",
+    "contexts": [],
+    "category": "situation"
+  },
+  {
+    "question": "breakfast to impress on a weekend",
+    "ground_truth": "A breakfast or brunch recipe that is more elaborate than everyday breakfast — such as eggs benedict, French toast, a frittata, or pancakes with toppings.",
+    "contexts": [],
+    "category": "situation"
+  },
+  {
+    "question": "kids would love this dinner",
+    "ground_truth": "A family-friendly dinner recipe with mild flavors and simple presentation that children would typically enjoy — such as pasta, pizza, nuggets, or mac and cheese.",
+    "contexts": [],
+    "category": "situation"
+  },
+  {
+    "question": "romantic dinner for two",
+    "ground_truth": "An elegant dinner recipe suitable for two people — featuring quality ingredients such as steak, seafood, or pasta — presented in a refined and intimate style.",
+    "contexts": [],
+    "category": "situation"
+  },
+  {
+    "question": "late night snack idea",
+    "ground_truth": "A quick and simple snack recipe that can be prepared in a few minutes with minimal cooking — such as toast, nachos, quesadillas, or a simple dip.",
+    "contexts": [],
+    "category": "situation"
+  },
+  {
+    "question": "picnic food that travels well",
+    "ground_truth": "A recipe suitable for outdoor eating — food that can be prepared in advance, stored at room temperature or in a cooler, and eaten without utensils or heating.",
+    "contexts": [],
+    "category": "situation"
+  },
+  {
+    "question": "quick healthy chicken dinner for weeknight",
+    "ground_truth": "A chicken dinner recipe that is both quick to prepare — under 30 minutes — and nutritionally balanced with vegetables or whole grains, suitable for a busy weeknight.",
+    "contexts": [],
+    "category": "multi_intent"
+  },
+  {
+    "question": "easy vegan breakfast with fruit",
+    "ground_truth": "A breakfast recipe that is vegan — no animal products — easy to prepare with minimal steps, and incorporates fresh or frozen fruit as a primary ingredient.",
+    "contexts": [],
+    "category": "multi_intent"
+  },
+  {
+    "question": "gluten-free italian pasta alternative",
+    "ground_truth": "An Italian-style pasta dish made with gluten-free pasta or a gluten-free pasta alternative such as zucchini noodles, rice noodles, or chickpea pasta.",
+    "contexts": [],
+    "category": "multi_intent"
+  },
+  {
+    "question": "slow cooker vegetarian soup for meal prep",
+    "ground_truth": "A vegetarian soup recipe designed for a slow cooker that can be made in a large batch for meal prep — containing no meat and storing well for multiple days.",
+    "contexts": [],
+    "category": "multi_intent"
+  },
+  {
+    "question": "low carb high protein breakfast",
+    "ground_truth": "A breakfast recipe that is low in carbohydrates and high in protein — such as eggs, Greek yogurt, or cottage cheese based dishes — with no bread, oats, or sugary ingredients.",
+    "contexts": [],
+    "category": "multi_intent"
+  },
+  {
+    "question": "spicy mexican vegetarian tacos",
+    "ground_truth": "A taco recipe with a spicy Mexican flavor profile using a vegetarian filling such as black beans, roasted vegetables, or tofu — no meat included.",
+    "contexts": [],
+    "category": "multi_intent"
+  },
+  {
+    "question": "quick japanese noodle soup",
+    "ground_truth": "A Japanese-style noodle soup such as ramen or soba that can be prepared quickly — under 30 minutes — with a flavorful broth and noodles as the base.",
+    "contexts": [],
+    "category": "multi_intent"
+  },
+  {
+    "question": "simple baked dessert without sugar",
+    "ground_truth": "A baked dessert recipe that contains no refined sugar, using natural sweeteners such as honey, maple syrup, dates, or bananas instead.",
+    "contexts": [],
+    "category": "multi_intent"
+  },
+  {
+    "question": "chiken noodl soop",
+    "ground_truth": "A recipe for chicken noodle soup — a broth-based soup with cooked chicken, noodles, and vegetables such as carrots, celery, and onion.",
+    "contexts": [],
+    "category": "misspelling"
+  },
+  {
+    "question": "spageti bolonese",
+    "ground_truth": "A recipe for spaghetti bolognese — pasta with a slow-cooked meat sauce made from ground beef or pork, tomatoes, onion, carrot, and celery.",
+    "contexts": [],
+    "category": "misspelling"
+  },
+  {
+    "question": "choclate brownis",
+    "ground_truth": "A recipe for chocolate brownies — dense, fudgy baked squares made with chocolate or cocoa powder, butter, eggs, sugar, and flour.",
+    "contexts": [],
+    "category": "misspelling"
+  },
+  {
+    "question": "pancaks with mapel sirup",
+    "ground_truth": "A recipe for pancakes served with maple syrup — fluffy pan-cooked rounds made from a batter of flour, eggs, milk, and baking powder.",
+    "contexts": [],
+    "category": "misspelling"
+  },
+  {
+    "question": "caeser salid with anchovys",
+    "ground_truth": "A recipe for Caesar salad — romaine lettuce with Caesar dressing made from anchovies, garlic, lemon juice, egg, and Parmesan cheese, topped with croutons.",
+    "contexts": [],
+    "category": "misspelling"
+  },
+  {
+    "question": "guacamoly dip",
+    "ground_truth": "A recipe for guacamole — a Mexican dip made from mashed avocados with lime juice, salt, cilantro, onion, and optionally tomatoes or jalapeños.",
+    "contexts": [],
+    "category": "misspelling"
+  },
+  {
+    "question": "dairy-free soup",
+    "ground_truth": "A soup recipe that contains no dairy products — no milk, cream, butter, cheese, or yogurt — in any form including hidden sources.",
+    "contexts": [],
+    "category": "x_free"
+  },
+  {
+    "question": "nut-free cookies",
+    "ground_truth": "A cookie recipe that contains no nuts of any kind — no peanuts, tree nuts, nut butters, or nut-derived oils — safe for someone with a nut allergy.",
+    "contexts": [],
+    "category": "x_free"
+  },
+  {
+    "question": "egg-free cake",
+    "ground_truth": "A cake recipe that contains no eggs or egg-derived ingredients, using egg substitutes such as flax eggs, applesauce, aquafaba, or commercial egg replacers.",
+    "contexts": [],
+    "category": "x_free"
+  },
+  {
+    "question": "gluten free bread",
+    "ground_truth": "A bread recipe made without any gluten-containing ingredients — no wheat, rye, or barley flour — using gluten-free alternatives such as rice flour, almond flour, or tapioca starch.",
+    "contexts": [],
+    "category": "x_free"
+  },
+  {
+    "question": "soy-free stir fry",
+    "ground_truth": "A stir fry recipe that contains no soy or soy-derived ingredients — no soy sauce, tofu, tempeh, edamame, or soybean oil.",
+    "contexts": [],
+    "category": "x_free"
+  },
+  {
+    "question": "sugar-free dessert",
+    "ground_truth": "A dessert recipe that contains no added refined sugar — no white sugar, brown sugar, or corn syrup — using no-calorie sweeteners or naturally sweet ingredients only.",
+    "contexts": [],
+    "category": "x_free"
+  },
+  {
+    "question": "oil-free salad dressing",
+    "ground_truth": "A salad dressing recipe that contains no oil of any kind, using alternatives such as citrus juice, vinegar, tahini thinned with water, or yogurt as the base.",
+    "contexts": [],
+    "category": "x_free"
+  },
+  {
+    "question": "alcohol-free tiramisu",
+    "ground_truth": "A tiramisu recipe that contains no alcohol — no marsala wine, rum, or coffee liqueur — using coffee or juice as a substitute for the alcoholic component.",
+    "contexts": [],
+    "category": "x_free"
+  },
+  {
+    "question": "food",
+    "ground_truth": "Any recipe of any kind — this query is too vague to have a specific expected result.",
+    "contexts": [],
+    "category": "edge_case"
+  },
+  {
+    "question": "r",
+    "ground_truth": "This query is a single character and too short to meaningfully match any recipe.",
+    "contexts": [],
+    "category": "edge_case"
+  },
+  {
+    "question": "the best recipe ever created in the world that everyone loves",
+    "ground_truth": "This query is too subjective and abstract to map to any specific recipe — no single universally loved recipe exists.",
+    "contexts": [],
+    "category": "edge_case"
+  },
+  {
+    "question": "how to lose weight fast with food",
+    "ground_truth": "This query is about dietary advice rather than a specific recipe — a relevant result would be a low-calorie or diet-friendly meal rather than a recipe for weight loss itself.",
+    "contexts": [],
+    "category": "edge_case"
+  },
+  {
+    "question": "something for dinner tonight",
+    "ground_truth": "Any dinner recipe suitable for the evening meal — this is intentionally vague and a good result would be any reasonably popular dinner dish.",
+    "contexts": [],
+    "category": "edge_case"
+  },
+  {
+    "question": "xkqzpw blarfnog recipe",
+    "ground_truth": "This query contains nonsense words that do not correspond to any real dish — no relevant recipe result should be expected.",
+    "contexts": [],
+    "category": "edge_case"
+  }
+]
