@@ -3,6 +3,7 @@ namespace ChefAgent.Agents.Orchestrator;
 using System.Text.RegularExpressions;
 using ChefAgent.Shared;
 using ChefAgent.Shared.Models;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -35,6 +36,7 @@ public class IntentRouter
     private readonly string _ollamaUrl;
     private readonly string _chatModel;
     private readonly CircuitBreaker _circuitBreaker;
+    private readonly SessionStore _sessionStore;
 
     // ── Signal Word Sets ──────────────────────────────────────────────────────
 
@@ -218,7 +220,8 @@ public class IntentRouter
         HttpClient httpClient,
         string ollamaUrl,
         string chatModel,
-        CircuitBreaker circuitBreaker,
+        [FromKeyedServices("ollama")] CircuitBreaker circuitBreaker,
+        SessionStore sessionStore,
         ILogger<IntentRouter> logger
     )
     {
@@ -226,6 +229,7 @@ public class IntentRouter
         _ollamaUrl = ollamaUrl;
         _chatModel = chatModel;
         _circuitBreaker = circuitBreaker;
+        _sessionStore = sessionStore;
         _logger = logger;
     }
 
@@ -253,24 +257,43 @@ public class IntentRouter
 
         // ── LLM entity extraction fallback ───────────────────────
         // Only fires when:
-        //   1. Rules extracted nothing (extractedProfile is null)
+        //   1. Rules extracted nothing
         //   2. Message contains implicit constraint signals
-        //   3. Existing profile doesn't already cover it
+        //   3. Extraction hasn't already run for this session
         if (extractedProfile is null && HasImplicitConstraintSignal(normalized))
         {
-            var llmProfile = await TryExtractProfileWithLlmAsync(message, existingProfile, history);
+            var sessionIdForCache = sessionId ?? string.Empty;
+            var (ranBefore, cachedProfile) = !string.IsNullOrEmpty(sessionIdForCache)
+                ? await _sessionStore.GetCachedExtractionAsync(sessionIdForCache)
+                : (false, null);
 
-            if (llmProfile is not null)
+            if (ranBefore)
             {
-                extractedProfile = llmProfile;
-                _logger.LogInformation(
-                    "[IntentRouter] LLM extracted profile — restrictions: [{R}] allergies: [{A}]",
-                    string.Join(", ", llmProfile.Restrictions),
-                    string.Join(", ", llmProfile.Allergies)
+                // Cache hit — use cached result, skip Ollama entirely
+                extractedProfile = cachedProfile;
+                _logger.LogInformation("[IntentRouter] Extraction cache hit — skipping LLM");
+            }
+            else
+            {
+                // Cache miss — call Ollama, then cache the result
+                var llmProfile = await TryExtractProfileWithLlmAsync(
+                    message,
+                    existingProfile,
+                    history
                 );
+                extractedProfile = llmProfile;
+
+                if (!string.IsNullOrEmpty(sessionIdForCache))
+                    await _sessionStore.SetCachedExtractionAsync(sessionIdForCache, llmProfile);
+
+                if (llmProfile is not null)
+                    _logger.LogInformation(
+                        "[IntentRouter] LLM extracted profile — restrictions: [{R}] allergies: [{A}]",
+                        string.Join(", ", llmProfile.Restrictions),
+                        string.Join(", ", llmProfile.Allergies)
+                    );
             }
         }
-
         var mergedProfile = MergeProfiles(existingProfile, extractedProfile);
         var classifiedBy = intent == UserIntent.SearchRecipe ? "rules-default" : "rules";
 

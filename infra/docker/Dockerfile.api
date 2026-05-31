@@ -9,6 +9,7 @@ COPY src/agents/RecipeAgent/*.csproj ./src/agents/RecipeAgent/
 COPY src/agents/DietAgent/*.csproj ./src/agents/DietAgent/
 COPY src/agents/PlannerAgent/*.csproj ./src/agents/PlannerAgent/
 COPY src/agents/Orchestrator/*.csproj ./src/agents/Orchestrator/
+COPY src/tests/*.csproj ./src/tests/
 
 RUN dotnet restore src/ChefAgent.sln
 

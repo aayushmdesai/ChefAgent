@@ -107,7 +107,7 @@ public static class ServiceRegistration
             var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
             var logger = sp.GetRequiredService<ILogger<RecipeSearchPlugin>>();
             var outputGuard = sp.GetRequiredService<OutputGuard>();
-            var circuitBreaker = sp.GetRequiredService<CircuitBreaker>();
+            var circuitBreaker = sp.GetRequiredKeyedService<CircuitBreaker>("ollama");
             var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
             var embeddingModel = config["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
             var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
@@ -158,7 +158,7 @@ public static class ServiceRegistration
                 httpClient,
                 ollamaUrl,
                 chatModel,
-                sp.GetRequiredService<CircuitBreaker>(),
+                sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
                 sp.GetRequiredService<ILogger<DietValidationPlugin>>()
             );
         });
@@ -198,16 +198,28 @@ public static class ServiceRegistration
                 maxRequestsPerMinute: config.GetValue<int>("RateLimiter:PerSessionLimit", 30)
             );
         });
-        services.AddSingleton<CircuitBreaker>(sp =>
-        {
-            var config = sp.GetRequiredService<IConfiguration>();
-            return new CircuitBreaker(
-                sp.GetRequiredService<ILogger<CircuitBreaker>>(),
-                sp.GetRequiredService<GuardrailAuditLog>(),
-                failureThreshold: config.GetValue<int>("CircuitBreaker:FailureThreshold", 3),
-                cooldownSeconds: config.GetValue<int>("CircuitBreaker:CooldownSeconds", 60)
-            );
-        });
+
+        services.AddKeyedSingleton<CircuitBreaker>(
+            "ollama",
+            (sp, _) =>
+                new CircuitBreaker(
+                    sp.GetRequiredService<ILogger<CircuitBreaker>>(),
+                    sp.GetRequiredService<GuardrailAuditLog>(),
+                    failureThreshold: 3,
+                    cooldownSeconds: 60
+                )
+        );
+
+        services.AddKeyedSingleton<CircuitBreaker>(
+            "redis",
+            (sp, _) =>
+                new CircuitBreaker(
+                    sp.GetRequiredService<ILogger<CircuitBreaker>>(),
+                    sp.GetRequiredService<GuardrailAuditLog>(),
+                    failureThreshold: 3,
+                    cooldownSeconds: 30
+                )
+        );
         services.AddSingleton<OutputGuard>();
         // IntentRouter — rules-based classifier, Month 2 will add LLM path
         services.AddSingleton(sp =>
@@ -220,7 +232,8 @@ public static class ServiceRegistration
                 httpClient,
                 ollamaUrl,
                 chatModel,
-                sp.GetRequiredService<CircuitBreaker>(),
+                sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
+                sp.GetRequiredService<SessionStore>(),
                 sp.GetRequiredService<ILogger<IntentRouter>>()
             );
         });
@@ -240,7 +253,7 @@ public static class ServiceRegistration
                 httpClient,
                 ollamaUrl,
                 chatModel,
-                sp.GetRequiredService<CircuitBreaker>(),
+                sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
                 sp.GetRequiredService<GuardrailAuditLog>(),
                 sp.GetRequiredService<ILogger<AgentOrchestrator>>()
             );
