@@ -1,0 +1,886 @@
+{
+  "timestamp": "2026-06-01T18:10:08.910331",
+  "question_count": 100,
+  "judge_model": "llama3.2",
+  "overall": {
+    "context_relevance": 0.47,
+    "faithfulness": 0.489,
+    "answer_relevancy": 0.267
+  },
+  "per_category": {
+    "exact_match": {
+      "context_relevance": 0.525,
+      "faithfulness": 0.625,
+      "answer_relevancy": 0.25,
+      "count": 8
+    },
+    "by_ingredients": {
+      "context_relevance": 0.63,
+      "faithfulness": 0.52,
+      "answer_relevancy": 0.2,
+      "count": 10
+    },
+    "dietary": {
+      "context_relevance": 0.408,
+      "faithfulness": 0.433,
+      "answer_relevancy": 0.25,
+      "count": 12
+    },
+    "negation": {
+      "context_relevance": 0.46,
+      "faithfulness": 0.49,
+      "answer_relevancy": 0.2,
+      "count": 10
+    },
+    "cuisine": {
+      "context_relevance": 0.625,
+      "faithfulness": 0.688,
+      "answer_relevancy": 0.3,
+      "count": 8
+    },
+    "technique": {
+      "context_relevance": 0.438,
+      "faithfulness": 0.537,
+      "answer_relevancy": 0.438,
+      "count": 8
+    },
+    "filtering": {
+      "context_relevance": 0.45,
+      "faithfulness": 0.35,
+      "answer_relevancy": 0.45,
+      "count": 8
+    },
+    "situation": {
+      "context_relevance": 0.525,
+      "faithfulness": 0.512,
+      "answer_relevancy": 0.3,
+      "count": 8
+    },
+    "multi_intent": {
+      "context_relevance": 0.362,
+      "faithfulness": 0.537,
+      "answer_relevancy": 0.238,
+      "count": 8
+    },
+    "misspelling": {
+      "context_relevance": 0.442,
+      "faithfulness": 0.533,
+      "answer_relevancy": 0.217,
+      "count": 6
+    },
+    "x_free": {
+      "context_relevance": 0.438,
+      "faithfulness": 0.425,
+      "answer_relevancy": 0.2,
+      "count": 8
+    },
+    "edge_case": {
+      "context_relevance": 0.267,
+      "faithfulness": 0.167,
+      "answer_relevancy": 0.167,
+      "count": 6
+    }
+  },
+  "per_question": [
+    {
+      "question": "chicken parmesan",
+      "category": "exact_match",
+      "answer": "Chicken Parmesan",
+      "context_relevance": 0.2,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "beef stroganoff",
+      "category": "exact_match",
+      "answer": "Beef Stroganoff For 2",
+      "context_relevance": 0.8,
+      "faithfulness": 0.7,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "chicken tikka masala",
+      "category": "exact_match",
+      "answer": "Kota Kapama",
+      "context_relevance": 0.2,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "beef tacos",
+      "category": "exact_match",
+      "answer": "Creamed Tacos",
+      "context_relevance": 0.2,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.2
+    },
+    {
+      "question": "spaghetti carbonara",
+      "category": "exact_match",
+      "answer": "Pasta Carbonara",
+      "context_relevance": 0.4,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "caesar salad",
+      "category": "exact_match",
+      "answer": "Caesar Salad",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "banana bread",
+      "category": "exact_match",
+      "answer": "Banana Bread",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "chicken noodle soup",
+      "category": "exact_match",
+      "answer": "Homemade Chicken Noodle Soup",
+      "context_relevance": 0.8,
+      "faithfulness": 0.9,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "what can I make with chicken and garlic",
+      "category": "by_ingredients",
+      "answer": "Chicken And Rice",
+      "context_relevance": 0.8,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "recipes using ground beef and tomatoes",
+      "category": "by_ingredients",
+      "answer": "Hearty Meat Sauce",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.2
+    },
+    {
+      "question": "what can I cook with eggs and cheese",
+      "category": "by_ingredients",
+      "answer": "Easter \"Cheese\"",
+      "context_relevance": 0.3,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "dinner ideas with salmon and lemon",
+      "category": "by_ingredients",
+      "answer": "Salmon Appetizer",
+      "context_relevance": 0.0,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "recipes with leftover rice and vegetables",
+      "category": "by_ingredients",
+      "answer": "No Fat Rice And Vegetable Dish",
+      "context_relevance": 0.8,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "what to make with potatoes and bacon",
+      "category": "by_ingredients",
+      "answer": "Bacon Cheese Potatoes",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "meals using shrimp and pasta",
+      "category": "by_ingredients",
+      "answer": "Seafood And Pasta Salad",
+      "context_relevance": 0.8,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "dinner with chicken breast and mushrooms",
+      "category": "by_ingredients",
+      "answer": "Creamy Chicken And Mushrooms",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.2
+    },
+    {
+      "question": "something with spinach and feta",
+      "category": "by_ingredients",
+      "answer": "Spinach Fettucine",
+      "context_relevance": 0.8,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "recipes using only pantry staples",
+      "category": "by_ingredients",
+      "answer": "Spice Bread In A Jar",
+      "context_relevance": 0.4,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.3
+    },
+    {
+      "question": "vegetarian pasta",
+      "category": "dietary",
+      "answer": "Fettucini With Lemon Vegetables",
+      "context_relevance": 0.5,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "gluten-free dinner",
+      "category": "dietary",
+      "answer": "Raw Gluten",
+      "context_relevance": 0.2,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "vegan chocolate cake",
+      "category": "dietary",
+      "answer": "Delicious Low Calorie Chocolate Cake",
+      "context_relevance": 0.0,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "vegetarian indian food",
+      "category": "dietary",
+      "answer": "Indian Meat Loaf",
+      "context_relevance": 0.0,
+      "faithfulness": 0.7,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "low carb chicken dinner",
+      "category": "dietary",
+      "answer": "Easy Chicken Dinner",
+      "context_relevance": 0.2,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "kosher beef recipe",
+      "category": "dietary",
+      "answer": "Hungarian Goulash",
+      "context_relevance": 0.3,
+      "faithfulness": 0.9,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "halal chicken recipe",
+      "category": "dietary",
+      "answer": "Dajaj Pilaf (Chicken)(Middle Eastern Feast Dish)",
+      "context_relevance": 0.6,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "vegan breakfast ideas",
+      "category": "dietary",
+      "answer": "Friendship Tea",
+      "context_relevance": 0.2,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "pescatarian dinner with fish",
+      "category": "dietary",
+      "answer": "Pescado En Salsa Verde(Fish In Green Sauce)",
+      "context_relevance": 0.8,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "vegetarian high protein meal",
+      "category": "dietary",
+      "answer": "Seven-In-One Hot Dish",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "gluten-free dessert",
+      "category": "dietary",
+      "answer": "Lucy Anne'S Quick Dessert",
+      "context_relevance": 0.8,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.3
+    },
+    {
+      "question": "plant-based burger",
+      "category": "dietary",
+      "answer": "Vegetable-Burger Soup",
+      "context_relevance": 0.5,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.3
+    },
+    {
+      "question": "pasta without tomatoes",
+      "category": "negation",
+      "answer": "Homemade Pasta",
+      "context_relevance": 0.8,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "cookies without nuts",
+      "category": "negation",
+      "answer": "Cookies For A Crowd",
+      "context_relevance": 0.0,
+      "faithfulness": 0.7,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "chicken recipe without cream",
+      "category": "negation",
+      "answer": "Chicken And Dumplings",
+      "context_relevance": 0.2,
+      "faithfulness": 0.2,
+      "answer_relevancy": 0.7
+    },
+    {
+      "question": "soup without onions",
+      "category": "negation",
+      "answer": "Homemade Soup Mix",
+      "context_relevance": 0.0,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.3
+    },
+    {
+      "question": "dessert without eggs",
+      "category": "negation",
+      "answer": "Four Layer Dessert",
+      "context_relevance": 0.4,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "salad without lettuce",
+      "category": "negation",
+      "answer": "Salad Recipe",
+      "context_relevance": 0.3,
+      "faithfulness": 0.7,
+      "answer_relevancy": 0.2
+    },
+    {
+      "question": "bread without yeast",
+      "category": "negation",
+      "answer": "Health Bread",
+      "context_relevance": 0.8,
+      "faithfulness": 0.7,
+      "answer_relevancy": 0.3
+    },
+    {
+      "question": "stir fry without soy sauce",
+      "category": "negation",
+      "answer": "Spinach Stir-Fry",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "cake without butter",
+      "category": "negation",
+      "answer": "Holy Cake",
+      "context_relevance": 0.8,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "rice dish without garlic",
+      "category": "negation",
+      "answer": "Rice Dish",
+      "context_relevance": 0.5,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "mexican dinner",
+      "category": "cuisine",
+      "answer": "Mexican Casserole",
+      "context_relevance": 0.8,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.4
+    },
+    {
+      "question": "thai soup",
+      "category": "cuisine",
+      "answer": "Antionett'S Soup",
+      "context_relevance": 0.0,
+      "faithfulness": 0.9,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "italian pasta dish",
+      "category": "cuisine",
+      "answer": "Creamy Italian Pasta Salad",
+      "context_relevance": 0.7,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "japanese dinner recipe",
+      "category": "cuisine",
+      "answer": "Japanese Fried Rice",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.2
+    },
+    {
+      "question": "indian curry",
+      "category": "cuisine",
+      "answer": "Chicken Curry(Recipe From India)",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "greek salad or mezze",
+      "category": "cuisine",
+      "answer": "Greek-Style Pasta Salad",
+      "context_relevance": 0.3,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "chinese stir fry",
+      "category": "cuisine",
+      "answer": "Easy Chicken Stir-Fry",
+      "context_relevance": 0.8,
+      "faithfulness": 0.7,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "french onion soup",
+      "category": "cuisine",
+      "answer": "French Onion Soup",
+      "context_relevance": 0.8,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "slow cooker beef stew",
+      "category": "technique",
+      "answer": "Crock-Pot Sweet And Sour Beef And Vegetables",
+      "context_relevance": 0.2,
+      "faithfulness": 0.7,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "grilled chicken marinade",
+      "category": "technique",
+      "answer": "Marinated Chicken Breasts",
+      "context_relevance": 0.8,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "baked salmon recipe",
+      "category": "technique",
+      "answer": "Salmon Loaf",
+      "context_relevance": 0.3,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "pan fried pork chops",
+      "category": "technique",
+      "answer": "Baked Pork Chops 'N' Corn",
+      "context_relevance": 0.8,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.7
+    },
+    {
+      "question": "steamed vegetables with sauce",
+      "category": "technique",
+      "answer": "Oriental Vegetables",
+      "context_relevance": 0.7,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "roasted root vegetables",
+      "category": "technique",
+      "answer": "Roasted Potatoes With Arugula",
+      "context_relevance": 0.2,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "pressure cooker chicken soup",
+      "category": "technique",
+      "answer": "Claudine'S Homemade Chicken Rice Soup",
+      "context_relevance": 0.3,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "deep fried appetizers",
+      "category": "technique",
+      "answer": "4 Amigos Deep Fried Ice Cream(Guatemala)",
+      "context_relevance": 0.2,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "simple recipes under 5 ingredients",
+      "category": "filtering",
+      "answer": "Quick Cobbler",
+      "context_relevance": 0.3,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "quick dinner ready in 20 minutes",
+      "category": "filtering",
+      "answer": "Simple Rolls",
+      "context_relevance": 0.2,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.3
+    },
+    {
+      "question": "easy beginner recipes with few steps",
+      "category": "filtering",
+      "answer": "Beginner'S Rolls",
+      "context_relevance": 0.7,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.2
+    },
+    {
+      "question": "recipes with more than 10 ingredients",
+      "category": "filtering",
+      "answer": "Thousand Isle Dressing",
+      "context_relevance": 0.3,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.7
+    },
+    {
+      "question": "one pot meal",
+      "category": "filtering",
+      "answer": "One Pot Chili",
+      "context_relevance": 0.8,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "meal prep recipe for the week",
+      "category": "filtering",
+      "answer": "Sunday Dinner",
+      "context_relevance": 0.2,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "budget friendly dinner under 10 dollars",
+      "category": "filtering",
+      "answer": "Six Layer Dinner",
+      "context_relevance": 0.3,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "recipe with only 3 steps",
+      "category": "filtering",
+      "answer": "4 Layer Dessert",
+      "context_relevance": 0.8,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "something warm and comforting for a cold night",
+      "category": "situation",
+      "answer": "Happiness",
+      "context_relevance": 0.0,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "impressive dinner for guests",
+      "category": "situation",
+      "answer": "Chicken Spectacular",
+      "context_relevance": 0.7,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.7
+    },
+    {
+      "question": "something light for summer",
+      "category": "situation",
+      "answer": "Summer Salad",
+      "context_relevance": 0.8,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "breakfast to impress on a weekend",
+      "category": "situation",
+      "answer": "Holiday Breakfast Bread",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.2
+    },
+    {
+      "question": "kids would love this dinner",
+      "category": "situation",
+      "answer": "My Own Self",
+      "context_relevance": 0.3,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "romantic dinner for two",
+      "category": "situation",
+      "answer": "Special Occasion Casserole",
+      "context_relevance": 0.3,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "late night snack idea",
+      "category": "situation",
+      "answer": "Quick And Easy Snack",
+      "context_relevance": 0.5,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "picnic food that travels well",
+      "category": "situation",
+      "answer": "Summer Salad",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "quick healthy chicken dinner for weeknight",
+      "category": "multi_intent",
+      "answer": "Sunday Dinner",
+      "context_relevance": 0.2,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "easy vegan breakfast with fruit",
+      "category": "multi_intent",
+      "answer": "Fruit Salad",
+      "context_relevance": 0.8,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.3
+    },
+    {
+      "question": "gluten-free italian pasta alternative",
+      "category": "multi_intent",
+      "answer": "Pasta Fagiol",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "slow cooker vegetarian soup for meal prep",
+      "category": "multi_intent",
+      "answer": "Black Bean Soup(Slow Cooker)",
+      "context_relevance": 0.3,
+      "faithfulness": 0.7,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "low carb high protein breakfast",
+      "category": "multi_intent",
+      "answer": "Low Cholesterol Ice Cream",
+      "context_relevance": 0.0,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "spicy mexican vegetarian tacos",
+      "category": "multi_intent",
+      "answer": "Creamed Tacos",
+      "context_relevance": 0.5,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "quick japanese noodle soup",
+      "category": "multi_intent",
+      "answer": "Dry Mix (Oriental Rice)",
+      "context_relevance": 0.0,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "simple baked dessert without sugar",
+      "category": "multi_intent",
+      "answer": "4 Layer Dessert",
+      "context_relevance": 0.3,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "chiken noodl soop",
+      "category": "misspelling",
+      "answer": "Chitterlings(Makes 4 To 5 Servings)",
+      "context_relevance": 0.05,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "spageti bolonese",
+      "category": "misspelling",
+      "answer": "Porcini Risotto",
+      "context_relevance": 0.0,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "choclate brownis",
+      "category": "misspelling",
+      "answer": "Glorified Brownies",
+      "context_relevance": 0.8,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "pancaks with mapel sirup",
+      "category": "misspelling",
+      "answer": "Pannakochan",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "caeser salid with anchovys",
+      "category": "misspelling",
+      "answer": "Bagna Cauda (Italy)",
+      "context_relevance": 0.2,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "guacamoly dip",
+      "category": "misspelling",
+      "answer": "Guacamole Dip",
+      "context_relevance": 0.8,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "dairy-free soup",
+      "category": "x_free",
+      "answer": "Cheese Soup",
+      "context_relevance": 0.8,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "nut-free cookies",
+      "category": "x_free",
+      "answer": "Nut Cookies",
+      "context_relevance": 0.3,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "egg-free cake",
+      "category": "x_free",
+      "answer": "Eggless Milkless Applesauce Cake",
+      "context_relevance": 0.8,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.3
+    },
+    {
+      "question": "gluten free bread",
+      "category": "x_free",
+      "answer": "Raw Gluten",
+      "context_relevance": 0.4,
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "soy-free stir fry",
+      "category": "x_free",
+      "answer": "Sugar-Free Sweet-N-Sour Stir-Fry",
+      "context_relevance": 0.0,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "sugar-free dessert",
+      "category": "x_free",
+      "answer": "Fat-Free Strawberry Dessert(My Personal Recipe)",
+      "context_relevance": 0.2,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "oil-free salad dressing",
+      "category": "x_free",
+      "answer": "Oil Free French Dressing",
+      "context_relevance": 0.8,
+      "faithfulness": 0.3,
+      "answer_relevancy": 0.8
+    },
+    {
+      "question": "alcohol-free tiramisu",
+      "category": "x_free",
+      "answer": "Tiramisu",
+      "context_relevance": 0.2,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "food",
+      "category": "edge_case",
+      "answer": "Rice Dish",
+      "context_relevance": 0.4,
+      "faithfulness": 0.2,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "r",
+      "category": "edge_case",
+      "answer": "Roy'S Roast",
+      "context_relevance": 0.0,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "the best recipe ever created in the world that everyone loves",
+      "category": "edge_case",
+      "answer": "Best Cake In The World",
+      "context_relevance": 0.7,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "how to lose weight fast with food",
+      "category": "edge_case",
+      "answer": "Destroy Your Diet Dessert",
+      "context_relevance": 0.3,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0
+    },
+    {
+      "question": "something for dinner tonight",
+      "category": "edge_case",
+      "answer": "Sunday Dinner",
+      "context_relevance": 0.2,
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.5
+    },
+    {
+      "question": "xkqzpw blarfnog recipe",
+      "category": "edge_case",
+      "answer": "Hashbrown Casserole",
+      "context_relevance": 0.0,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.0
+    }
+  ]
+}
