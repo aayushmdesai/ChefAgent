@@ -3,6 +3,7 @@ using ChefAgent.Shared;
 using ChefAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 using Moq;
+using StackExchange.Redis;
 using Xunit;
 
 namespace ChefAgent.Tests;
@@ -20,12 +21,17 @@ public class IntentRouterTests
         var auditLogger = new Mock<ILogger<GuardrailAuditLog>>().Object;
         var audit = new GuardrailAuditLog(auditLogger);
         var circuitBreaker = new CircuitBreaker(cbLogger, audit);
+        var sessionStore = new Mock<SessionStore>(
+            Mock.Of<StackExchange.Redis.IConnectionMultiplexer>(),
+            circuitBreaker
+        ).Object;
 
         return new IntentRouter(
             new HttpClient(),
-            "http://localhost:11434", // ollamaUrl — not called for rules path
-            "llama3.2", // chatModel — not called for rules path
+            "http://localhost:11434",
+            "llama3.2",
             circuitBreaker,
+            sessionStore,
             new Mock<ILogger<IntentRouter>>().Object
         );
     }
