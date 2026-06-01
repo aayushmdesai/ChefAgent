@@ -10,16 +10,55 @@ A multi-agent system where specialized AI agents collaborate to handle recipe se
 
 ## Current Status
 
-| Component          | Status             | Notes                                                                     |
-| ------------------ | ------------------ | ------------------------------------------------------------------------- |
-| **Recipe Agent**   | ✅ Week 2 complete | Multi-stage retrieval — negation, filtering, reranking                    |
-| **Diet Agent**     | ✅ Week 3 complete | Two-layer validation + substitutions (94% rules coverage)                 |
-| **Orchestrator**   | ✅ Week 4 complete | Intent routing, /chat endpoint, React UI                                  |
-| **Planner Agent**  | ✅ Week 5 complete | Stateful meal plans, Redis session memory, multi-slot, swap UI            |
-| **Memory & State** | ✅ Week 6 complete | Conversation history, profile persistence, reference resolution           |
-| **Guardrails**     | ✅ Week 7 complete | Input validation, output guard, circuit breaker, rate limiting, audit log |
+| Component            | Status             | Notes                                                                     |
+| -------------------- | ------------------ | ------------------------------------------------------------------------- |
+| **Recipe Agent**     | ✅ Week 2 complete | Multi-stage retrieval — negation, filtering, reranking, spell-check       |
+| **Diet Agent**       | ✅ Week 3 complete | Two-layer validation + substitutions (94% rules coverage)                 |
+| **Orchestrator**     | ✅ Week 4 complete | Intent routing, /chat endpoint, React UI                                  |
+| **Planner Agent**    | ✅ Week 5 complete | Stateful meal plans, Redis session memory, multi-slot, swap UI            |
+| **Memory & State**   | ✅ Week 6 complete | Conversation history, profile persistence, reference resolution           |
+| **Guardrails**       | ✅ Week 7 complete | Input validation, output guard, circuit breaker, rate limiting, audit log |
+| **Failure Matrix**   | ✅ Week 8 complete | 36/36 failure modes tested, e2e sweep                                     |
+| **Eval Pipeline**    | ✅ Week 9 complete | 100-query golden dataset, RAGAS-style eval, SymSpell +0.175 improvement   |
 
-**Latest tag:** `v0.4.0`
+**Latest tag:** `v0.6.0`
+
+---
+
+## Evaluation
+
+Retrieval quality measured with a custom sequential scorer (Ollama as judge) across 100 golden queries in 12 categories.
+
+| Metric | Baseline | Post Spell-Check | Delta |
+|--------|----------|-----------------|-------|
+| Context Relevance | 0.470 | 0.524 | +0.054 |
+| Faithfulness | 0.489 | 0.444 | -0.045 |
+| Answer Relevancy | 0.267 | 0.234 | -0.033 |
+
+**Faithfulness and answer relevancy are suppressed by template-based generation** — returning a recipe title confuses the LLM judge. These metrics become meaningful when LLM-generated responses are added.
+
+| Category | Baseline | Post Spell-Check | Delta |
+|----------|----------|-----------------|-------|
+| misspelling | 0.442 | 0.617 | **+0.175** |
+| x_free | 0.438 | 0.588 | **+0.150** |
+| exact_match | 0.525 | 0.613 | **+0.088** |
+| by_ingredients | 0.630 | 0.610 | -0.020 |
+| cuisine | 0.625 | 0.613 | -0.012 |
+
+**Strongest categories:** by_ingredients, cuisine, exact_match
+**Weakest categories:** multi_intent (0.46), dietary (0.46), edge_case (0.43)
+
+```bash
+# Run evaluation
+python eval/harnesses/retrieve.py                    # fetch contexts locally
+# upload retrieved_contexts.json to Colab
+python eval/harnesses/score_simple.py --limit 100   # score with Ollama judge
+
+# Compare experiments
+python eval/harnesses/compare_experiments.py \
+    eval/experiments/2026-06-01_baseline.json \
+    eval/experiments/2026-06-07_spell_check.json
+```
 
 ---
 
@@ -32,6 +71,7 @@ User /chat message
     ├─ RateLimiter          30 req/min per session · repeated query detection
     │
     ├─ IntentRouter         rules <1ms · LLM entity extraction (opt-in)
+    │                       entity extraction cache (Redis) — 90s → 13ms on hit
     │
     ├─ AgentOrchestrator    routes by intent · history · profile persistence
     │       ├─ ResolveReferences   "the first one" → recipe title from history
@@ -81,6 +121,8 @@ Request → InputGuard → RateLimiter → RepeatCheck → Classify → Route
 | Abuse      | `RateLimiter`                    | 30 req/min per session, repeated query detection            |
 | Trust      | Confidence + `GuardrailAuditLog` | Disclaimers, allergy warnings, observable audit trail       |
 
+Two circuit breakers: `ollama` (60s cooldown) and `redis` (30s cooldown) — keyed singletons, independent failure domains.
+
 **Integration test:** 18/18 passing across all 5 layers. `GET /admin/guardrails` for live audit log.
 
 ### Confidence signaling
@@ -99,27 +141,29 @@ Every `/chat` response includes a `confidence` field:
 
 ```
 Session memory (Redis, TTL 7 days):
-    session:{id}:plan     → MealPlan (JSON)
-    session:{id}:profile  → DietaryProfile (JSON)
-    session:{id}:history  → ConversationEntry[] (Redis list, 20-entry window)
+    session:{id}:plan       → MealPlan (JSON)
+    session:{id}:profile    → DietaryProfile (JSON)
+    session:{id}:history    → ConversationEntry[] (Redis list, 20-entry window)
+    session:{id}:extraction → Cached LLM entity extraction result (JSON)
 ```
 
 **Reference resolution:** "is the first one vegan?" → resolves to top recipe from prior turn. Zero LLM calls, ~1ms.
 
 **Profile persistence:** Union merge on every request — stored + extracted, saved back to Redis. User never needs to re-send dietary constraints.
 
-**LLM entity extraction:** "I can't have dairy, find me dinner" → `restrictions: [dairy]` extracted via Ollama fallback, merged into stored profile.
+**LLM entity extraction:** "I can't have dairy, find me dinner" → `restrictions: [dairy]` extracted via Ollama fallback, merged into stored profile. Result cached in Redis — subsequent messages skip the LLM entirely (90s → 13ms).
 
 ---
 
 ## Agents
 
-### Recipe Agent (Weeks 1–2)
+### Recipe Agent (Weeks 1–2 + Week 9)
 
 Multi-stage semantic search pipeline over 10K recipes.
 
 ```
 Query
+  ├─ [0] Spell correction       SymSpell + food domain dict — "chiken" → "chicken"
   ├─ [1] Negation parsing       regex, instant — "pasta without tomatoes" → excluded: ["tomatoes"]
   ├─ [2] Query expansion        Ollama opt-in — "cozy" → "soup, stew, chili"
   ├─ [3] Embed cleaned query    Ollama nomic-embed-text (768d)
@@ -128,6 +172,10 @@ Query
   ├─ [6] Negation filter        removes excluded ingredients post-retrieval
   └─ [7] LLM re-rank            Ollama opt-in — CallWithRetryAsync via OutputGuard
 ```
+
+**Spell correction — two-layer architecture:**
+- Food domain dictionary (`food_corrections.json`) — high-confidence culinary corrections
+- SymSpell — frequency-weighted general spell correction, handles unknown misspellings
 
 ---
 
@@ -197,17 +245,19 @@ First stateful agent. Generates 7-day meal plans with slot-level modification.
 
 ## Tech Stack
 
-| Layer             | Technology                              |
-| ----------------- | --------------------------------------- |
-| **Orchestration** | Semantic Kernel (C#)                    |
-| **LLM**           | Ollama — llama3.2 (local, CPU)          |
-| **Embeddings**    | Ollama — nomic-embed-text (768d)        |
-| **Vector DB**     | Qdrant (self-hosted, Docker)            |
-| **Session state** | Redis (Docker, TTL 7 days)              |
-| **Backend**       | ASP.NET Core Minimal API                |
-| **Frontend**      | React + Tailwind (Vite)                 |
-| **Observability** | Langfuse — Month 3                      |
-| **Deployment**    | Docker Compose (local), Azure — Month 3 |
+| Layer                | Technology                                      |
+| -------------------- | ----------------------------------------------- |
+| **Orchestration**    | Semantic Kernel (C#)                            |
+| **LLM**              | Ollama — llama3.2 (local, CPU)                  |
+| **Embeddings**       | Ollama — nomic-embed-text (768d)                |
+| **Vector DB**        | Qdrant (self-hosted, Docker)                    |
+| **Session state**    | Redis (Docker, TTL 7 days)                      |
+| **Spell correction** | SymSpell + food domain dictionary               |
+| **Backend**          | ASP.NET Core Minimal API                        |
+| **Frontend**         | React + Tailwind (Vite)                         |
+| **Eval**             | Custom scorer (Ollama judge) + Colab GPU runner |
+| **Observability**    | Langfuse — Week 10                              |
+| **Deployment**       | Docker Compose (local), cloud — Week 11–12      |
 
 ---
 
@@ -261,20 +311,23 @@ ChefAgent/
 ├── src/
 │   ├── agents/
 │   │   ├── RecipeAgent/
-│   │   │   ├── RecipeSearchPlugin.cs     # Multi-stage retrieval, OutputGuard sanity
-│   │   │   ├── RecipeReranker.cs         # LLM rerank via OutputGuard.CallWithRetryAsync
-│   │   │   └── QueryPreprocessor.cs      # Negation parsing + query expansion
+│   │   │   ├── RecipeSearchPlugin.cs         # Multi-stage retrieval, OutputGuard sanity
+│   │   │   ├── RecipeReranker.cs             # LLM rerank via OutputGuard.CallWithRetryAsync
+│   │   │   ├── QueryPreprocessor.cs          # Spell-check, negation, query expansion
+│   │   │   └── Dictionaries/
+│   │   │       ├── food_corrections.json     # Domain-specific spell corrections
+│   │   │       └── frequency_dictionary_en_80k.txt  # SymSpell frequency list
 │   │   ├── DietAgent/
-│   │   │   ├── DietaryRules.cs           # 420+ phrase rules, 12 categories
-│   │   │   └── DietValidationPlugin.cs   # Two-layer validation, CircuitBreaker
+│   │   │   ├── DietaryRules.cs               # 420+ phrase rules, 12 categories
+│   │   │   └── DietValidationPlugin.cs       # Two-layer validation, CircuitBreaker
 │   │   ├── PlannerAgent/
-│   │   │   └── MealPlannerPlugin.cs      # Generate + Modify + variety enforcement
+│   │   │   └── MealPlannerPlugin.cs          # Generate + Modify + variety enforcement
 │   │   └── Orchestrator/
-│   │       ├── IntentRouter.cs           # Rules classifier + LLM entity extraction
-│   │       └── AgentOrchestrator.cs      # Dispatch + history + confidence + disclaimers
+│   │       ├── IntentRouter.cs               # Rules classifier + LLM entity extraction
+│   │       └── AgentOrchestrator.cs          # Dispatch + history + confidence + disclaimers
 │   ├── api/
 │   │   ├── Program.cs
-│   │   ├── Endpoints.cs                  # /chat, /profile, /admin/guardrails
+│   │   ├── Endpoints.cs                      # /chat, /profile, /admin/guardrails
 │   │   └── ServiceRegistration.cs
 │   ├── frontend/
 │   │   └── src/components/
@@ -282,23 +335,28 @@ ChefAgent/
 │   │       ├── ChatMessages.jsx
 │   │       ├── RecipeCard.jsx
 │   │       ├── ProfileSidebar.jsx
-│   │       └── MealPlanView.jsx          # 7-day grid, per-slot swap, dietary badges
+│   │       └── MealPlanView.jsx              # 7-day grid, per-slot swap, dietary badges
 │   └── shared/
-│       ├── Models.cs                     # All domain records + enums
-│       ├── SessionStore.cs               # Redis — plan, profile, history
-│       ├── InputGuard.cs                 # Two-signal injection detection
-│       ├── OutputGuard.cs                # JSON validation, sanity, retry/fallback
-│       ├── CircuitBreaker.cs             # 3-state Ollama failure protection
-│       ├── RateLimiter.cs                # Per-session sliding window
-│       └── GuardrailAuditLog.cs          # In-memory ring buffer, 9 event types
+│       ├── Models.cs                         # All domain records + enums
+│       ├── SessionStore.cs                   # Redis — plan, profile, history, extraction cache
+│       ├── InputGuard.cs                     # Two-signal injection detection
+│       ├── OutputGuard.cs                    # JSON validation, sanity, retry/fallback
+│       ├── CircuitBreaker.cs                 # 3-state breaker (ollama + redis instances)
+│       ├── RateLimiter.cs                    # Per-session sliding window
+│       └── GuardrailAuditLog.cs              # In-memory ring buffer, 9 event types
 ├── eval/
-│   └── datasets/
-│       ├── retrieval_baseline.md
-│       ├── week2_retrieval_results.md
-│       ├── diet_agent_test_cases.md
-│       ├── diet_agent_test_results.md
-│       ├── planner_test_results.md
-│       └── memory_test_results.md        # 15/15 stateful flow tests
+│   ├── datasets/
+│   │   ├── golden_dataset.json               # 100 labeled Q&A pairs, 12 categories
+│   │   ├── retrieved_contexts.json           # Last retrieval run output
+│   │   └── ragas_results.json                # Latest eval scores
+│   ├── experiments/
+│   │   ├── 2026-06-01_baseline.json          # Baseline scores
+│   │   └── 2026-06-07_spell_check.json       # Post spell-check scores
+│   └── harnesses/
+│       ├── retrieve.py                       # Step 1: fetch contexts from API
+│       ├── score_simple.py                   # Step 2: score with Ollama judge
+│       ├── run_ragas.py                      # Full RAGAS pipeline (requires OpenAI)
+│       └── compare_experiments.py            # Diff two experiment result files
 ├── scripts/
 │   ├── prepare_recipes.py
 │   ├── generate_embeddings.py
@@ -306,10 +364,10 @@ ChefAgent/
 │   └── eval/
 │       ├── test_planner.py
 │       ├── test_memory.py
-│       ├── test_input_guard.py           # 15/15
-│       ├── test_output_guard.py          # 10/10
-│       ├── test_circuit_breaker.py       # 8/10 (2 expected — embedding needs Ollama)
-│       └── test_guardrails.py            # 18/18 integration
+│       ├── test_input_guard.py               # 15/15
+│       ├── test_output_guard.py              # 10/10
+│       ├── test_circuit_breaker.py           # 8/10 (2 expected — embedding needs Ollama)
+│       └── test_guardrails.py                # 18/18 integration
 ├── docs/
 │   └── adrs/
 │       ├── 001-orchestration-framework.md
@@ -319,7 +377,8 @@ ChefAgent/
 │       ├── 005-orchestrator-design.md
 │       ├── 006-planner-agent-architecture.md
 │       ├── 007-session-memory-design.md
-│       └── 008-guardrails-architecture.md
+│       ├── 008-guardrails-architecture.md
+│       └── 009-evaluation-pipeline.md
 ├── docker-compose.yml
 └── chefagent_embeddings.ipynb
 ```
@@ -336,18 +395,19 @@ ChefAgent/
 - [ADR-006: Planner Agent Architecture](docs/adrs/006-planner-agent-architecture.md)
 - [ADR-007: Session Memory Design](docs/adrs/007-session-memory-design.md)
 - [ADR-008: Guardrails Architecture](docs/adrs/008-guardrails-architecture.md)
+- [ADR-009: Evaluation Pipeline](docs/adrs/009-evaluation-pipeline.md)
 
 ---
 
 ## Roadmap
 
-| Month               | Focus                                              | Status      |
-| ------------------- | -------------------------------------------------- | ----------- |
-| Month 1 (Weeks 1–4) | Recipe Agent, Diet Agent, Orchestrator, React UI   | ✅ Complete |
-| Month 2 (Weeks 5–7) | Planner Agent, Session Memory, Guardrails          | ✅ Complete |
-| Month 3             | Eval (RAGAS), Langfuse observability, cloud deploy | 🔜 Next     |
-| Month 4             | MCP server, LinkedIn posts                         | 🔜 Planned  |
-| Month 5             | Portfolio site, resume, outreach                   | 🔜 Planned  |
+| Month                 | Focus                                              | Status         |
+| --------------------- | -------------------------------------------------- | -------------- |
+| Month 1 (Weeks 1–4)   | Recipe Agent, Diet Agent, Orchestrator, React UI   | ✅ Complete    |
+| Month 2 (Weeks 5–8)   | Planner Agent, Session Memory, Guardrails          | ✅ Complete    |
+| Month 3 (Weeks 9–12)  | Eval pipeline, Langfuse observability, cloud deploy| 🔄 In progress |
+| Month 4               | MCP server, LinkedIn posts                         | 🔜 Planned     |
+| Month 5               | Portfolio site, resume, outreach                   | 🔜 Planned     |
 
 ---
 
