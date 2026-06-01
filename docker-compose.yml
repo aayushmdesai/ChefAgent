@@ -13,13 +13,19 @@ services:
       - Ollama__ChatModel=llama3.2:1b
       - Ollama__EmbeddingModel=nomic-embed-text
       - Redis__ConnectionString=redis:6379
+      - Langfuse__Enabled=true
+      - Langfuse__BaseUrl=http://langfuse-server:3000
+      - Langfuse__PublicKey=pk-lf-local
+      - Langfuse__SecretKey=sk-lf-local
     depends_on:
-      
       redis:
         condition: service_healthy
       ollama:
         condition: service_started
+      langfuse-server:
+        condition: service_started
 
+  # ── Vector Database ───────────────────────────────────────────────────────────
   qdrant:
     image: qdrant/qdrant:v1.12.1
     ports:
@@ -28,6 +34,7 @@ services:
     volumes:
       - qdrant-data:/qdrant/storage
 
+  # ── LLM + Embeddings ──────────────────────────────────────────────────────────
   ollama:
     image: ollama/ollama:latest
     ports:
@@ -35,6 +42,7 @@ services:
     volumes:
       - ollama-data:/root/.ollama
 
+  # ── Session Memory ────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     ports:
@@ -47,7 +55,64 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Observability — Langfuse v2 Self-Hosted ───────────────────────────────────
+  #
+  # Why self-hosted over Langfuse Cloud (free tier)?
+  #   Cloud free tier is 50K observations/month — enough for development.
+  #   But traces contain LLM input/output and user query text. Self-hosting
+  #   keeps all data on the machine, consistent with the zero-paid-services
+  #   constraint across the whole stack (Qdrant, Redis, Ollama all local).
+  #   The observability code is identical — only BaseUrl changes to switch.
+  #
+  # Why v2 over v3?
+  #   Langfuse v3 adds ClickHouse (OLAP) + MinIO (blob) + a separate worker
+  #   container — 5 containers total, ~1.2–1.5GB extra RAM.
+  #   v2 needs only Postgres + the server — ~650MB total.
+  #   All traces, spans, and LLM generation logging needed here are fully
+  #   supported in v2. Upgrade path documented in ADR-010.
+  #
+  # LANGFUSE_INIT_* auto-creates org, project, and API keys on first boot.
+  # No manual UI setup needed — keys match what the api service sends.
+  #
+  langfuse-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes:
+      - langfuse-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  langfuse-server:
+    image: langfuse/langfuse:2
+    ports:
+      - "3100:3000"    # UI → http://localhost:3100
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: dev-secret-changeme
+      SALT: dev-salt-changeme
+      NEXTAUTH_URL: http://localhost:3100
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_INIT_ORG_ID: chefagent-org
+      LANGFUSE_INIT_ORG_NAME: ChefAgent
+      LANGFUSE_INIT_PROJECT_ID: chefagent-project
+      LANGFUSE_INIT_PROJECT_NAME: chefagent
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-local
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-local
+      LANGFUSE_INIT_USER_EMAIL: dev@chefagent.local
+      LANGFUSE_INIT_USER_NAME: dev
+      LANGFUSE_INIT_USER_PASSWORD: devpassword
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+
 volumes:
   qdrant-data:
   ollama-data:
   redis-data:
+  langfuse-db-data:

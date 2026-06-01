@@ -40,6 +40,7 @@ public class AgentOrchestrator
     private readonly string _chatModel;
     private readonly CircuitBreaker _circuitBreaker;
     private readonly GuardrailAuditLog _audit;
+    private readonly Tracing _tracing;
     private readonly ILogger<AgentOrchestrator> _logger;
 
     // Agent loop cap — in HandleCreateMealPlanAsync
@@ -57,6 +58,7 @@ public class AgentOrchestrator
         string chatModel,
         CircuitBreaker circuitBreaker,
         GuardrailAuditLog audit,
+        Tracing tracing,
         ILogger<AgentOrchestrator> logger
     )
     {
@@ -69,6 +71,7 @@ public class AgentOrchestrator
         _chatModel = chatModel;
         _circuitBreaker = circuitBreaker;
         _audit = audit;
+        _tracing = tracing;
         _logger = logger;
     }
 
@@ -76,46 +79,70 @@ public class AgentOrchestrator
 
     /// <summary>
     /// Main entry point. Takes a classified intent and routes to the right agent(s).
+    /// TraceContext flows in from the /chat handler — all child spans attach under it.
     /// Always returns an OrchestratorResponse — never throws to the caller.
     /// </summary>
-    public async Task<OrchestratorResponse> RouteAsync(ClassifiedIntent classified)
+    public async Task<OrchestratorResponse> RouteAsync(
+        ClassifiedIntent classified,
+        TraceContext traceCtx
+    )
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         _logger.LogInformation(
-            "[Orchestrator] Intent={Intent} ClassifiedBy={By} Query='{Query}' Profile={HasProfile}",
+            "[{CorrelationId}] [Orchestrator] Intent={Intent} ClassifiedBy={By} Query='{Query}' Profile={HasProfile}",
+            traceCtx.CorrelationId,
             classified.Intent,
             classified.ClassifiedBy,
             classified.SearchQuery,
             classified.MergedProfile is not null
         );
 
+        // Root orchestrator span — covers history load, profile merge, agent dispatch
+        var orchCtx = _tracing.StartSpan(
+            traceCtx,
+            "orchestrator",
+            input: new
+            {
+                intent = classified.Intent.ToString(),
+                query = classified.SearchQuery,
+                hasProfile = classified.MergedProfile is not null,
+                sessionId = classified.SessionId,
+            }
+        );
+
         // ── Step 1: Save user message to history ─────────────────
         if (!string.IsNullOrEmpty(classified.SessionId))
         {
+            var historyCtx = _tracing.StartSpan(orchCtx, "session.append_user_message");
             try
             {
                 await _sessionStore.AppendMessageAsync(
                     classified.SessionId,
                     new ConversationEntry { Role = "user", Content = classified.OriginalMessage }
                 );
+                _tracing.EndSpan(historyCtx, statusMessage: "ok");
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(
                     ex,
-                    "[Orchestrator] Failed to append user message — continuing stateless"
+                    "[{CorrelationId}] [Orchestrator] Failed to append user message — continuing stateless",
+                    traceCtx.CorrelationId
                 );
+                _tracing.EndSpan(historyCtx, statusMessage: "error");
             }
         }
 
         // ── Step 2: Load + merge + persist profile ────────────────
         if (!string.IsNullOrEmpty(classified.SessionId))
         {
+            var profileCtx = _tracing.StartSpan(orchCtx, "session.load_profile");
             var mergedProfile = await LoadAndMergeProfileAsync(
                 classified.SessionId,
                 classified.MergedProfile
             );
+            _tracing.EndSpan(profileCtx, output: new { hasProfile = mergedProfile is not null });
 
             if (mergedProfile is not null)
                 classified = classified with { MergedProfile = mergedProfile };
@@ -127,20 +154,22 @@ public class AgentOrchestrator
         // ── Step 4: Route to the right handler ───────────────────
         var response = classified.Intent switch
         {
-            UserIntent.SearchRecipe => await HandleSearchRecipeAsync(classified),
-            UserIntent.ValidateDiet => await HandleValidateDietAsync(classified),
-            UserIntent.GetMealPlan => await HandleGetMealPlanAsync(classified),
-            UserIntent.CreateMealPlan => await HandleCreateMealPlanAsync(classified),
-            UserIntent.ModifyMealPlan => await HandleModifyMealPlanAsync(classified),
-            UserIntent.GeneralQuestion => await HandleGeneralQuestionAsync(classified),
+            UserIntent.SearchRecipe => await HandleSearchRecipeAsync(classified, orchCtx),
+            UserIntent.ValidateDiet => await HandleValidateDietAsync(classified, orchCtx),
+            UserIntent.GetMealPlan => await HandleGetMealPlanAsync(classified, orchCtx),
+            UserIntent.CreateMealPlan => await HandleCreateMealPlanAsync(classified, orchCtx),
+            UserIntent.ModifyMealPlan => await HandleModifyMealPlanAsync(classified, orchCtx),
+            UserIntent.GeneralQuestion => await HandleGeneralQuestionAsync(classified, orchCtx),
             _ => HandleUnknown(classified),
         };
-        // Step 4.5: Append confidence disclaimers
+
+        // ── Step 4.5: Append confidence disclaimers ───────────────
         response = AppendConfidenceDisclaimer(response, classified);
 
         // ── Step 5: Save assistant response to history ────────────
         if (!string.IsNullOrEmpty(classified.SessionId))
         {
+            var saveCtx = _tracing.StartSpan(orchCtx, "session.append_assistant_message");
             try
             {
                 await _sessionStore.AppendMessageAsync(
@@ -157,21 +186,37 @@ public class AgentOrchestrator
                         PlanId = response.MealPlan?.PlanId,
                     }
                 );
+                _tracing.EndSpan(saveCtx, statusMessage: "ok");
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(
                     ex,
-                    "[Orchestrator] Failed to append assistant message — continuing stateless"
+                    "[{CorrelationId}] [Orchestrator] Failed to append assistant message — continuing stateless",
+                    traceCtx.CorrelationId
                 );
+                _tracing.EndSpan(saveCtx, statusMessage: "error");
             }
         }
+
         sw.Stop();
         _logger.LogInformation(
-            "[Orchestrator] Intent={Intent} Time={Ms}ms Recipes={Count}",
+            "[{CorrelationId}] [Orchestrator] Intent={Intent} Time={Ms}ms Recipes={Count}",
+            traceCtx.CorrelationId,
             classified.Intent,
             sw.ElapsedMilliseconds,
             response.Recipes.Count
+        );
+
+        _tracing.EndSpan(
+            orchCtx,
+            output: new
+            {
+                intent = response.DetectedIntent.ToString(),
+                recipeCount = response.Recipes.Count,
+                confidence = response.Confidence.ToString(),
+                latencyMs = sw.ElapsedMilliseconds,
+            }
         );
 
         return response;
@@ -323,7 +368,7 @@ public class AgentOrchestrator
                     ? lastAssistant.RecipeTitles.ElementAtOrDefault(1)
                 : lower.Contains("third") || lower.Contains("3rd")
                     ? lastAssistant.RecipeTitles.ElementAtOrDefault(2)
-                : lastAssistant.RecipeTitles[0]; // "it", "that", "first" → top result
+                : lastAssistant.RecipeTitles[0];
 
             if (targetRecipe is not null)
             {
@@ -352,32 +397,40 @@ public class AgentOrchestrator
             && string.IsNullOrEmpty(classified.TargetDay)
         )
         {
-            // Find the last user message that had a TargetDay — re-extract it
-            var lastUserModify = history.Where(e => e.Role == "user").LastOrDefault();
-
-            // Can't recover the day from raw content reliably — ask clarifying question
-            // The key win here is that intent is now ModifyMealPlan, not Unknown
-            return classified with
-            {
-                Intent = UserIntent.ModifyMealPlan,
-            };
+            return classified with { Intent = UserIntent.ModifyMealPlan };
         }
 
         return classified;
     }
 
     // ── Intent Handlers ───────────────────────────────────────────────────────
-    private async Task<OrchestratorResponse> HandleSearchRecipeAsync(ClassifiedIntent classified)
+
+    private async Task<OrchestratorResponse> HandleSearchRecipeAsync(
+        ClassifiedIntent classified,
+        TraceContext parentCtx
+    )
     {
-        // Step 1 — Recipe Agent
+        // Recipe Agent span
+        var recipeCtx = _tracing.StartSpan(
+            parentCtx,
+            "recipe_agent.search",
+            input: new
+            {
+                query = classified.SearchQuery,
+                hasProfile = classified.MergedProfile is not null,
+            }
+        );
+
         List<RecipeDocument> recipes;
         try
         {
             recipes = await _recipeAgent.SearchRecipesAsync(classified.SearchQuery, maxResults: 5);
+            _tracing.EndSpan(recipeCtx, output: new { resultCount = recipes.Count });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Recipe Agent failed for query '{Query}'", classified.SearchQuery);
+            _tracing.EndSpan(recipeCtx, statusMessage: "error");
             return ErrorResponse(
                 classified,
                 "Sorry — I couldn't search for recipes right now. Please try again."
@@ -395,7 +448,7 @@ public class AgentOrchestrator
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
 
-        // Step 2 — Diet Agent (only if profile present)
+        // No profile — skip Diet Agent
         if (
             classified.MergedProfile is null
             || (
@@ -414,17 +467,33 @@ public class AgentOrchestrator
             };
         }
 
-        // Profile present → validate each recipe
+        // Diet Agent — one span per recipe
         var dietaryResults = new List<ValidatedRecipe>();
         var dietaryUnavailable = false;
 
         foreach (var recipe in recipes)
         {
+            var dietCtx = _tracing.StartSpan(
+                parentCtx,
+                "diet_agent.validate",
+                input: new { recipeTitle = recipe.Title }
+            );
+
             try
             {
                 var validation = await _dietAgent.ValidateRecipeAsync(
                     recipe,
                     classified.MergedProfile
+                );
+                _tracing.EndSpan(
+                    dietCtx,
+                    output: new
+                    {
+                        isCompatible = validation.IsCompatible,
+                        violationCount = validation.Violations.Count,
+                        tier = validation.Violations.FirstOrDefault()?.DetectedBy.ToString()
+                            ?? "none",
+                    }
                 );
                 dietaryResults.Add(new ValidatedRecipe { Recipe = recipe, Dietary = validation });
             }
@@ -435,6 +504,7 @@ public class AgentOrchestrator
                     "Diet Agent failed for '{Title}' — including without validation",
                     recipe.Title
                 );
+                _tracing.EndSpan(dietCtx, statusMessage: "error");
                 dietaryUnavailable = true;
                 dietaryResults.Add(new ValidatedRecipe { Recipe = recipe, Dietary = null });
             }
@@ -469,7 +539,10 @@ public class AgentOrchestrator
         };
     }
 
-    private async Task<OrchestratorResponse> HandleValidateDietAsync(ClassifiedIntent classified)
+    private async Task<OrchestratorResponse> HandleValidateDietAsync(
+        ClassifiedIntent classified,
+        TraceContext parentCtx
+    )
     {
         // ValidateDiet without a specific recipe — search first, then validate top result
         if (
@@ -491,11 +564,17 @@ public class AgentOrchestrator
             };
         }
 
-        // Search for the recipe mentioned in the query
+        var recipeCtx = _tracing.StartSpan(
+            parentCtx,
+            "recipe_agent.search",
+            input: new { query = classified.SearchQuery }
+        );
+
         List<RecipeDocument> recipes;
         try
         {
             recipes = await _recipeAgent.SearchRecipesAsync(classified.SearchQuery, maxResults: 1);
+            _tracing.EndSpan(recipeCtx, output: new { resultCount = recipes.Count });
         }
         catch (Exception ex)
         {
@@ -504,11 +583,11 @@ public class AgentOrchestrator
                 "Recipe search failed during ValidateDiet for '{Query}'",
                 classified.SearchQuery
             );
+            _tracing.EndSpan(recipeCtx, statusMessage: "error");
             return ErrorResponse(classified, "Sorry — I couldn't find that recipe right now.");
         }
 
         if (recipes.Count == 0)
-        {
             return new OrchestratorResponse
             {
                 Message =
@@ -517,14 +596,26 @@ public class AgentOrchestrator
                 Recipes = [],
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
-        }
 
         var recipe = recipes[0];
-        DietaryValidation validation;
+        var dietCtx = _tracing.StartSpan(
+            parentCtx,
+            "diet_agent.validate",
+            input: new { recipeTitle = recipe.Title }
+        );
 
+        DietaryValidation validation;
         try
         {
             validation = await _dietAgent.ValidateRecipeAsync(recipe, classified.MergedProfile);
+            _tracing.EndSpan(
+                dietCtx,
+                output: new
+                {
+                    isCompatible = validation.IsCompatible,
+                    violationCount = validation.Violations.Count,
+                }
+            );
         }
         catch (Exception ex)
         {
@@ -533,6 +624,7 @@ public class AgentOrchestrator
                 "Diet Agent failed during ValidateDiet for '{Title}'",
                 recipe.Title
             );
+            _tracing.EndSpan(dietCtx, statusMessage: "error");
             return new OrchestratorResponse
             {
                 Message =
@@ -570,7 +662,10 @@ public class AgentOrchestrator
         };
     }
 
-    private async Task<OrchestratorResponse> HandleCreateMealPlanAsync(ClassifiedIntent classified)
+    private async Task<OrchestratorResponse> HandleCreateMealPlanAsync(
+        ClassifiedIntent classified,
+        TraceContext parentCtx
+    )
     {
         var sessionId = classified.SessionId;
         if (string.IsNullOrEmpty(sessionId))
@@ -584,10 +679,31 @@ public class AgentOrchestrator
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
 
+        var planCtx = _tracing.StartSpan(
+            parentCtx,
+            "planner_agent.generate",
+            input: new
+            {
+                sessionId,
+                slots = classified.MealSlots,
+                hasProfile = classified.MergedProfile is not null,
+            }
+        );
+
         try
         {
             var constraints = new PlanConstraints { MealSlots = classified.MealSlots };
             var plan = await _plannerAgent.GeneratePlanAsync(classified.MergedProfile, constraints);
+
+            _tracing.EndSpan(
+                planCtx,
+                output: new
+                {
+                    planId = plan.PlanId,
+                    dayCount = plan.Days.Count,
+                    slotCount = plan.Days.FirstOrDefault()?.Slots.Count ?? 0,
+                }
+            );
 
             try
             {
@@ -600,7 +716,6 @@ public class AgentOrchestrator
                     "[Orchestrator] Failed to save plan {PlanId} — plan generated but not persisted",
                     plan.PlanId
                 );
-                // Continue — return the plan to user even if Redis save failed
             }
 
             _logger.LogInformation(
@@ -637,6 +752,7 @@ public class AgentOrchestrator
         catch (Exception ex)
         {
             _logger.LogError(ex, "Planner Agent failed for session {SessionId}", sessionId);
+            _tracing.EndSpan(planCtx, statusMessage: "error");
             return ErrorResponse(
                 classified,
                 "Sorry — I couldn't generate your meal plan right now. Please try again."
@@ -644,7 +760,10 @@ public class AgentOrchestrator
         }
     }
 
-    private async Task<OrchestratorResponse> HandleGetMealPlanAsync(ClassifiedIntent classified)
+    private async Task<OrchestratorResponse> HandleGetMealPlanAsync(
+        ClassifiedIntent classified,
+        TraceContext parentCtx
+    )
     {
         var sessionId = classified.SessionId;
         if (string.IsNullOrEmpty(sessionId))
@@ -657,10 +776,13 @@ public class AgentOrchestrator
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
 
+        var loadCtx = _tracing.StartSpan(parentCtx, "session.get_plan", input: new { sessionId });
+
         MealPlan? plan = null;
         try
         {
             plan = await _sessionStore.GetPlanAsync(sessionId);
+            _tracing.EndSpan(loadCtx, output: new { found = plan is not null });
         }
         catch (Exception ex)
         {
@@ -669,6 +791,7 @@ public class AgentOrchestrator
                 "[Orchestrator] Failed to load plan for session {SessionId} — treating as no plan",
                 sessionId
             );
+            _tracing.EndSpan(loadCtx, statusMessage: "error");
         }
 
         if (plan is null)
@@ -699,7 +822,10 @@ public class AgentOrchestrator
         };
     }
 
-    private async Task<OrchestratorResponse> HandleModifyMealPlanAsync(ClassifiedIntent classified)
+    private async Task<OrchestratorResponse> HandleModifyMealPlanAsync(
+        ClassifiedIntent classified,
+        TraceContext parentCtx
+    )
     {
         var sessionId = classified.SessionId;
         if (string.IsNullOrEmpty(sessionId))
@@ -726,6 +852,18 @@ public class AgentOrchestrator
                 Metadata = BuildMetadata(classified, dietaryApplied: false),
             };
 
+        var modifyCtx = _tracing.StartSpan(
+            parentCtx,
+            "planner_agent.modify",
+            input: new
+            {
+                sessionId,
+                targetDay,
+                targetSlot = classified.TargetSlot,
+                constraint = classified.ModifyConstraint,
+            }
+        );
+
         try
         {
             var (plan, message) = await _plannerAgent.ModifyPlanAsync(
@@ -734,6 +872,8 @@ public class AgentOrchestrator
                 classified.TargetSlot,
                 classified.ModifyConstraint
             );
+
+            _tracing.EndSpan(modifyCtx, output: new { planId = plan.PlanId });
 
             return new OrchestratorResponse
             {
@@ -748,6 +888,7 @@ public class AgentOrchestrator
         catch (InvalidOperationException ex)
         {
             _logger.LogError(ex, "Invalid operation for session {SessionId}", sessionId);
+            _tracing.EndSpan(modifyCtx, statusMessage: "error");
             return new OrchestratorResponse
             {
                 Message =
@@ -759,6 +900,7 @@ public class AgentOrchestrator
         }
         catch (ArgumentException ex)
         {
+            _tracing.EndSpan(modifyCtx, statusMessage: "error");
             return new OrchestratorResponse
             {
                 Message = ex.Message,
@@ -769,17 +911,27 @@ public class AgentOrchestrator
         }
     }
 
-    private async Task<OrchestratorResponse> HandleGeneralQuestionAsync(ClassifiedIntent classified)
+    private async Task<OrchestratorResponse> HandleGeneralQuestionAsync(
+        ClassifiedIntent classified,
+        TraceContext parentCtx
+    )
     {
+        var genCtx = _tracing.StartSpan(
+            parentCtx,
+            "ollama.general_question",
+            input: new { query = classified.SearchQuery }
+        );
+
         try
         {
             if (!_circuitBreaker.IsAllowed())
             {
-                _logger.LogInformation("[DietAgent] Circuit open — skipping LLM validation");
+                _logger.LogInformation("[Orchestrator] Circuit open — skipping LLM call");
+                _tracing.EndSpan(genCtx, statusMessage: "circuit_open");
                 return new OrchestratorResponse
                 {
                     Message =
-                        "I'm having trouble accessing my reasoning engine right now, so I can't answer that question. Try asking me to find a recipe or check a dish for your diet instead.",
+                        "I'm having trouble accessing my reasoning engine right now. Try asking me to find a recipe instead.",
                     DetectedIntent = UserIntent.GeneralQuestion,
                     Recipes = [],
                     Confidence = ResponseConfidence.Low,
@@ -787,8 +939,25 @@ public class AgentOrchestrator
                 };
             }
 
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var answer = await AskOllamaAsync(classified.SearchQuery);
+            sw.Stop();
+
             _circuitBreaker.RecordSuccess();
+
+            // Log this as a generation — captures prompt + completion + latency
+            _tracing.LogGeneration(
+                genCtx,
+                name: "general_question",
+                model: _chatModel,
+                prompt: classified.SearchQuery,
+                completion: answer,
+                estimatedTokens: (classified.SearchQuery.Length + answer.Length) / 4,
+                latencyMs: sw.ElapsedMilliseconds
+            );
+
+            _tracing.EndSpan(genCtx, output: new { latencyMs = sw.ElapsedMilliseconds });
+
             return new OrchestratorResponse
             {
                 Message = answer,
@@ -806,6 +975,7 @@ public class AgentOrchestrator
                 classified.SearchQuery
             );
             _circuitBreaker.RecordFailure();
+            _tracing.EndSpan(genCtx, statusMessage: "error");
             return new OrchestratorResponse
             {
                 Message =
@@ -818,9 +988,8 @@ public class AgentOrchestrator
         }
     }
 
-    private static OrchestratorResponse HandleUnknown(ClassifiedIntent classified)
-    {
-        return new OrchestratorResponse
+    private static OrchestratorResponse HandleUnknown(ClassifiedIntent classified) =>
+        new()
         {
             Message =
                 "I'm not sure what you're looking for. Try asking me to find a recipe, check if a dish is safe for your diet, or ask a cooking question.",
@@ -829,7 +998,6 @@ public class AgentOrchestrator
             Confidence = ResponseConfidence.High,
             Metadata = BuildMetadata(classified, dietaryApplied: false),
         };
-    }
 
     // ── Response Message Templates ────────────────────────────────────────────
 
@@ -858,9 +1026,7 @@ public class AgentOrchestrator
             var profileDesc = string.Join(", ", restrictions.Concat(allergies));
 
             if (compatibleCount == count)
-            {
                 sb.Append($"Here are {count} {profileDesc}-friendly recipes for \"{query}\".");
-            }
             else if (compatibleCount == 0)
             {
                 sb.Append(
@@ -884,9 +1050,7 @@ public class AgentOrchestrator
 
         // Append deferred message if any
         if (!string.IsNullOrEmpty(classified.DeferredMessage))
-        {
             sb.Append($" {classified.DeferredMessage}");
-        }
 
         return sb.ToString();
     }
@@ -948,9 +1112,12 @@ public class AgentOrchestrator
                 classified.SessionId ?? "unknown",
                 classified.Intent.ToString()
             );
-            var disclaimer =
-                " Note: I'm less certain about these results — you might want to double-check.";
-            return response with { Message = response.Message + disclaimer };
+            return response with
+            {
+                Message =
+                    response.Message
+                    + " Note: I'm less certain about these results — you might want to double-check.",
+            };
         }
 
         if (
@@ -963,9 +1130,12 @@ public class AgentOrchestrator
         {
             var allergens = string.Join(", ", classified.MergedProfile.Allergies);
             _audit.Record("allergy_warning", classified.SessionId ?? "unknown", allergens);
-            var warning =
-                $" ⚠️ This recipe was checked by AI — please verify ingredients for your {allergens} allergy before cooking.";
-            return response with { Message = response.Message + warning };
+            return response with
+            {
+                Message =
+                    response.Message
+                    + $" ⚠️ This recipe was checked by AI — please verify ingredients for your {allergens} allergy before cooking.",
+            };
         }
 
         return response;

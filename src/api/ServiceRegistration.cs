@@ -37,6 +37,7 @@ public static class ServiceRegistration
         services.AddDietAgent(config);
         services.AddOrchestrator(config);
         services.AddMealPlannerAgent(config);
+        services.AddObservability(config);
         services.AddApiServices();
         return services;
     }
@@ -255,6 +256,7 @@ public static class ServiceRegistration
                 chatModel,
                 sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
                 sp.GetRequiredService<GuardrailAuditLog>(),
+                sp.GetRequiredService<Tracing>(),
                 sp.GetRequiredService<ILogger<AgentOrchestrator>>()
             );
         });
@@ -275,6 +277,25 @@ public static class ServiceRegistration
         });
 
         services.AddHealthChecks();
+
+        return services;
+    }
+
+    // ── Observability ──────────────────────────────────────────
+    private static IServiceCollection AddObservability(
+        this IServiceCollection services,
+        IConfiguration config
+    )
+    {
+        services.Configure<LangfuseOptions>(config.GetSection(LangfuseOptions.Section));
+
+        services.AddHttpClient<Tracing>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(5);
+        });
+
+        services.AddSingleton<Tracing>();
+        services.AddHostedService(sp => sp.GetRequiredService<Tracing>());
 
         return services;
     }

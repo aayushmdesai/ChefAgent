@@ -58,8 +58,9 @@ public static class Endpoints
                         vectorDb = "Qdrant",
                         llm = "Ollama",
                         memory = "Redis",
+                        observability = "Langfuse",
                     },
-                    agents = new[] { "recipe", "diet", "orchestrator", "planner (coming soon)" },
+                    agents = new[] { "recipe", "diet", "orchestrator", "planner" },
                     endpoints = new[]
                     {
                         "GET  /health",
@@ -202,10 +203,20 @@ public static class Endpoints
                 AgentOrchestrator orchestrator,
                 SessionStore sessionStore,
                 RateLimiter rateLimiter,
-                GuardrailAuditLog audit
+                GuardrailAuditLog audit,
+                Tracing tracing
             ) =>
             {
-                // First line inside the /chat handler, before IntentRouter
+                // Start a trace for this request — covers everything below.
+                // Returns TraceContext.None immediately if Langfuse is disabled.
+                // Never throws — tracing failures are always silent.
+                var traceCtx = tracing.StartTrace(
+                    name: "chat",
+                    sessionId: request.SessionId ?? "anonymous",
+                    input: request.Message
+                );
+
+                // ── Guardrails ────────────────────────────────────────────
                 var validation = InputGuard.Validate(request.Message);
                 if (!validation.IsValid)
                 {
@@ -214,6 +225,8 @@ public static class Endpoints
                         request.SessionId ?? "unknown",
                         request.Message
                     );
+                    // Early exits skip EndTrace — too fast to be worth tracing,
+                    // and they never reach the agents.
                     return Results.Ok(
                         new OrchestratorResponse
                         {
@@ -259,7 +272,8 @@ public static class Endpoints
                         }
                     );
                 }
-                // Load history for LLM entity extraction context
+
+                // ── Intent Classification ─────────────────────────────────
                 List<ConversationEntry>? history = null;
                 if (!string.IsNullOrEmpty(request.SessionId))
                 {
@@ -268,7 +282,8 @@ public static class Endpoints
                         history = await sessionStore.GetHistoryAsync(request.SessionId, limit: 6);
                     }
                     catch
-                    { /* non-critical — proceed without history */
+                    {
+                        /* non-critical — proceed without history */
                     }
                 }
 
@@ -277,9 +292,15 @@ public static class Endpoints
                     request.DietaryProfile,
                     request.SessionId,
                     history
-                ); // ← pass history
+                );
 
-                var response = await orchestrator.RouteAsync(classified);
+                // ── Agent Dispatch ────────────────────────────────────────
+                var response = await orchestrator.RouteAsync(classified, traceCtx);
+
+                // Close the root trace with the final response message.
+                // At this point all agent spans are already ended inside RouteAsync.
+                tracing.EndTrace(traceCtx, output: response.Message);
+
                 return Results.Ok(response);
             }
         );
