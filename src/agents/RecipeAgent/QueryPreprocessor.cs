@@ -27,6 +27,119 @@ public class QueryPreprocessor
         @"(\w+)-free",
         RegexOptions.IgnoreCase | RegexOptions.Compiled
     );
+    private static readonly Lazy<SymSpell> _symSpell = new(() =>
+    {
+        var symSpell = new SymSpell(initialCapacity: 82765, maxDictionaryEditDistance: 2);
+        var dictPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "Dictionaries",
+            "frequency_dictionary_en_80k.txt"
+        );
+        symSpell.LoadDictionary(dictPath, termIndex: 0, countIndex: 1);
+        return symSpell;
+    });
+    private static readonly Lazy<Dictionary<string, string>> _foodCorrections = new(() =>
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Dictionaries", "food_corrections.json");
+        if (!File.Exists(path))
+            return new Dictionary<string, string>();
+        var json = File.ReadAllText(path);
+        return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json)
+            ?? new Dictionary<string, string>();
+    });
+
+    /// <summary>
+    /// Corrects misspelled words in the query using Hunspell dictionary.
+    /// Skips correction for known food/dietary terms to avoid over-correction.
+    /// Returns original word if no suggestion found.
+    /// </summary>
+    public string CorrectSpelling(string query)
+    {
+        var skipWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "gluten-free",
+            "dairy-free",
+            "nut-free",
+            "egg-free",
+            "soy-free",
+            "vegan",
+            "vegetarian",
+            "pescatarian",
+            "halal",
+            "kosher",
+            "sattvic",
+            "jain",
+            "tikka",
+            "masala",
+            "carbonara",
+            "stroganoff",
+            "bolognese",
+            "parmesan",
+            "guacamole",
+            "tiramisu",
+            "ramen",
+            "pho",
+            "bibimbap",
+            "shakshuka",
+            "sriracha",
+            "tahini",
+            "hummus",
+            "tzatziki",
+            "kimchi",
+        };
+
+        var foodCorrections = _foodCorrections.Value;
+        var symSpell = _symSpell.Value;
+        var words = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var corrected = new List<string>();
+
+        foreach (var word in words)
+        {
+            // Step 1: food domain lookup — highest confidence, no ambiguity
+            if (foodCorrections.TryGetValue(word.ToLowerInvariant(), out var foodFixed))
+            {
+                corrected.Add(foodFixed);
+                _logger.LogInformation(
+                    "[QueryPreprocessor] Food dict corrected: \"{Original}\" → \"{Corrected}\"",
+                    word,
+                    foodFixed
+                );
+                continue;
+            }
+
+            // Step 2: skip known food/dietary terms and short words
+            if (skipWords.Contains(word) || word.Contains('-') || word.Length <= 2)
+            {
+                corrected.Add(word);
+                continue;
+            }
+
+            // Step 3: SymSpell — frequency-weighted, picks most common valid word
+            var suggestions = symSpell.Lookup(
+                word.ToLowerInvariant(),
+                SymSpell.Verbosity.Top, // top suggestion only
+                maxEditDistance: 2
+            );
+
+            if (suggestions.Count > 0 && suggestions[0].term != word.ToLowerInvariant())
+            {
+                var best = suggestions[0].term;
+                corrected.Add(best);
+                _logger.LogInformation(
+                    "[QueryPreprocessor] SymSpell corrected: \"{Original}\" → \"{Corrected}\" (freq={Freq})",
+                    word,
+                    best,
+                    suggestions[0].count
+                );
+            }
+            else
+            {
+                corrected.Add(word);
+            }
+        }
+
+        return string.Join(" ", corrected);
+    }
 
     // Signals that a query is abstract/vague and needs expansion
     private static readonly string[] AbstractSignals =
@@ -77,12 +190,21 @@ public class QueryPreprocessor
         CancellationToken ct = default
     )
     {
-        // Step 1: Parse negation and remove excluded ingredients from the query text.
-        var negationResult = ParseNegation(query);
+        // Step 0: Correct spelling before any other processing
+        var spellingCorrected = CorrectSpelling(query);
+        if (spellingCorrected != query)
+            _logger.LogInformation(
+                "[QueryPreprocessor] Spelling corrected: \"{Original}\" → \"{Corrected}\"",
+                query,
+                spellingCorrected
+            );
+
+        // Step 1: Parse negation
+        var negationResult = ParseNegation(spellingCorrected);
         var cleanedQuery = negationResult.CleanedQuery;
         var excludedTerms = negationResult.ExcludedTerms;
 
-        // Step 2: Expand vague or abstract queries into concrete food search terms when requested.
+        // Step 2: Expand if abstract
         var expandedQuery = cleanedQuery;
         if (expand && IsAbstract(cleanedQuery))
         {
@@ -106,7 +228,7 @@ public class QueryPreprocessor
             OriginalQuery: query,
             SearchQuery: expandedQuery,
             ExcludedTerms: excludedTerms,
-            WasExpanded: expandedQuery != cleanedQuery
+            WasExpanded: expandedQuery != spellingCorrected
         );
     }
 

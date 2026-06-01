@@ -10,9 +10,14 @@
     <PackageReference Include="Microsoft.SemanticKernel" Version="1.30.0" />
     <PackageReference Include="Qdrant.Client" Version="1.12.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageReference Include="symspell" Version="6.7.3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../shared/ChefAgent.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Dictionaries\food_corrections.json" CopyToOutputDirectory="Always" />
+    <None Update="Dictionaries\frequency_dictionary_en_80k.txt" CopyToOutputDirectory="Always" />
   </ItemGroup>
 </Project>
