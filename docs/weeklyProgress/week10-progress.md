@@ -175,7 +175,54 @@ services.AddHostedService(sp => sp.GetRequiredService<Tracing>());
 - `EndTrace` called after `orchestrator.RouteAsync` returns
 - Early exits (injection blocked, rate limited, repeat) skip `EndTrace` — never reach agents, too fast to be worth tracing
 
-**Day 1 done when:** `/chat` request appears as a trace in Langfuse dashboard with timing data.
+---
+
+## Day 2 — Instrument all agent calls
+
+### AgentOrchestrator
+
+`RouteAsync` signature updated to accept `TraceContext traceCtx` as second parameter. Correlation ID flows into every log line:
+
+```
+[{CorrelationId}] [Orchestrator] Intent=SearchRecipe Query='quick chicken dinner'
+```
+
+Spans added for every operation inside `RouteAsync`:
+
+| Span | What it covers |
+|------|---------------|
+| `orchestrator` | Root — covers entire agent dispatch |
+| `session.append_user_message` | Redis write, user turn |
+| `session.load_profile` | Redis read + merge |
+| `recipe_agent.search` | Full recipe search pipeline |
+| `diet_agent.validate` | Per-recipe diet validation (one span each) |
+| `session.append_assistant_message` | Redis write, assistant turn |
+| `session.get_plan` | Redis read for GetMealPlan |
+| `planner_agent.generate` | Full plan generation |
+| `planner_agent.modify` | Plan modification |
+| `ollama.general_question` | Direct Ollama call + LogGeneration |
+
+Every span captures `statusMessage: "ok" / "error" / "circuit_open"` so failures are immediately visible in the dashboard without reading logs.
+
+`LogGeneration` wired for `GeneralQuestion` Ollama calls — captures model name, prompt, completion, estimated token count, latency.
+
+### Verified trace tree (first live trace)
+
+Request: `"find me a quick chicken dinner"` | Session: `trace-test-1`
+
+```
+TRACE chat (17.30s)
+└── SPAN chat
+    └── SPAN orchestrator (17.28s)
+        ├── SPAN session.append_user_message (0.03s)
+        ├── SPAN session.load_profile (0.01s)
+        ├── SPAN recipe_agent.search (17.24s)   ← bottleneck immediately visible
+        └── SPAN session.append_assistant_message (0.00s)
+```
+
+**Key insight from first trace:** bottleneck is immediately obvious — `recipe_agent.search` consumed 17.24s of 17.30s total. Session operations are negligible (30ms, 10ms). No log reading needed — one glance at the dashboard answers "what was slow?"
+
+Session tag `trace-test-1` visible in Langfuse, input/output captured at trace level.
 
 ---
 
@@ -189,6 +236,10 @@ services.AddHostedService(sp => sp.GetRequiredService<Tracing>());
 
 **`SALT` is a required env var in Langfuse v2.** Not documented prominently — found via container crash logs. Used for API key encryption.
 
+**The bottleneck is always obvious in a trace.** The first live trace immediately showed `recipe_agent.search` at 17.24s vs 0.03s for Redis. No log archaeology needed.
+
+**`statusMessage` on every span is essential.** `"ok"` / `"error"` / `"circuit_open"` lets you filter the dashboard for failures without reading individual span details. Design for failure visibility from the start.
+
 ---
 
 ## Files Changed
@@ -200,8 +251,9 @@ src/shared/TraceContext.cs                  — NEW: lightweight context record
 src/shared/Tracing.cs                       — NEW: fire-and-forget Langfuse client
 src/shared/ChefAgent.Shared.csproj          — hosting + options NuGet packages
 src/api/appsettings.json                    — Langfuse section
-src/api/ServiceRegistration.cs              — AddObservability() method
+src/api/ServiceRegistration.cs              — AddObservability() + Tracing in AgentOrchestrator ctor
 src/api/Endpoints.cs                        — Tracing parameter + StartTrace/EndTrace
+src/agents/Orchestrator/AgentOrchestrator.cs — RouteAsync(classified, traceCtx), all handler spans
 docs/adrs/010-observability-architecture.md — NEW: ADR-010
 ```
 
@@ -209,7 +261,6 @@ docs/adrs/010-observability-architecture.md — NEW: ADR-010
 
 ## Deferred to Later Days
 
-- Agent-level spans (RecipeSearch, DietValidation, Planner) — Day 2
 - Guardrail + circuit breaker spans — Day 3
 - `/admin/metrics` aggregate endpoint — Day 4
 - Correlation IDs in structured logs — Day 5
@@ -218,6 +269,6 @@ docs/adrs/010-observability-architecture.md — NEW: ADR-010
 
 ---
 
-## Next: Day 2 — Instrument all agent calls
+## Next: Day 3 — Instrument guardrails and session operations
 
-Wire `TraceContext` through `AgentOrchestrator.RouteAsync`, `RecipeSearchPlugin.SearchRecipesAsync`, `DietValidationPlugin.ValidateRecipeAsync`, and `MealPlannerPlugin.GeneratePlanAsync`. Every Ollama call gets `LogGeneration`. Goal: a single `/chat` request for "find me dairy-free pasta" produces a full trace tree showing all operations with individual timings.
+Add spans for `InputGuard`, `RateLimiter`, `CircuitBreaker` state, and all `SessionStore` Redis operations. After Day 3 every component that touches a request is visible in the trace tree.

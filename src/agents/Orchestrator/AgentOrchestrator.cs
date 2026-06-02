@@ -424,7 +424,11 @@ public class AgentOrchestrator
         List<RecipeDocument> recipes;
         try
         {
-            recipes = await _recipeAgent.SearchRecipesAsync(classified.SearchQuery, maxResults: 5);
+            recipes = await _recipeAgent.SearchRecipesAsync(
+                classified.SearchQuery,
+                maxResults: 5,
+                parentCtx: parentCtx
+            );
             _tracing.EndSpan(recipeCtx, output: new { resultCount = recipes.Count });
         }
         catch (Exception ex)
@@ -483,7 +487,8 @@ public class AgentOrchestrator
             {
                 var validation = await _dietAgent.ValidateRecipeAsync(
                     recipe,
-                    classified.MergedProfile
+                    classified.MergedProfile,
+                    parentCtx
                 );
                 _tracing.EndSpan(
                     dietCtx,
@@ -573,7 +578,11 @@ public class AgentOrchestrator
         List<RecipeDocument> recipes;
         try
         {
-            recipes = await _recipeAgent.SearchRecipesAsync(classified.SearchQuery, maxResults: 1);
+            recipes = await _recipeAgent.SearchRecipesAsync(
+                classified.SearchQuery,
+                maxResults: 1,
+                parentCtx: parentCtx
+            );
             _tracing.EndSpan(recipeCtx, output: new { resultCount = recipes.Count });
         }
         catch (Exception ex)
@@ -607,7 +616,11 @@ public class AgentOrchestrator
         DietaryValidation validation;
         try
         {
-            validation = await _dietAgent.ValidateRecipeAsync(recipe, classified.MergedProfile);
+            validation = await _dietAgent.ValidateRecipeAsync(
+                recipe,
+                classified.MergedProfile,
+                parentCtx
+            );
             _tracing.EndSpan(
                 dietCtx,
                 output: new

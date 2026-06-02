@@ -37,6 +37,7 @@ public class IntentRouter
     private readonly string _chatModel;
     private readonly CircuitBreaker _circuitBreaker;
     private readonly SessionStore _sessionStore;
+    private readonly Tracing _tracing;
 
     // ── Signal Word Sets ──────────────────────────────────────────────────────
 
@@ -222,6 +223,7 @@ public class IntentRouter
         string chatModel,
         [FromKeyedServices("ollama")] CircuitBreaker circuitBreaker,
         SessionStore sessionStore,
+        Tracing tracing,
         ILogger<IntentRouter> logger
     )
     {
@@ -230,6 +232,7 @@ public class IntentRouter
         _chatModel = chatModel;
         _circuitBreaker = circuitBreaker;
         _sessionStore = sessionStore;
+        _tracing = tracing;
         _logger = logger;
     }
 
@@ -245,7 +248,8 @@ public class IntentRouter
         string message,
         DietaryProfile? existingProfile = null,
         string? sessionId = null,
-        List<ConversationEntry>? history = null
+        List<ConversationEntry>? history = null,
+        TraceContext? parentCtx = null
     )
     {
         var lower = message.ToLowerInvariant().Trim();
@@ -279,7 +283,8 @@ public class IntentRouter
                 var llmProfile = await TryExtractProfileWithLlmAsync(
                     message,
                     existingProfile,
-                    history
+                    history,
+                    parentCtx
                 );
                 extractedProfile = llmProfile;
 
@@ -508,12 +513,19 @@ public class IntentRouter
     private async Task<DietaryProfile?> TryExtractProfileWithLlmAsync(
         string message,
         DietaryProfile? existingProfile,
-        List<ConversationEntry>? history
+        List<ConversationEntry>? history,
+        TraceContext? parentCtx = null
     )
     {
+        var spanCtx = _tracing.StartSpan(
+            parentCtx ?? TraceContext.None,
+            "intent.llm_extraction",
+            input: new { message }
+        );
         if (!_circuitBreaker.IsAllowed())
         {
             _logger.LogInformation("[IntentRouter] Circuit open — skipping LLM entity extraction");
+            _tracing.EndSpan(spanCtx, statusMessage: "circuit_open");
             return null;
         }
         try
@@ -622,6 +634,11 @@ public class IntentRouter
                     .ToList()
                 : new List<string>();
 
+            _tracing.EndSpan(
+                spanCtx,
+                output: new { restrictions = restrictions, allergies = allergies }
+            );
+
             if (restrictions.Count == 0 && allergies.Count == 0)
                 return null;
 
@@ -638,6 +655,7 @@ public class IntentRouter
         catch (Exception ex)
         {
             _circuitBreaker.RecordFailure();
+            _tracing.EndSpan(spanCtx, statusMessage: "error");
             _logger.LogWarning(
                 ex,
                 "[IntentRouter] LLM entity extraction failed — proceeding without"

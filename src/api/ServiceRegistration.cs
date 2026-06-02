@@ -33,11 +33,13 @@ public static class ServiceRegistration
     {
         services.AddRedis(config);
         services.AddInfrastructure(config);
+        // Observability must be registered early so Tracing can be injected
+        // into agents created below.
+        services.AddObservability(config);
         services.AddRecipeAgent(config);
         services.AddDietAgent(config);
         services.AddOrchestrator(config);
         services.AddMealPlannerAgent(config);
-        services.AddObservability(config);
         services.AddApiServices();
         return services;
     }
@@ -128,6 +130,7 @@ public static class ServiceRegistration
                     chatModel,
                     outputGuard,
                     circuitBreaker,
+                    sp.GetRequiredService<Tracing>(),
                     sp.GetRequiredService<ILogger<RecipeReranker>>()
                 ),
                 new QueryPreprocessor(
@@ -160,6 +163,7 @@ public static class ServiceRegistration
                 ollamaUrl,
                 chatModel,
                 sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
+                sp.GetRequiredService<Tracing>(),
                 sp.GetRequiredService<ILogger<DietValidationPlugin>>()
             );
         });
@@ -235,6 +239,7 @@ public static class ServiceRegistration
                 chatModel,
                 sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
                 sp.GetRequiredService<SessionStore>(),
+                sp.GetRequiredService<Tracing>(),
                 sp.GetRequiredService<ILogger<IntentRouter>>()
             );
         });

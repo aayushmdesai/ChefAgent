@@ -225,8 +225,10 @@ public static class Endpoints
                         request.SessionId ?? "unknown",
                         request.Message
                     );
-                    // Early exits skip EndTrace — too fast to be worth tracing,
-                    // and they never reach the agents.
+
+                    // Ensure we close the trace for this request before returning.
+                    tracing.EndTrace(traceCtx, output: validation.RejectionReason);
+
                     return Results.Ok(
                         new OrchestratorResponse
                         {
@@ -239,11 +241,15 @@ public static class Endpoints
                 if (!rateLimiter.IsAllowed(request.SessionId))
                 {
                     audit.Record("rate_limited", request.SessionId ?? "unknown");
+
+                    var rateMsg =
+                        "You're sending requests too quickly. Please wait a moment and try again.";
+                    tracing.EndTrace(traceCtx, output: rateMsg);
+
                     return Results.Json(
                         new OrchestratorResponse
                         {
-                            Message =
-                                "You're sending requests too quickly. Please wait a moment and try again.",
+                            Message = rateMsg,
                             DetectedIntent = UserIntent.Unknown,
                             Confidence = ResponseConfidence.High,
                         },
@@ -262,11 +268,15 @@ public static class Endpoints
                         request.SessionId ?? "unknown",
                         validation.SanitizedMessage
                     );
+
+                    var repeatMsg =
+                        "I already answered that — would you like to try a different query?";
+                    tracing.EndTrace(traceCtx, output: repeatMsg);
+
                     return Results.Ok(
                         new OrchestratorResponse
                         {
-                            Message =
-                                "I already answered that — would you like to try a different query?",
+                            Message = repeatMsg,
                             DetectedIntent = UserIntent.Unknown,
                             Confidence = ResponseConfidence.High,
                         }
@@ -291,7 +301,8 @@ public static class Endpoints
                     validation.SanitizedMessage,
                     request.DietaryProfile,
                     request.SessionId,
-                    history
+                    history,
+                    traceCtx
                 );
 
                 // ── Agent Dispatch ────────────────────────────────────────

@@ -33,6 +33,7 @@ public class DietValidationPlugin
     private readonly string _chatModel;
     private readonly CircuitBreaker _circuitBreaker;
     private readonly ILogger<DietValidationPlugin> _logger;
+    private readonly Tracing _tracing;
 
     // ── Substitution Knowledge Base ───────────────────────────────────────────
     // Maps a known violating ingredient phrase to its substitution options.
@@ -182,6 +183,7 @@ public class DietValidationPlugin
         string ollamaUrl,
         string chatModel,
         CircuitBreaker circuitBreaker,
+        Tracing tracing,
         ILogger<DietValidationPlugin> logger
     )
     {
@@ -189,6 +191,7 @@ public class DietValidationPlugin
         _ollamaUrl = ollamaUrl;
         _chatModel = chatModel;
         _circuitBreaker = circuitBreaker;
+        _tracing = tracing;
         _logger = logger;
     }
 
@@ -205,7 +208,8 @@ public class DietValidationPlugin
     /// </summary>
     public async Task<DietaryValidation> ValidateRecipeAsync(
         RecipeDocument recipe,
-        DietaryProfile? profile
+        DietaryProfile? profile,
+        TraceContext? parentCtx = null
     )
     {
         // No profile — skip all validation
@@ -282,7 +286,8 @@ public class DietValidationPlugin
                 recipe,
                 profile,
                 unknownRestrictions,
-                unknownAllergies
+                unknownAllergies,
+                parentCtx
             );
             sw.Stop();
             _logger.LogInformation(
@@ -351,7 +356,8 @@ public class DietValidationPlugin
             recipe,
             profile,
             unknownRestrictions,
-            unknownAllergies
+            unknownAllergies,
+            parentCtx
         );
         sw.Stop();
         _logger.LogInformation(
@@ -431,19 +437,32 @@ public class DietValidationPlugin
         RecipeDocument recipe,
         DietaryProfile profile,
         List<string> unknownRestrictions,
-        List<string> unknownAllergies
+        List<string> unknownAllergies,
+        TraceContext? parentCtx = null
     )
     {
         var prompt = BuildValidationPrompt(recipe, profile, unknownRestrictions, unknownAllergies);
 
+        var spanCtx = TraceContext.None;
         try
         {
+            try
+            {
+                spanCtx = _tracing.StartSpan(
+                    parentCtx ?? TraceContext.None,
+                    "diet.llm_validation",
+                    input: new { recipeTitle = recipe.Title }
+                );
+            }
+            catch { }
+
             if (!_circuitBreaker.IsAllowed())
             {
                 _logger.LogInformation(
                     "[DietAgent] Circuit open — skipping LLM validation for '{Title}'",
                     recipe.Title
                 );
+                _tracing.EndSpan(spanCtx, statusMessage: "circuit_open");
                 return new DietaryValidation
                 {
                     RecipeId = recipe.Id,
@@ -455,6 +474,8 @@ public class DietValidationPlugin
             }
             var raw = await CallOllamaAsync(prompt);
             _circuitBreaker.RecordSuccess();
+
+            _tracing.EndSpan(spanCtx, output: new { latency = "ok" });
 
             return ParseLlmValidation(recipe.Id, raw);
         }
@@ -468,6 +489,12 @@ public class DietValidationPlugin
             );
 
             _circuitBreaker.RecordFailure();
+
+            try
+            {
+                _tracing.EndSpan(spanCtx, statusMessage: "error");
+            }
+            catch { }
 
             return new DietaryValidation
             {

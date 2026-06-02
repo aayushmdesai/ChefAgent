@@ -17,6 +17,7 @@ public class RecipeReranker
     private readonly string _chatModel;
     private readonly OutputGuard _outputGuard;
     private readonly CircuitBreaker _circuitBreaker;
+    private readonly Tracing _tracing;
     private readonly ILogger<RecipeReranker> _logger;
 
     public RecipeReranker(
@@ -25,6 +26,7 @@ public class RecipeReranker
         string chatModel,
         OutputGuard outputGuard,
         CircuitBreaker circuitBreaker,
+        Tracing tracing,
         ILogger<RecipeReranker> logger
     )
     {
@@ -33,6 +35,7 @@ public class RecipeReranker
         _chatModel = chatModel;
         _outputGuard = outputGuard;
         _circuitBreaker = circuitBreaker;
+        _tracing = tracing;
         _logger = logger;
     }
 
@@ -44,7 +47,8 @@ public class RecipeReranker
         string query,
         List<RecipeDocument> candidates,
         int topN = 5,
-        CancellationToken ct = default
+        CancellationToken ct = default,
+        TraceContext? parentCtx = null
     )
     {
         if (candidates.Count <= 1)
@@ -57,46 +61,64 @@ public class RecipeReranker
             candidates.Count,
             query
         );
-        if (!_circuitBreaker.IsAllowed())
-        {
-            _logger.LogInformation("[AgentName] Circuit open — skipping LLM");
-            return candidates.Take(topN).ToList();
-        }
-        var rankings = await _outputGuard.CallWithRetryAsync(
-            llmCall: () => CallOllamaAsync(prompt, ct),
-            validator: raw => _outputGuard.ValidateRerankOutput(raw, candidates.Count),
-            context: "Reranker"
+        var spanCtx = _tracing.StartSpan(
+            parentCtx ?? TraceContext.None,
+            "reranker.llm",
+            input: new { query }
         );
-        _circuitBreaker.RecordSuccess();
-
-        if (rankings is null)
+        try
         {
-            _logger.LogWarning("Re-ranking failed after retry — using vector search order");
-            return candidates.Take(topN).ToList();
-        }
+            if (!_circuitBreaker.IsAllowed())
+            {
+                _logger.LogInformation("[RecipeReranker] Circuit open — skipping LLM");
+                _tracing.EndSpan(spanCtx, statusMessage: "circuit_open");
+                return candidates.Take(topN).ToList();
+            }
 
-        // Build ranked list from validated entries
-        var ranked = new List<RecipeDocument>();
-        foreach (var entry in rankings)
+            var rankings = await _outputGuard.CallWithRetryAsync(
+                llmCall: () => CallOllamaAsync(prompt, ct),
+                validator: raw => _outputGuard.ValidateRerankOutput(raw, candidates.Count),
+                context: "Reranker"
+            );
+            _circuitBreaker.RecordSuccess();
+
+            if (rankings is null)
+            {
+                _logger.LogWarning("Re-ranking failed after retry — using vector search order");
+                _tracing.EndSpan(spanCtx, statusMessage: "invalid_output");
+                return candidates.Take(topN).ToList();
+            }
+
+            // Build ranked list from validated entries
+            var ranked = new List<RecipeDocument>();
+            foreach (var entry in rankings)
+            {
+                var recipe = candidates[entry.Index];
+                ranked.Add(recipe with { RelevanceScore = entry.Score });
+            }
+
+            // Append any candidates the LLM missed
+            var rankedIds = ranked.Select(r => r.Id).ToHashSet();
+            foreach (var candidate in candidates)
+            {
+                if (!rankedIds.Contains(candidate.Id))
+                    ranked.Add(candidate with { RelevanceScore = 0.0 });
+            }
+
+            _logger.LogInformation(
+                "Re-ranking complete. Top result: {Title}",
+                ranked.FirstOrDefault()?.Title ?? "none"
+            );
+
+            var result = ranked.Take(topN).ToList();
+            _tracing.EndSpan(spanCtx, output: new { resultCount = result.Count });
+            return result;
+        }
+        catch
         {
-            var recipe = candidates[entry.Index];
-            ranked.Add(recipe with { RelevanceScore = entry.Score });
+            _tracing.EndSpan(spanCtx, statusMessage: "error");
+            throw;
         }
-
-        // Append any candidates the LLM missed
-        var rankedIds = ranked.Select(r => r.Id).ToHashSet();
-        foreach (var candidate in candidates)
-        {
-            if (!rankedIds.Contains(candidate.Id))
-                ranked.Add(candidate with { RelevanceScore = 0.0 });
-        }
-
-        _logger.LogInformation(
-            "Re-ranking complete. Top result: {Title}",
-            ranked.FirstOrDefault()?.Title ?? "none"
-        );
-
-        return ranked.Take(topN).ToList();
     }
 
     private static string BuildPrompt(string query, List<RecipeDocument> candidates)

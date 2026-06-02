@@ -65,7 +65,8 @@ public class RecipeSearchPlugin
         [Description("Filter: max number of steps (null = no filter)")] int? maxSteps = null,
         bool rerank = false,
         bool expand = false,
-        CancellationToken cancellationToken = default
+        CancellationToken cancellationToken = default,
+        TraceContext? parentCtx = null
     )
     {
         _logger.LogInformation(
@@ -179,7 +180,13 @@ public class RecipeSearchPlugin
         // 6. Re-rank if enabled
         if (_reranker != null && rerank && results.Count > 0)
         {
-            results = await _reranker.RerankAsync(query, results, maxResults, cancellationToken);
+            results = await _reranker.RerankAsync(
+                query,
+                results,
+                maxResults,
+                cancellationToken,
+                parentCtx
+            );
         }
         else
         {

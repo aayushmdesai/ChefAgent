@@ -26,12 +26,22 @@ public class IntentRouterTests
             circuitBreaker
         ).Object;
 
+        var tracingOptions = Mock.Of<Microsoft.Extensions.Options.IOptions<LangfuseOptions>>(o =>
+            o.Value == new LangfuseOptions { Enabled = false, BaseUrl = "http://localhost" }
+        );
+        var tracing = new Tracing(
+            tracingOptions,
+            new Mock<ILogger<Tracing>>().Object,
+            new HttpClient()
+        );
+
         return new IntentRouter(
             new HttpClient(),
             "http://localhost:11434",
             "llama3.2",
             circuitBreaker,
             sessionStore,
+            tracing,
             new Mock<ILogger<IntentRouter>>().Object
         );
     }
