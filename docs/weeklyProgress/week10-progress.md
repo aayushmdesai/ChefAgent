@@ -334,10 +334,11 @@ docker-compose.yml                           — langfuse-db + langfuse-server s
 src/shared/LangfuseOptions.cs                — NEW: config binding
 src/shared/TraceContext.cs                   — NEW: lightweight context record
 src/shared/Tracing.cs                        — NEW: fire-and-forget Langfuse client
+src/shared/MetricsCollector.cs               — NEW: sliding 5-min window, p50/p95/p99
 src/shared/ChefAgent.Shared.csproj           — hosting + options NuGet packages
 src/api/appsettings.json                     — Langfuse section
-src/api/ServiceRegistration.cs               — AddObservability() + Tracing in all agent ctors
-src/api/Endpoints.cs                         — StartTrace/EndTrace on all exits + traceCtx to ClassifyAsync
+src/api/ServiceRegistration.cs               — AddObservability() + Tracing + MetricsCollector
+src/api/Endpoints.cs                         — /admin/metrics endpoint + collector.Record in /chat
 src/agents/Orchestrator/AgentOrchestrator.cs — RouteAsync(classified, traceCtx), all handler spans
 src/agents/Orchestrator/IntentRouter.cs      — intent.llm_extraction span, traceCtx param
 src/agents/RecipeAgent/RecipeSearchPlugin.cs — parentCtx forwarded to reranker
@@ -351,12 +352,81 @@ docs/adrs/010-observability-architecture.md  — NEW: ADR-010
 
 ## Deferred to Later Days
 
-- `/admin/metrics` aggregate endpoint — Day 4
 - Tracing overhead measurement — Day 6-7
 - Screenshot best traces for portfolio — Day 6-7
 
 ---
 
-## Next: Day 4 — `/admin/metrics` aggregate endpoint
+## Next: Day 5 — Correlation IDs in structured logs
 
-In-memory aggregation of request counts, latency percentiles (p50/p95/p99), circuit breaker states, and guardrail event counts. Served at `GET /admin/metrics`. Simple dashboard polling it every few seconds.
+Add correlation ID to every log line so logs and Langfuse traces are cross-referenceable. Format: `[corr:a8f3b2c1d4e5]` prefix on all agent log messages.
+
+---
+
+## Day 4 — `/admin/metrics` aggregate endpoint
+
+### Design decision: in-memory vs querying Langfuse
+
+**Rejected: query Langfuse** — Langfuse is an observability backend for humans debugging specific requests. Querying it from a metrics endpoint creates a runtime dependency — if Langfuse is slow or down, `/admin/metrics` fails too. The entire week was spent ensuring Langfuse never affects the request path. Querying it from an endpoint breaks that isolation in the other direction. Also, Langfuse aggregation queries aren't designed for sub-100ms API responses hit by a polling dashboard every few seconds.
+
+**Chosen: in-memory `MetricsCollector`** — same pattern as `GuardrailAuditLog`. `ConcurrentQueue<RequestSample>`, ring buffer cap (5000 samples), singleton registered in DI. Zero infrastructure dependencies, microsecond reads.
+
+### Sliding 5-minute window vs last-N requests
+
+Tracking "last 1000 requests" at low traffic (10 req/hour) reflects the last 100 hours — a latency spike from 3 hours ago still drags p95. A 5-minute window reflects right now, which is what an ops dashboard needs.
+
+### What p50/p95/p99 actually mean
+
+**p50** — median. Half of requests are faster, half slower. Your "normal" experience.
+
+**p95** — 95% of requests are faster than this. Ignores outliers. Tells you what a typical user experiences under real load, not what your worst cold start looks like.
+
+**p99** — worst 1%. Alert on this in production. If p99 spikes while p50 is stable, occasional slow requests (cold starts, circuit breaker recovery). If p50 rises too, systemic problem.
+
+Average is deceptive — 99 requests at 200ms + 1 at 15000ms = 350ms average that no user actually experienced. Percentiles tell the real story.
+
+### `MetricsCollector.cs`
+
+New file in `src/shared/`. Key design choices:
+
+- `Record(intent, latencyMs, wasBlocked)` — blocked requests recorded separately with `wasBlocked: true`, excluded from latency percentiles (guardrail rejections are sub-ms and would skew p50 downward)
+- `GetSnapshot()` — filters to 5-minute window, computes percentiles fresh on every call. No pre-aggregation — fast enough at hundreds of samples
+- **Nearest-rank percentile** — returns an actual observed value, not a synthetic interpolated midpoint. Simpler to reason about at our sample sizes
+- `ConcurrentQueue<RequestSample>` — same thread-safety pattern as `GuardrailAuditLog`
+
+### Wiring
+
+**`Endpoints.cs`** — `/chat` handler:
+- `MetricsCollector collector` added to handler parameters
+- `Stopwatch` wraps `orchestrator.RouteAsync` to measure end-to-end latency
+- `collector.Record(intent, latencyMs)` called after response returns
+- `collector.Record("blocked"/"rate_limited"/"repeated_query", 0, wasBlocked: true)` on early exits
+
+**`ServiceRegistration.cs`** — `services.AddSingleton<MetricsCollector>()` in `AddApiServices()`
+
+**`Endpoints.cs`** — new endpoint alongside `/admin/guardrails`:
+```csharp
+app.MapGet("/admin/metrics", (MetricsCollector collector) => Results.Ok(collector.GetSnapshot()));
+```
+
+### Verified output (6 requests, warm system)
+
+```json
+{
+  "windowMinutes": 5,
+  "requestsTotal": 6,
+  "requestsCompleted": 6,
+  "requestsBlocked": 0,
+  "requestsByIntent": { "SearchRecipe": 6 },
+  "latency": {
+    "p50Ms": 111,
+    "p95Ms": 16865,
+    "p99Ms": 16865,
+    "minMs": 70,
+    "maxMs": 16865,
+    "meanMs": 3041
+  }
+}
+```
+
+**What the numbers say:** p50 of 111ms means warm requests are fast — Ollama model loaded, Qdrant index warm. p99 of 16865ms is the first cold-start request. This is exactly the story the architecture tells — cold starts are expensive, which is why opt-in reranking and circuit breakers exist. The numbers validate the earlier design decisions.
