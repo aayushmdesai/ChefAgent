@@ -33,8 +33,6 @@ public static class ServiceRegistration
     {
         services.AddRedis(config);
         services.AddInfrastructure(config);
-        // Observability must be registered early so Tracing can be injected
-        // into agents created below.
         services.AddObservability(config);
         services.AddRecipeAgent(config);
         services.AddDietAgent(config);
@@ -273,6 +271,7 @@ public static class ServiceRegistration
 
     private static IServiceCollection AddApiServices(this IServiceCollection services)
     {
+        services.AddSingleton<MetricsCollector>();
         // CORS — allow React dev
         services.AddCors(options =>
         {

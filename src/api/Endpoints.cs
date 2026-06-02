@@ -32,6 +32,10 @@ public static class Endpoints
             "/admin/guardrails",
             (GuardrailAuditLog audit) => Results.Ok(audit.GetRecent(50))
         );
+        app.MapGet(
+            "/admin/metrics",
+            (MetricsCollector collector) => Results.Ok(collector.GetSnapshot())
+        );
         app.MapServiceInfo();
         app.MapRecipeSearch();
         app.MapRecipeSearchValidated();
@@ -204,7 +208,8 @@ public static class Endpoints
                 SessionStore sessionStore,
                 RateLimiter rateLimiter,
                 GuardrailAuditLog audit,
-                Tracing tracing
+                Tracing tracing,
+                MetricsCollector collector
             ) =>
             {
                 // Start a trace for this request — covers everything below.
@@ -228,7 +233,7 @@ public static class Endpoints
 
                     // Ensure we close the trace for this request before returning.
                     tracing.EndTrace(traceCtx, output: validation.RejectionReason);
-
+                    collector.Record("blocked", latencyMs: 0, wasBlocked: true);
                     return Results.Ok(
                         new OrchestratorResponse
                         {
@@ -245,7 +250,7 @@ public static class Endpoints
                     var rateMsg =
                         "You're sending requests too quickly. Please wait a moment and try again.";
                     tracing.EndTrace(traceCtx, output: rateMsg);
-
+                    collector.Record("rate_limited", latencyMs: 0, wasBlocked: true);
                     return Results.Json(
                         new OrchestratorResponse
                         {
@@ -272,6 +277,7 @@ public static class Endpoints
                     var repeatMsg =
                         "I already answered that — would you like to try a different query?";
                     tracing.EndTrace(traceCtx, output: repeatMsg);
+                    collector.Record("repeated_query", latencyMs: 0, wasBlocked: true);
 
                     return Results.Ok(
                         new OrchestratorResponse
@@ -306,10 +312,14 @@ public static class Endpoints
                 );
 
                 // ── Agent Dispatch ────────────────────────────────────────
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 var response = await orchestrator.RouteAsync(classified, traceCtx);
+                sw.Stop();
 
-                // Close the root trace with the final response message.
-                // At this point all agent spans are already ended inside RouteAsync.
+                collector.Record(
+                    intent: classified.Intent.ToString(),
+                    latencyMs: sw.ElapsedMilliseconds
+                );
                 tracing.EndTrace(traceCtx, output: response.Message);
 
                 return Results.Ok(response);
