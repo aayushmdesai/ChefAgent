@@ -212,77 +212,155 @@ public class DietValidationPlugin
         TraceContext? parentCtx = null
     )
     {
-        // No profile — skip all validation
-        if (profile is null || (profile.Allergies.Count == 0 && profile.Restrictions.Count == 0))
+        using (_logger.BeginScope(new { CorrelationId = parentCtx?.CorrelationId ?? "none" }))
         {
-            _logger.LogDebug("No dietary profile — skipping validation for recipe {Id}", recipe.Id);
-            return Compatible(recipe.Id, "No dietary restrictions provided.");
-        }
+            // No profile — skip all validation
+            if (
+                profile is null
+                || (profile.Allergies.Count == 0 && profile.Restrictions.Count == 0)
+            )
+            {
+                _logger.LogDebug(
+                    "No dietary profile — skipping validation for recipe {Id}",
+                    recipe.Id
+                );
+                return Compatible(recipe.Id, "No dietary restrictions provided.");
+            }
 
-        var sw = System.Diagnostics.Stopwatch.StartNew();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
 
-        _logger.LogInformation(
-            "Validating recipe '{Title}' | allergies: [{Allergies}] restrictions: [{Restrictions}]",
-            recipe.Title,
-            string.Join(", ", profile.Allergies),
-            string.Join(", ", profile.Restrictions)
-        );
-
-        // ── Layer 1: Rules Engine ─────────────────────────────────────────────
-        var rulesViolations = DietaryRules.Validate(recipe.Ingredients, profile);
-
-        if (rulesViolations.Count > 0)
-        {
-            sw.Stop();
             _logger.LogInformation(
-                "[DietAgent] Recipe='{Title}' Layer=Rules Time={Ms}ms Violations={Count} Compatible=false",
+                "Validating recipe '{Title}' | allergies: [{Allergies}] restrictions: [{Restrictions}]",
                 recipe.Title,
-                sw.ElapsedMilliseconds,
-                rulesViolations.Count
+                string.Join(", ", profile.Allergies),
+                string.Join(", ", profile.Restrictions)
             );
 
-            var substitutions = SuggestSubstitutionsFromRules(rulesViolations);
-            return new DietaryValidation
+            // ── Layer 1: Rules Engine ─────────────────────────────────────────────
+            var rulesViolations = DietaryRules.Validate(recipe.Ingredients, profile);
+
+            if (rulesViolations.Count > 0)
             {
-                RecipeId = recipe.Id,
-                IsCompatible = false,
-                Violations = rulesViolations,
-                Substitutions = substitutions,
-                Explanation = BuildRulesExplanation(rulesViolations),
-            };
-        }
+                sw.Stop();
+                _logger.LogInformation(
+                    "[DietAgent] Recipe='{Title}' Layer=Rules Time={Ms}ms Violations={Count} Compatible=false",
+                    recipe.Title,
+                    sw.ElapsedMilliseconds,
+                    rulesViolations.Count
+                );
 
-        // ── Layer 2: LLM Escalation ───────────────────────────────────────────
-        var unknownRestrictions = profile
-            .Restrictions.Where(r => !DietaryRules.IsKnownRestriction(r))
-            .ToList();
+                var substitutions = SuggestSubstitutionsFromRules(rulesViolations);
+                return new DietaryValidation
+                {
+                    RecipeId = recipe.Id,
+                    IsCompatible = false,
+                    Violations = rulesViolations,
+                    Substitutions = substitutions,
+                    Explanation = BuildRulesExplanation(rulesViolations),
+                };
+            }
 
-        var unknownAllergies = profile
-            .Allergies.Where(a => !DietaryRules.IsKnownAllergy(a))
-            .ToList();
+            // ── Layer 2: LLM Escalation ───────────────────────────────────────────
+            var unknownRestrictions = profile
+                .Restrictions.Where(r => !DietaryRules.IsKnownRestriction(r))
+                .ToList();
 
-        var ruleMatchedIngredients = rulesViolations.Select(v => v.Ingredient).ToHashSet();
+            var unknownAllergies = profile
+                .Allergies.Where(a => !DietaryRules.IsKnownAllergy(a))
+                .ToList();
 
-        var hasAmbiguousIngredients = recipe
-            .Ingredients.Where(i =>
-                !KnownSafePhrases.Any(known =>
-                    i.Contains(known, StringComparison.OrdinalIgnoreCase)
+            var ruleMatchedIngredients = rulesViolations.Select(v => v.Ingredient).ToHashSet();
+
+            var hasAmbiguousIngredients = recipe
+                .Ingredients.Where(i =>
+                    !KnownSafePhrases.Any(known =>
+                        i.Contains(known, StringComparison.OrdinalIgnoreCase)
+                    )
+                )
+                .Any(i =>
+                    AmbiguousSignals.Any(signal =>
+                        i.Contains(signal, StringComparison.OrdinalIgnoreCase)
+                    )
+                );
+
+            // Allergy + ambiguous → LLM (could be life-threatening)
+            if (profile.Allergies.Count > 0 && hasAmbiguousIngredients)
+            {
+                _logger.LogInformation(
+                    "Escalating '{Title}' to LLM — allergy profile + ambiguous ingredients detected",
+                    recipe.Title
+                );
+                var result = await ValidateWithLlmAsync(
+                    recipe,
+                    profile,
+                    unknownRestrictions,
+                    unknownAllergies,
+                    parentCtx
+                );
+                sw.Stop();
+                _logger.LogInformation(
+                    "[DietAgent] Recipe='{Title}' Layer=Llm Time={Ms}ms Violations={Count} Compatible={Compatible}",
+                    recipe.Title,
+                    sw.ElapsedMilliseconds,
+                    result.Violations.Count,
+                    result.IsCompatible
+                );
+                return result;
+            }
+
+            // Restriction + ambiguous → skip recipe
+            if (
+                profile.Restrictions.Count > 0
+                && recipe.Ingredients.Any(i =>
+                    AmbiguousSignals.Any(signal =>
+                        i.Contains(signal, StringComparison.OrdinalIgnoreCase)
+                    )
                 )
             )
-            .Any(i =>
-                AmbiguousSignals.Any(signal =>
-                    i.Contains(signal, StringComparison.OrdinalIgnoreCase)
-                )
+            {
+                sw.Stop();
+                _logger.LogInformation(
+                    "[DietAgent] Recipe='{Title}' Layer=Skip Time={Ms}ms Violations=0 Compatible=false — ambiguous ingredients",
+                    recipe.Title,
+                    sw.ElapsedMilliseconds
+                );
+                return new DietaryValidation
+                {
+                    RecipeId = recipe.Id,
+                    IsCompatible = false,
+                    Violations = [],
+                    Substitutions = [],
+                    Explanation =
+                        "Recipe contains ambiguous ingredients (e.g. 'spice blend', 'natural flavors') "
+                        + "that could not be verified against your dietary restrictions. Recipe skipped.",
+                };
+            }
+
+            // All known, no ambiguity → rules result is final
+            var needsLlm = unknownRestrictions.Count > 0 || unknownAllergies.Count > 0;
+
+            if (!needsLlm)
+            {
+                sw.Stop();
+                _logger.LogInformation(
+                    "[DietAgent] Recipe='{Title}' Layer=Rules Time={Ms}ms Violations=0 Compatible=true",
+                    recipe.Title,
+                    sw.ElapsedMilliseconds
+                );
+                return Compatible(
+                    recipe.Id,
+                    $"Recipe passed all rule checks for: {string.Join(", ", profile.Restrictions.Concat(profile.Allergies))}."
+                );
+            }
+
+            // Unknown restriction or allergy → LLM
+            _logger.LogInformation(
+                "Escalating '{Title}' to LLM | unknown: [{U}]",
+                recipe.Title,
+                string.Join(", ", unknownRestrictions.Concat(unknownAllergies))
             );
 
-        // Allergy + ambiguous → LLM (could be life-threatening)
-        if (profile.Allergies.Count > 0 && hasAmbiguousIngredients)
-        {
-            _logger.LogInformation(
-                "Escalating '{Title}' to LLM — allergy profile + ambiguous ingredients detected",
-                recipe.Title
-            );
-            var result = await ValidateWithLlmAsync(
+            var llmResult = await ValidateWithLlmAsync(
                 recipe,
                 profile,
                 unknownRestrictions,
@@ -294,80 +372,11 @@ public class DietValidationPlugin
                 "[DietAgent] Recipe='{Title}' Layer=Llm Time={Ms}ms Violations={Count} Compatible={Compatible}",
                 recipe.Title,
                 sw.ElapsedMilliseconds,
-                result.Violations.Count,
-                result.IsCompatible
+                llmResult.Violations.Count,
+                llmResult.IsCompatible
             );
-            return result;
+            return llmResult;
         }
-
-        // Restriction + ambiguous → skip recipe
-        if (
-            profile.Restrictions.Count > 0
-            && recipe.Ingredients.Any(i =>
-                AmbiguousSignals.Any(signal =>
-                    i.Contains(signal, StringComparison.OrdinalIgnoreCase)
-                )
-            )
-        )
-        {
-            sw.Stop();
-            _logger.LogInformation(
-                "[DietAgent] Recipe='{Title}' Layer=Skip Time={Ms}ms Violations=0 Compatible=false — ambiguous ingredients",
-                recipe.Title,
-                sw.ElapsedMilliseconds
-            );
-            return new DietaryValidation
-            {
-                RecipeId = recipe.Id,
-                IsCompatible = false,
-                Violations = [],
-                Substitutions = [],
-                Explanation =
-                    "Recipe contains ambiguous ingredients (e.g. 'spice blend', 'natural flavors') "
-                    + "that could not be verified against your dietary restrictions. Recipe skipped.",
-            };
-        }
-
-        // All known, no ambiguity → rules result is final
-        var needsLlm = unknownRestrictions.Count > 0 || unknownAllergies.Count > 0;
-
-        if (!needsLlm)
-        {
-            sw.Stop();
-            _logger.LogInformation(
-                "[DietAgent] Recipe='{Title}' Layer=Rules Time={Ms}ms Violations=0 Compatible=true",
-                recipe.Title,
-                sw.ElapsedMilliseconds
-            );
-            return Compatible(
-                recipe.Id,
-                $"Recipe passed all rule checks for: {string.Join(", ", profile.Restrictions.Concat(profile.Allergies))}."
-            );
-        }
-
-        // Unknown restriction or allergy → LLM
-        _logger.LogInformation(
-            "Escalating '{Title}' to LLM | unknown: [{U}]",
-            recipe.Title,
-            string.Join(", ", unknownRestrictions.Concat(unknownAllergies))
-        );
-
-        var llmResult = await ValidateWithLlmAsync(
-            recipe,
-            profile,
-            unknownRestrictions,
-            unknownAllergies,
-            parentCtx
-        );
-        sw.Stop();
-        _logger.LogInformation(
-            "[DietAgent] Recipe='{Title}' Layer=Llm Time={Ms}ms Violations={Count} Compatible={Compatible}",
-            recipe.Title,
-            sw.ElapsedMilliseconds,
-            llmResult.Violations.Count,
-            llmResult.IsCompatible
-        );
-        return llmResult;
     }
 
     /// <summary>
@@ -441,73 +450,81 @@ public class DietValidationPlugin
         TraceContext? parentCtx = null
     )
     {
-        var prompt = BuildValidationPrompt(recipe, profile, unknownRestrictions, unknownAllergies);
-
-        var spanCtx = TraceContext.None;
-        try
+        using (_logger.BeginScope(new { CorrelationId = parentCtx?.CorrelationId ?? "none" }))
         {
+            var prompt = BuildValidationPrompt(
+                recipe,
+                profile,
+                unknownRestrictions,
+                unknownAllergies
+            );
+
+            var spanCtx = TraceContext.None;
             try
             {
-                spanCtx = _tracing.StartSpan(
-                    parentCtx ?? TraceContext.None,
-                    "diet.llm_validation",
-                    input: new { recipeTitle = recipe.Title }
-                );
-            }
-            catch { }
+                try
+                {
+                    spanCtx = _tracing.StartSpan(
+                        parentCtx ?? TraceContext.None,
+                        "diet.llm_validation",
+                        input: new { recipeTitle = recipe.Title }
+                    );
+                }
+                catch { }
 
-            if (!_circuitBreaker.IsAllowed())
+                if (!_circuitBreaker.IsAllowed())
+                {
+                    _logger.LogInformation(
+                        "[DietAgent] Circuit open — skipping LLM validation for '{Title}'",
+                        recipe.Title
+                    );
+                    _tracing.EndSpan(spanCtx, statusMessage: "circuit_open");
+                    return new DietaryValidation
+                    {
+                        RecipeId = recipe.Id,
+                        IsCompatible = true,
+                        Explanation =
+                            "Rules found no violations. Deep validation skipped (LLM unavailable). Please review manually.",
+                        // same shape as the existing catch block fallback
+                    };
+                }
+                var raw = await CallOllamaAsync(prompt);
+                _circuitBreaker.RecordSuccess();
+
+                _tracing.EndSpan(spanCtx, output: new { latency = "ok" });
+
+                return ParseLlmValidation(recipe.Id, raw);
+            }
+            catch (Exception ex)
             {
-                _logger.LogInformation(
-                    "[DietAgent] Circuit open — skipping LLM validation for '{Title}'",
+                // Graceful fallback — LLM failure should not break the pipeline
+                _logger.LogWarning(
+                    ex,
+                    "LLM validation failed for recipe '{Title}' — returning compatible with warning",
                     recipe.Title
                 );
-                _tracing.EndSpan(spanCtx, statusMessage: "circuit_open");
+
+                _circuitBreaker.RecordFailure();
+
+                try
+                {
+                    _tracing.EndSpan(spanCtx, statusMessage: "error");
+                }
+                catch { }
+
                 return new DietaryValidation
                 {
                     RecipeId = recipe.Id,
                     IsCompatible = true,
+                    Violations = [],
+                    Substitutions = [],
                     Explanation =
-                        "Rules found no violations. Deep validation skipped (LLM unavailable). Please review manually.",
-                    // same shape as the existing catch block fallback
+                        "Rules engine found no violations. Deep validation unavailable (LLM timeout). "
+                        + "Please review manually for: "
+                        + string.Join(", ", unknownRestrictions.Concat(unknownAllergies))
+                        + ".",
                 };
             }
-            var raw = await CallOllamaAsync(prompt);
-            _circuitBreaker.RecordSuccess();
-
-            _tracing.EndSpan(spanCtx, output: new { latency = "ok" });
-
-            return ParseLlmValidation(recipe.Id, raw);
-        }
-        catch (Exception ex)
-        {
-            // Graceful fallback — LLM failure should not break the pipeline
-            _logger.LogWarning(
-                ex,
-                "LLM validation failed for recipe '{Title}' — returning compatible with warning",
-                recipe.Title
-            );
-
-            _circuitBreaker.RecordFailure();
-
-            try
-            {
-                _tracing.EndSpan(spanCtx, statusMessage: "error");
-            }
-            catch { }
-
-            return new DietaryValidation
-            {
-                RecipeId = recipe.Id,
-                IsCompatible = true,
-                Violations = [],
-                Substitutions = [],
-                Explanation =
-                    "Rules engine found no violations. Deep validation unavailable (LLM timeout). "
-                    + "Please review manually for: "
-                    + string.Join(", ", unknownRestrictions.Concat(unknownAllergies))
-                    + ".",
-            };
         }
     }
 

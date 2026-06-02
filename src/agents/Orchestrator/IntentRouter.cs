@@ -252,106 +252,110 @@ public class IntentRouter
         TraceContext? parentCtx = null
     )
     {
-        var lower = message.ToLowerInvariant().Trim();
-        var normalized = NormalizeContractions(lower);
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-
-        var intent = ClassifyIntent(normalized);
-        var extractedProfile = ExtractProfile(normalized);
-
-        // ── LLM entity extraction fallback ───────────────────────
-        // Only fires when:
-        //   1. Rules extracted nothing
-        //   2. Message contains implicit constraint signals
-        //   3. Extraction hasn't already run for this session
-        if (extractedProfile is null && HasImplicitConstraintSignal(normalized))
+        using (_logger.BeginScope(new { CorrelationId = parentCtx?.CorrelationId ?? "none" }))
         {
-            var sessionIdForCache = sessionId ?? string.Empty;
-            var (ranBefore, cachedProfile) = !string.IsNullOrEmpty(sessionIdForCache)
-                ? await _sessionStore.GetCachedExtractionAsync(sessionIdForCache)
-                : (false, null);
+            var lower = message.ToLowerInvariant().Trim();
+            var normalized = NormalizeContractions(lower);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
 
-            if (ranBefore)
+            var intent = ClassifyIntent(normalized);
+            var extractedProfile = ExtractProfile(normalized);
+
+            // ── LLM entity extraction fallback ───────────────────────
+            // Only fires when:
+            //   1. Rules extracted nothing
+            //   2. Message contains implicit constraint signals
+            //   3. Extraction hasn't already run for this session
+            if (extractedProfile is null && HasImplicitConstraintSignal(normalized))
             {
-                // Cache hit — use cached result, skip Ollama entirely
-                extractedProfile = cachedProfile;
-                _logger.LogInformation("[IntentRouter] Extraction cache hit — skipping LLM");
-            }
-            else
-            {
-                // Cache miss — call Ollama, then cache the result
-                var llmProfile = await TryExtractProfileWithLlmAsync(
-                    message,
-                    existingProfile,
-                    history,
-                    parentCtx
-                );
-                extractedProfile = llmProfile;
+                var sessionIdForCache = sessionId ?? string.Empty;
+                var (ranBefore, cachedProfile) = !string.IsNullOrEmpty(sessionIdForCache)
+                    ? await _sessionStore.GetCachedExtractionAsync(sessionIdForCache)
+                    : (false, null);
 
-                if (!string.IsNullOrEmpty(sessionIdForCache))
-                    await _sessionStore.SetCachedExtractionAsync(sessionIdForCache, llmProfile);
-
-                if (llmProfile is not null)
-                    _logger.LogInformation(
-                        "[IntentRouter] LLM extracted profile — restrictions: [{R}] allergies: [{A}]",
-                        string.Join(", ", llmProfile.Restrictions),
-                        string.Join(", ", llmProfile.Allergies)
+                if (ranBefore)
+                {
+                    // Cache hit — use cached result, skip Ollama entirely
+                    extractedProfile = cachedProfile;
+                    _logger.LogInformation("[IntentRouter] Extraction cache hit — skipping LLM");
+                }
+                else
+                {
+                    // Cache miss — call Ollama, then cache the result
+                    var llmProfile = await TryExtractProfileWithLlmAsync(
+                        message,
+                        existingProfile,
+                        history,
+                        parentCtx
                     );
+                    extractedProfile = llmProfile;
+
+                    if (!string.IsNullOrEmpty(sessionIdForCache))
+                        await _sessionStore.SetCachedExtractionAsync(sessionIdForCache, llmProfile);
+
+                    if (llmProfile is not null)
+                        _logger.LogInformation(
+                            "[IntentRouter] LLM extracted profile — restrictions: [{R}] allergies: [{A}]",
+                            string.Join(", ", llmProfile.Restrictions),
+                            string.Join(", ", llmProfile.Allergies)
+                        );
+                }
             }
-        }
-        var mergedProfile = MergeProfiles(existingProfile, extractedProfile);
-        var classifiedBy = intent == UserIntent.SearchRecipe ? "rules-default" : "rules";
+            var mergedProfile = MergeProfiles(existingProfile, extractedProfile);
+            var classifiedBy = intent == UserIntent.SearchRecipe ? "rules-default" : "rules";
 
-        // Extract day, slot and constraint for ModifyMealPlan
-        string? targetDay = null;
-        string? targetSlot = null;
-        string? modifyConstraint = null;
-        if (intent == UserIntent.ModifyMealPlan)
-        {
-            var slots = new[] { "breakfast", "lunch", "dinner" };
-            targetSlot = slots.FirstOrDefault(s => lower.Contains(s)) ?? "dinner";
-            var days = new[]
+            // Extract day, slot and constraint for ModifyMealPlan
+            string? targetDay = null;
+            string? targetSlot = null;
+            string? modifyConstraint = null;
+            if (intent == UserIntent.ModifyMealPlan)
             {
-                "monday",
-                "tuesday",
-                "wednesday",
-                "thursday",
-                "friday",
-                "saturday",
-                "sunday",
+                var slots = new[] { "breakfast", "lunch", "dinner" };
+                targetSlot = slots.FirstOrDefault(s => lower.Contains(s)) ?? "dinner";
+                var days = new[]
+                {
+                    "monday",
+                    "tuesday",
+                    "wednesday",
+                    "thursday",
+                    "friday",
+                    "saturday",
+                    "sunday",
+                };
+                var matched = days.FirstOrDefault(d => lower.Contains(d));
+                targetDay = matched is not null ? char.ToUpper(matched[0]) + matched[1..] : null;
+                modifyConstraint = ExtractModifyConstraint(lower);
+            }
+
+            sw.Stop();
+            _logger.LogInformation(
+                "[IntentRouter] Message='{Msg}' Intent={Intent} Layer={Layer} Time={Ms}ms",
+                message,
+                intent,
+                classifiedBy,
+                sw.ElapsedMilliseconds
+            );
+
+            var mealSlots =
+                intent == UserIntent.CreateMealPlan ? ExtractMealSlots(lower) : ["dinner"];
+
+            return new ClassifiedIntent
+            {
+                Intent = intent,
+                SearchQuery = ExtractSearchQuery(lower, intent),
+                OriginalMessage = message,
+                ExtractedProfile = extractedProfile,
+                MergedProfile = mergedProfile,
+                SessionId = sessionId,
+                TargetDay = targetDay,
+                TargetSlot = targetSlot ?? "dinner",
+                MealSlots = mealSlots,
+                ModifyConstraint = modifyConstraint,
+                DeferredIntents = [],
+                DeferredMessage = null,
+                ClassifiedBy = classifiedBy,
             };
-            var matched = days.FirstOrDefault(d => lower.Contains(d));
-            targetDay = matched is not null ? char.ToUpper(matched[0]) + matched[1..] : null;
-            modifyConstraint = ExtractModifyConstraint(lower);
         }
-
-        sw.Stop();
-        _logger.LogInformation(
-            "[IntentRouter] Message='{Msg}' Intent={Intent} Layer={Layer} Time={Ms}ms",
-            message,
-            intent,
-            classifiedBy,
-            sw.ElapsedMilliseconds
-        );
-
-        var mealSlots = intent == UserIntent.CreateMealPlan ? ExtractMealSlots(lower) : ["dinner"];
-
-        return new ClassifiedIntent
-        {
-            Intent = intent,
-            SearchQuery = ExtractSearchQuery(lower, intent),
-            OriginalMessage = message,
-            ExtractedProfile = extractedProfile,
-            MergedProfile = mergedProfile,
-            SessionId = sessionId,
-            TargetDay = targetDay,
-            TargetSlot = targetSlot ?? "dinner",
-            MealSlots = mealSlots,
-            ModifyConstraint = modifyConstraint,
-            DeferredIntents = [],
-            DeferredMessage = null,
-            ClassifiedBy = classifiedBy,
-        };
     }
 
     // ── Intent Classification ─────────────────────────────────────────────────
@@ -517,150 +521,162 @@ public class IntentRouter
         TraceContext? parentCtx = null
     )
     {
-        var spanCtx = _tracing.StartSpan(
-            parentCtx ?? TraceContext.None,
-            "intent.llm_extraction",
-            input: new { message }
-        );
-        if (!_circuitBreaker.IsAllowed())
+        using (_logger.BeginScope(new { CorrelationId = parentCtx?.CorrelationId ?? "none" }))
         {
-            _logger.LogInformation("[IntentRouter] Circuit open — skipping LLM entity extraction");
-            _tracing.EndSpan(spanCtx, statusMessage: "circuit_open");
-            return null;
-        }
-        try
-        {
-            var historyText =
-                history is not null && history.Count > 0
-                    ? string.Join("\n", history.TakeLast(6).Select(e => $"{e.Role}: {e.Content}"))
-                    : "No prior conversation.";
-
-            var knownProfile = existingProfile is null
-                ? "None"
-                : $"restrictions: [{string.Join(", ", existingProfile.Restrictions)}], "
-                    + $"allergies: [{string.Join(", ", existingProfile.Allergies)}]";
-
-            var outputFormat =
-                """{"restrictions": ["vegetarian"], "allergies": ["nuts"], "uncertain": ["healthy"], "confidence": "high"}""";
-            var emptyFormat =
-                """{"restrictions": [], "allergies": [], "uncertain": [], "confidence": "high"}""";
-
-            var prompt =
-                $"You are a dietary constraint extractor. Extract ONLY NEW dietary "
-                + $"restrictions or allergies from the conversation below that are NOT "
-                + $"already in the known profile.\n\n"
-                + $"Known profile (do NOT re-extract these): {knownProfile}\n\n"
-                + $"Conversation history:\n{historyText}\n\n"
-                + $"Current message: {message}\n\n"
-                + $"Return ONLY valid JSON, no explanation, no markdown fences:\n"
-                + $"{outputFormat}\n\n"
-                + $"Use these exact restriction names where applicable:\n"
-                + $"vegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, "
-                + $"gluten-free, dairy-free, nut-free, egg-free, soy-free\n\n"
-                + $"If nothing new was expressed, return:\n{emptyFormat}";
-            var payload = new
-            {
-                model = _chatModel,
-                stream = false,
-                messages = new[] { new { role = "user", content = prompt } },
-            };
-
-            var json = System.Text.Json.JsonSerializer.Serialize(payload);
-            var content = new System.Net.Http.StringContent(
-                json,
-                System.Text.Encoding.UTF8,
-                "application/json"
+            var spanCtx = _tracing.StartSpan(
+                parentCtx ?? TraceContext.None,
+                "intent.llm_extraction",
+                input: new { message }
             );
-
-            // 90s timeout — LLM extraction is opt-in, caller already opted in
-            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(90));
-            var response = await _httpClient.PostAsync(
-                $"{_ollamaUrl}/api/chat",
-                content,
-                cts.Token
-            );
-            response.EnsureSuccessStatusCode();
-            _circuitBreaker.RecordSuccess();
-
-            var body = await response.Content.ReadAsStringAsync();
-            using var doc = System.Text.Json.JsonDocument.Parse(body);
-            var raw =
-                doc.RootElement.GetProperty("message").GetProperty("content").GetString()
-                ?? string.Empty;
-
-            _logger.LogInformation("[IntentRouter] LLM raw response: {Raw}", raw);
-            // Strip markdown fences if present
-            raw = raw.Trim();
-            if (raw.StartsWith("```"))
-                raw = raw[(raw.IndexOf('\n') + 1)..];
-            if (raw.EndsWith("```"))
-                raw = raw[..raw.LastIndexOf("```")].Trim();
-
-            // Extract first JSON object only — LLM sometimes appends explanation after
-            var braceStart = raw.IndexOf('{');
-            var braceEnd = raw.LastIndexOf('}');
-            if (braceStart < 0 || braceEnd < 0 || braceEnd <= braceStart)
-            {
-                _logger.LogWarning("[IntentRouter] LLM response had no valid JSON object");
-                return null;
-            }
-            raw = raw[braceStart..(braceEnd + 1)];
-
-            using var result = System.Text.Json.JsonDocument.Parse(raw);
-            var root = result.RootElement;
-
-            var confidence = root.TryGetProperty("confidence", out var c) ? c.GetString() : "low";
-
-            // Low confidence → don't apply, log and return null
-            if (confidence == "low")
+            if (!_circuitBreaker.IsAllowed())
             {
                 _logger.LogInformation(
-                    "[IntentRouter] LLM extraction confidence=low — not applying"
+                    "[IntentRouter] Circuit open — skipping LLM entity extraction"
+                );
+                _tracing.EndSpan(spanCtx, statusMessage: "circuit_open");
+                return null;
+            }
+            try
+            {
+                var historyText =
+                    history is not null && history.Count > 0
+                        ? string.Join(
+                            "\n",
+                            history.TakeLast(6).Select(e => $"{e.Role}: {e.Content}")
+                        )
+                        : "No prior conversation.";
+
+                var knownProfile = existingProfile is null
+                    ? "None"
+                    : $"restrictions: [{string.Join(", ", existingProfile.Restrictions)}], "
+                        + $"allergies: [{string.Join(", ", existingProfile.Allergies)}]";
+
+                var outputFormat =
+                    """{"restrictions": ["vegetarian"], "allergies": ["nuts"], "uncertain": ["healthy"], "confidence": "high"}""";
+                var emptyFormat =
+                    """{"restrictions": [], "allergies": [], "uncertain": [], "confidence": "high"}""";
+
+                var prompt =
+                    $"You are a dietary constraint extractor. Extract ONLY NEW dietary "
+                    + $"restrictions or allergies from the conversation below that are NOT "
+                    + $"already in the known profile.\n\n"
+                    + $"Known profile (do NOT re-extract these): {knownProfile}\n\n"
+                    + $"Conversation history:\n{historyText}\n\n"
+                    + $"Current message: {message}\n\n"
+                    + $"Return ONLY valid JSON, no explanation, no markdown fences:\n"
+                    + $"{outputFormat}\n\n"
+                    + $"Use these exact restriction names where applicable:\n"
+                    + $"vegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, "
+                    + $"gluten-free, dairy-free, nut-free, egg-free, soy-free\n\n"
+                    + $"If nothing new was expressed, return:\n{emptyFormat}";
+                var payload = new
+                {
+                    model = _chatModel,
+                    stream = false,
+                    messages = new[] { new { role = "user", content = prompt } },
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(payload);
+                var content = new System.Net.Http.StringContent(
+                    json,
+                    System.Text.Encoding.UTF8,
+                    "application/json"
+                );
+
+                // 90s timeout — LLM extraction is opt-in, caller already opted in
+                using var cts = new System.Threading.CancellationTokenSource(
+                    TimeSpan.FromSeconds(90)
+                );
+                var response = await _httpClient.PostAsync(
+                    $"{_ollamaUrl}/api/chat",
+                    content,
+                    cts.Token
+                );
+                response.EnsureSuccessStatusCode();
+                _circuitBreaker.RecordSuccess();
+
+                var body = await response.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+                var raw =
+                    doc.RootElement.GetProperty("message").GetProperty("content").GetString()
+                    ?? string.Empty;
+
+                _logger.LogInformation("[IntentRouter] LLM raw response: {Raw}", raw);
+                // Strip markdown fences if present
+                raw = raw.Trim();
+                if (raw.StartsWith("```"))
+                    raw = raw[(raw.IndexOf('\n') + 1)..];
+                if (raw.EndsWith("```"))
+                    raw = raw[..raw.LastIndexOf("```")].Trim();
+
+                // Extract first JSON object only — LLM sometimes appends explanation after
+                var braceStart = raw.IndexOf('{');
+                var braceEnd = raw.LastIndexOf('}');
+                if (braceStart < 0 || braceEnd < 0 || braceEnd <= braceStart)
+                {
+                    _logger.LogWarning("[IntentRouter] LLM response had no valid JSON object");
+                    return null;
+                }
+                raw = raw[braceStart..(braceEnd + 1)];
+
+                using var result = System.Text.Json.JsonDocument.Parse(raw);
+                var root = result.RootElement;
+
+                var confidence = root.TryGetProperty("confidence", out var c)
+                    ? c.GetString()
+                    : "low";
+
+                // Low confidence → don't apply, log and return null
+                if (confidence == "low")
+                {
+                    _logger.LogInformation(
+                        "[IntentRouter] LLM extraction confidence=low — not applying"
+                    );
+                    return null;
+                }
+
+                var restrictions = root.TryGetProperty("restrictions", out var r)
+                    ? r.EnumerateArray()
+                        .Select(x => x.GetString()!)
+                        .Where(s => !string.IsNullOrEmpty(s))
+                        .ToList()
+                    : new List<string>();
+
+                var allergies = root.TryGetProperty("allergies", out var a)
+                    ? a.EnumerateArray()
+                        .Select(x => x.GetString()!)
+                        .Where(s => !string.IsNullOrEmpty(s))
+                        .ToList()
+                    : new List<string>();
+
+                _tracing.EndSpan(
+                    spanCtx,
+                    output: new { restrictions = restrictions, allergies = allergies }
+                );
+
+                if (restrictions.Count == 0 && allergies.Count == 0)
+                    return null;
+
+                return new DietaryProfile { Restrictions = restrictions, Allergies = allergies };
+            }
+            catch (OperationCanceledException)
+            {
+                _circuitBreaker.RecordFailure();
+                _logger.LogWarning(
+                    "[IntentRouter] LLM entity extraction timed out — proceeding without"
                 );
                 return null;
             }
-
-            var restrictions = root.TryGetProperty("restrictions", out var r)
-                ? r.EnumerateArray()
-                    .Select(x => x.GetString()!)
-                    .Where(s => !string.IsNullOrEmpty(s))
-                    .ToList()
-                : new List<string>();
-
-            var allergies = root.TryGetProperty("allergies", out var a)
-                ? a.EnumerateArray()
-                    .Select(x => x.GetString()!)
-                    .Where(s => !string.IsNullOrEmpty(s))
-                    .ToList()
-                : new List<string>();
-
-            _tracing.EndSpan(
-                spanCtx,
-                output: new { restrictions = restrictions, allergies = allergies }
-            );
-
-            if (restrictions.Count == 0 && allergies.Count == 0)
+            catch (Exception ex)
+            {
+                _circuitBreaker.RecordFailure();
+                _tracing.EndSpan(spanCtx, statusMessage: "error");
+                _logger.LogWarning(
+                    ex,
+                    "[IntentRouter] LLM entity extraction failed — proceeding without"
+                );
                 return null;
-
-            return new DietaryProfile { Restrictions = restrictions, Allergies = allergies };
-        }
-        catch (OperationCanceledException)
-        {
-            _circuitBreaker.RecordFailure();
-            _logger.LogWarning(
-                "[IntentRouter] LLM entity extraction timed out — proceeding without"
-            );
-            return null;
-        }
-        catch (Exception ex)
-        {
-            _circuitBreaker.RecordFailure();
-            _tracing.EndSpan(spanCtx, statusMessage: "error");
-            _logger.LogWarning(
-                ex,
-                "[IntentRouter] LLM entity extraction failed — proceeding without"
-            );
-            return null;
+            }
         }
     }
 
