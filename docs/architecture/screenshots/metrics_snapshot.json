@@ -1,0 +1,22 @@
+{
+  "windowMinutes": 5,
+  "requestsTotal": 13,
+  "requestsCompleted": 11,
+  "requestsBlocked": 2,
+  "requestsByIntent": {
+    "SearchRecipe": 6,
+    "GeneralQuestion": 1,
+    "CreateMealPlan": 1,
+    "GetMealPlan": 1,
+    "ModifyMealPlan": 1,
+    "ValidateDiet": 1
+  },
+  "latency": {
+    "p50Ms": 101,
+    "p95Ms": 14326,
+    "p99Ms": 14326,
+    "minMs": 12,
+    "maxMs": 14326,
+    "meanMs": 2356
+  }
+}

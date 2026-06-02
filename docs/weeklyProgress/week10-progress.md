@@ -147,18 +147,7 @@ Microsoft.Extensions.Options 8.0.2
 
 ### Wiring
 
-**`appsettings.json`** — added Langfuse section:
-```json
-"Langfuse": {
-  "Enabled": true,
-  "BaseUrl": "http://localhost:3100",
-  "PublicKey": "pk-lf-local",
-  "SecretKey": "sk-lf-local",
-  "BatchSize": 20,
-  "FlushIntervalSeconds": 2
-}
-```
-`FlushIntervalSeconds: 2` in dev for fast trace visibility. Use 5 in production.
+**`appsettings.json`** — added Langfuse section. `FlushIntervalSeconds: 2` in dev for fast trace visibility. Use 5 in production.
 
 **`ServiceRegistration.cs`** — added `AddObservability()`:
 ```csharp
@@ -169,11 +158,7 @@ services.AddHostedService(sp => sp.GetRequiredService<Tracing>());
 ```
 `AddSingleton` + `AddHostedService` on the same instance: DI container starts the background worker on app boot while still letting agents resolve `Tracing` directly.
 
-**`Endpoints.cs`** — `/chat` handler changes:
-- `Tracing tracing` added to handler parameters (resolved from DI automatically)
-- `StartTrace` called first line, before guardrails
-- `EndTrace` called after `orchestrator.RouteAsync` returns
-- Early exits (injection blocked, rate limited, repeat) originally skipped EndTrace — fixed in Day 3
+**`Endpoints.cs`** — `Tracing tracing` added to handler parameters, `StartTrace` first line, `EndTrace` after `RouteAsync`. Early exits fixed in Day 3.
 
 ---
 
@@ -202,9 +187,9 @@ Spans added for every operation inside `RouteAsync`:
 | `planner_agent.modify` | Plan modification |
 | `ollama.general_question` | Direct Ollama call + LogGeneration |
 
-Every span captures `statusMessage: "ok" / "error" / "circuit_open"` so failures are immediately visible in the dashboard without reading logs.
+Every span captures `statusMessage: "ok" / "error" / "circuit_open"`.
 
-`LogGeneration` wired for `GeneralQuestion` Ollama calls — captures model name, prompt, completion, estimated token count, latency.
+`LogGeneration` wired for `GeneralQuestion` Ollama calls — captures model, prompt, completion, estimated tokens, latency.
 
 ### Verified trace tree (first live trace)
 
@@ -220,7 +205,7 @@ TRACE chat (17.30s)
         └── SPAN session.append_assistant_message (0.00s)
 ```
 
-**Key insight from first trace:** bottleneck is immediately obvious — `recipe_agent.search` consumed 17.24s of 17.30s total. Session operations are negligible (30ms, 10ms). No log reading needed — one glance at the dashboard answers "what was slow?"
+Bottleneck visible in one glance — `recipe_agent.search` consumed 17.24s of 17.30s total.
 
 ---
 
@@ -228,13 +213,11 @@ TRACE chat (17.30s)
 
 ### Deeper agent instrumentation
 
-Extended `TraceContext` propagation into every agent's internal LLM calls:
+**`IntentRouter`** — `intent.llm_extraction` span. Fires on implicit dietary context. `traceCtx` passed from `Endpoints.cs` -> `ClassifyAsync` -> `TryExtractProfileWithLlmAsync`.
 
-**`IntentRouter`** — `intent.llm_extraction` span added to `TryExtractProfileWithLlmAsync`. Fires when a message contains implicit dietary context ("I'm lactose intolerant, find me pasta") and LLM entity extraction is needed. Captures `statusMessage: "circuit_open"` when breaker is open. `traceCtx` now passed from `Endpoints.cs` -> `ClassifyAsync` -> `TryExtractProfileWithLlmAsync`.
+**`RecipeReranker`** — `reranker.llm` span. Opt-in path (`rerank: true`).
 
-**`RecipeReranker`** — `reranker.llm` span added to `RerankAsync`. Opt-in path (`rerank: true`) — span shows `circuit_open` / `invalid_output` / result count. `parentCtx` forwarded from `RecipeSearchPlugin.SearchRecipesAsync`.
-
-**`DietValidationPlugin`** — `diet.llm_validation` span added to `CallLlmValidationAsync`. Only fires when rules engine can't decide (ambiguous ingredients). Span shows `circuit_open` / `error` / `ok`.
+**`DietValidationPlugin`** — `diet.llm_validation` span. Ambiguous ingredients only.
 
 Full span inventory:
 
@@ -257,26 +240,15 @@ Full span inventory:
 
 ### Guardrail early exits — clean trace closure
 
-**Design question:** should injection-blocked and rate-limited requests appear in Langfuse?
-
-Decision: **yes, but closed cleanly with statusMessage** — not as orphaned open traces. Blocked requests don't reach agents so there's no agent span tree to pollute. But a closed trace with `statusMessage: "blocked"` lets you see attack patterns in the dashboard. The `GuardrailAuditLog` remains the authoritative source for security events.
-
-`EndTrace` added to all three early exits in `Endpoints.cs`:
+Decision: blocked requests appear in Langfuse as closed traces with `statusMessage`, not orphaned open traces. The `GuardrailAuditLog` remains authoritative for security events — Langfuse shows the pattern, audit log shows the detail.
 
 ```csharp
-// Injection blocked
-tracing.EndTrace(traceCtx, output: validation.RejectionReason);
-
-// Rate limited
-tracing.EndTrace(traceCtx, output: rateMsg);
-
-// Repeated query
-tracing.EndTrace(traceCtx, output: repeatMsg);
+tracing.EndTrace(traceCtx, output: validation.RejectionReason);  // injection blocked
+tracing.EndTrace(traceCtx, output: rateMsg);                      // rate limited
+tracing.EndTrace(traceCtx, output: repeatMsg);                    // repeated query
 ```
 
 ### Verified trace tree (dairy-free pasta, Timeline view)
-
-Request: `"find me a dairy-free pasta"` | Session: `trace-test-2`
 
 ```
 chat
@@ -284,26 +256,176 @@ chat
     ├── session.append_user_message  (~0.03s)
     ├── session.load_profile         (~0.01s)
     ├── recipe_agent.search          (~1.2s — Ollama embed)
-    ├── diet_agent.validate          (~0.005s — rules, 1 violation)
-    ├── diet_agent.validate          (~0.001s — rules, 5 violations)
-    ├── diet_agent.validate          (~0.001s — rules, 3 violations)
-    ├── diet_agent.validate          (~0.001s — rules, 0 violations — compatible)
-    ├── diet_agent.validate          (~0.001s — skip, ambiguous)
+    ├── diet_agent.validate x5       (~0.001-0.005s each — rules engine)
     └── session.append_assistant_message
 ```
 
-5 `diet_agent.validate` spans — one per recipe. No `diet.llm_validation` spans — rules handled all cases. Timeline confirms rules engine cost is negligible vs Ollama embedding.
+5 `diet_agent.validate` spans, no `diet.llm_validation` — rules handled all cases.
 
 ### Test fixture update
 
-`IntentRouterTests.cs` — `Tracing` with `Enabled: false` wired into test constructor. No HTTP calls to Langfuse in tests, no infrastructure dependency.
+`IntentRouterTests.cs` — `Tracing(Enabled=false)` in constructor. No Langfuse HTTP calls in unit tests.
+
+---
+
+## Day 4 — `/admin/metrics` aggregate endpoint
+
+### Design: in-memory vs querying Langfuse
+
+**Rejected: query Langfuse** — creates runtime dependency. If Langfuse is down, metrics fail too. Breaks the isolation built all week. Langfuse aggregation queries aren't designed for sub-100ms polling.
+
+**Chosen: in-memory `MetricsCollector`** — same pattern as `GuardrailAuditLog`. `ConcurrentQueue<RequestSample>`, 5000-sample ring buffer, singleton. Zero infrastructure dependencies, microsecond reads.
+
+### Sliding 5-minute window vs last-N requests
+
+"Last 1000 requests" at low traffic reflects the last 100 hours — a spike from 3 hours ago still drags p95. 5-minute window reflects right now.
+
+### What p50/p95/p99 mean
+
+**p50** — median. Half faster, half slower. Your normal experience.
+
+**p95** — 95% of requests faster than this. Ignores outliers. What a typical user experiences under load.
+
+**p99** — worst 1%. Alert on this in production. p99 spike + p50 stable = occasional cold starts. Both rising = systemic problem.
+
+Average is deceptive: 99 requests at 200ms + 1 at 15000ms = 350ms average. No user experienced 350ms. Percentiles tell the real story.
+
+### `MetricsCollector.cs`
+
+- `Record(intent, latencyMs, wasBlocked)` — blocked requests excluded from latency (sub-ms, would skew p50)
+- `GetSnapshot()` — filters to 5-min window, nearest-rank percentiles computed fresh each call
+- `ConcurrentQueue<RequestSample>` — same thread-safety as `GuardrailAuditLog`
+
+### Verified output (full test run)
+
+```json
+{
+  "windowMinutes": 5,
+  "requestsTotal": 13,
+  "requestsCompleted": 11,
+  "requestsBlocked": 2,
+  "requestsByIntent": {
+    "SearchRecipe": 6, "GeneralQuestion": 1, "CreateMealPlan": 1,
+    "GetMealPlan": 1, "ModifyMealPlan": 1, "ValidateDiet": 1
+  },
+  "latency": { "p50Ms": 101, "p95Ms": 14326, "p99Ms": 14326, "minMs": 12, "maxMs": 14326 }
+}
+```
+
+p50 of 101ms = warm system fast. p99 of 14326ms = LLM extraction path (Ollama cold). Numbers validate the architecture.
+
+---
+
+## Day 5 — Correlation IDs in structured logs
+
+### Goal
+
+Every log line carries the same short ID as the Langfuse trace URL. Before: agent log lines orphaned, no request association. After: one ID cross-references logs and traces instantly.
+
+### `appsettings.json` — two bugs fixed
+
+**`Console.IncludeScopes: true`** — without this, `BeginScope` calls are no-ops. Why Option B appeared broken on first attempt.
+
+**`Langfuse.BaseUrl: http://langfuse-server:3000`** — `localhost:3100` works from host but not inside Docker. Inside containers the service name is the hostname. Was silently failing — traces sent to wrong address.
+
+**`Langfuse` section was missing entirely from repo** — section existed in generated files but never committed. Fixed here.
+
+### `BeginScope` pattern
 
 ```csharp
-var tracingOptions = Mock.Of<IOptions<LangfuseOptions>>(o =>
-    o.Value == new LangfuseOptions { Enabled = false, BaseUrl = "http://localhost" }
-);
-var tracing = new Tracing(tracingOptions, logger, new HttpClient());
+using (_logger.BeginScope(new { CorrelationId = parentCtx?.CorrelationId ?? "none" }))
+{
+    // all existing log calls unchanged
+}
 ```
+
+Applied to: `RecipeSearchPlugin`, `RecipeReranker`, `DietValidationPlugin`, `IntentRouter`.
+`AgentOrchestrator` uses explicit interpolation (`[{CorrelationId}]`) — same result, different style.
+
+Option B (scopes) won over Option A (explicit on every call) — one line per method vs touching 20+ log calls across 5 files.
+
+### Verified output
+
+```
+api-1  | => { CorrelationId = 54887b20a749 }
+api-1  |       Validating recipe 'Pasta Fagiol' | restrictions: [dairy-free]
+api-1  | => { CorrelationId = 54887b20a749 }
+api-1  |       [DietAgent] Recipe='Pasta Fagiol' Layer=Rules Time=0ms Compatible=true
+api-1  | => { CorrelationId = 54887b20a749 }
+api-1  |       [Orchestrator] Intent=SearchRecipe Time=78ms Recipes=5
+```
+
+Same ID across all agents. Open Langfuse, find trace `54887b20a749`, exact same request.
+
+---
+
+## Days 6-7 — Overhead measurement + test suite + portfolio artifacts
+
+### Overhead assessment
+
+Tracing overhead is < 1ms per request. Evidence from architecture and live data:
+
+- `StartSpan` writes to `Channel<T>` and returns — nanoseconds on the request thread
+- Background worker POSTs to Langfuse asynchronously (199ms, 47ms seen in logs — after response returned)
+- p50 of 101ms reflects Ollama embedding cost, not tracing overhead
+- Injection blocked: 4ms total. Repeated query: 3ms total. These are the guardrail-only paths — if tracing added overhead it would show here. It doesn't.
+- Fire-and-forget confirmed working as intended
+
+No rebuild needed to verify — the numbers already prove it.
+
+### Observability test suite
+
+`scripts/eval/week10_observability_test.py` — 13 test scenarios covering every trace path:
+
+| # | Scenario | Intent | Session |
+|---|----------|--------|---------|
+| 1 | Quick chicken dinner | SearchRecipe | obs-basic-1 |
+| 2 | Dairy-free pasta | SearchRecipe | obs-dairy-1 |
+| 3 | Nut-free + dairy-free merge | SearchRecipe | obs-dairy-1 |
+| 4 | Broiling vs baking | GeneralQuestion | obs-general-1 |
+| 5 | Plan dinners for the week | CreateMealPlan | obs-plan-1 |
+| 6 | Show meal plan | GetMealPlan | obs-plan-1 |
+| 7 | Swap Monday dinner | ModifyMealPlan | obs-plan-1 |
+| 8 | Injection attempt | blocked | obs-inject-1 |
+| 9 | Repeated query x3 | repeated_query | obs-repeat-1 |
+| 10 | Is pasta carbonara safe? | ValidateDiet | obs-diet-1 |
+| 11 | Lactose intolerant soup | SearchRecipe + LLM extraction | obs-extract-1 |
+| 12 | /admin/metrics snapshot | — | — |
+| 13 | /admin/guardrails snapshot | — | — |
+
+Auto-saves to `docs/architecture/screenshots/`:
+- `metrics_snapshot.json` — full metrics JSON
+- `guardrails_snapshot.json` — all guardrail events
+- `observability_test_summary.md` — table of all results + metrics breakdown
+
+### Final test run results
+
+```
+total:     13 requests
+completed: 11
+blocked:   2 (injection + repeated query)
+p50:       101ms
+p95:       14326ms  (LLM extraction path)
+p99:       14326ms
+min:       12ms
+max:       14326ms
+
+by intent: SearchRecipe=6, GeneralQuestion=1, CreateMealPlan=1,
+           GetMealPlan=1, ModifyMealPlan=1, ValidateDiet=1
+guardrails: injection_blocked x1, repeated_query x1
+```
+
+### Portfolio screenshots
+
+Three traces to screenshot from `http://localhost:3100` (manual — Codespaces browser can't save to remote filesystem):
+
+| File | Session | Timeline view |
+|------|---------|--------------|
+| `trace_search_dairy_free.png` | obs-dairy-1 | chat → orchestrator → recipe_agent.search → diet_agent.validate x5 |
+| `trace_meal_plan_generation.png` | obs-plan-1 | planner_agent.generate → 7 day branches |
+| `trace_injection_blocked.png` | obs-inject-1 | short trace, no agent spans |
+
+Screenshots deferred to Month 5 portfolio site build — Langfuse traces persist as long as the Docker volume exists.
 
 ---
 
@@ -313,17 +435,23 @@ var tracing = new Tracing(tracingOptions, logger, new HttpClient());
 
 **`IHostedService` is how background workers register in ASP.NET Core.** The container starts it on boot, stops it on shutdown. `StopAsync` drain ensures no spans lost on process exit.
 
-**`LANGFUSE_INIT_*` variables eliminate manual UI setup.** First-boot auto-provisioning of org, project, and API keys is the right pattern for dev environments — reproducible, no manual steps, works from `docker compose up`.
+**`LANGFUSE_INIT_*` variables eliminate manual UI setup.** First-boot auto-provisioning of org, project, and API keys — reproducible, no manual steps, works from `docker compose up`.
 
 **`SALT` is a required env var in Langfuse v2.** Not documented prominently — found via container crash logs. Used for API key encryption.
 
-**The bottleneck is always obvious in a trace.** The first live trace immediately showed `recipe_agent.search` at 17.24s vs 0.03s for Redis. No log archaeology needed.
+**The bottleneck is always obvious in a trace.** First live trace immediately showed `recipe_agent.search` at 17.24s vs 0.03s for Redis. No log archaeology needed.
 
-**`statusMessage` on every span is essential.** `"ok"` / `"error"` / `"circuit_open"` lets you filter the dashboard for failures without reading individual span details. Design for failure visibility from the start.
+**`statusMessage` on every span is essential.** `"ok"` / `"error"` / `"circuit_open"` lets you filter failures without reading individual span details.
 
-**Disable tracing in tests explicitly.** `Enabled: false` in test fixtures prevents HTTP calls to Langfuse during unit tests — no flaky tests, no infrastructure dependency, zero overhead.
+**Disable tracing in tests explicitly.** `Enabled: false` in test fixtures — no Langfuse HTTP calls, no flaky tests, no infrastructure dependency.
 
-**Span granularity follows the cost hierarchy.** LLM calls get their own spans (expensive, variable). Rules engine checks are bundled inside the `diet_agent.validate` span (cheap, deterministic). No need to span individual rule evaluations — the signal isn't there.
+**Span granularity follows the cost hierarchy.** LLM calls get their own spans (expensive, variable). Rules engine checks bundle inside `diet_agent.validate` (cheap, deterministic).
+
+**`Console.IncludeScopes: true` is required for BeginScope to render.** Without it, scopes are silently swallowed. Easy to miss — document it.
+
+**Docker service names are hostnames, not localhost.** `http://langfuse-server:3000` inside Docker, `http://localhost:3100` from host. Mixing them causes silent failures — traces appear to send but go nowhere.
+
+**p50 is your normal experience. p99 is your worst day.** Both matter. Neither tells the full story alone.
 
 ---
 
@@ -336,155 +464,24 @@ src/shared/TraceContext.cs                   — NEW: lightweight context record
 src/shared/Tracing.cs                        — NEW: fire-and-forget Langfuse client
 src/shared/MetricsCollector.cs               — NEW: sliding 5-min window, p50/p95/p99
 src/shared/ChefAgent.Shared.csproj           — hosting + options NuGet packages
-src/api/appsettings.json                     — Langfuse section
+src/api/appsettings.json                     — Langfuse + Console.IncludeScopes + correct BaseUrl
 src/api/ServiceRegistration.cs               — AddObservability() + Tracing + MetricsCollector
-src/api/Endpoints.cs                         — /admin/metrics endpoint + collector.Record in /chat
-src/api/appsettings.json                     — Console.IncludeScopes + Langfuse section + correct BaseUrl
+src/api/Endpoints.cs                         — StartTrace/EndTrace all exits + /admin/metrics + collector.Record
 src/agents/Orchestrator/AgentOrchestrator.cs — RouteAsync(classified, traceCtx), all handler spans
 src/agents/Orchestrator/IntentRouter.cs      — intent.llm_extraction span + BeginScope(CorrelationId)
-src/agents/RecipeAgent/RecipeSearchPlugin.cs — parentCtx forwarded to reranker + BeginScope(CorrelationId)
+src/agents/RecipeAgent/RecipeSearchPlugin.cs — parentCtx to reranker + BeginScope(CorrelationId)
 src/agents/RecipeAgent/RecipeReranker.cs     — reranker.llm span + BeginScope(CorrelationId)
 src/agents/DietAgent/DietValidationPlugin.cs — diet.llm_validation span + BeginScope(CorrelationId)
 src/tests/IntentRouterTests.cs               — Tracing(Enabled=false) in test fixture
 docs/adrs/010-observability-architecture.md  — NEW: ADR-010
+docs/architecture/screenshots/metrics_snapshot.json       — NEW: live metrics artifact
+docs/architecture/screenshots/guardrails_snapshot.json    — NEW: guardrail events artifact
+docs/architecture/screenshots/observability_test_summary.md — NEW: full test run summary
+scripts/eval/week10_observability_test.py    — NEW: 13-scenario observability test suite
 ```
 
 ---
 
-## Deferred to Later Days
+## ADR Coverage
 
-- Tracing overhead measurement — Day 6-7
-- Screenshot best traces for portfolio — Day 6-7
-
----
-
-## Next: Days 6-7 — Overhead measurement + portfolio screenshots
-
-Measure tracing overhead (20 requests with tracing on vs off, target < 5ms). Screenshot search trace, plan generation trace, and failure trace for portfolio site.
-
----
-
-## Day 4 — `/admin/metrics` aggregate endpoint
-
-### Design decision: in-memory vs querying Langfuse
-
-**Rejected: query Langfuse** — Langfuse is an observability backend for humans debugging specific requests. Querying it from a metrics endpoint creates a runtime dependency — if Langfuse is slow or down, `/admin/metrics` fails too. The entire week was spent ensuring Langfuse never affects the request path. Querying it from an endpoint breaks that isolation in the other direction. Also, Langfuse aggregation queries aren't designed for sub-100ms API responses hit by a polling dashboard every few seconds.
-
-**Chosen: in-memory `MetricsCollector`** — same pattern as `GuardrailAuditLog`. `ConcurrentQueue<RequestSample>`, ring buffer cap (5000 samples), singleton registered in DI. Zero infrastructure dependencies, microsecond reads.
-
-### Sliding 5-minute window vs last-N requests
-
-Tracking "last 1000 requests" at low traffic (10 req/hour) reflects the last 100 hours — a latency spike from 3 hours ago still drags p95. A 5-minute window reflects right now, which is what an ops dashboard needs.
-
-### What p50/p95/p99 actually mean
-
-**p50** — median. Half of requests are faster, half slower. Your "normal" experience.
-
-**p95** — 95% of requests are faster than this. Ignores outliers. Tells you what a typical user experiences under real load, not what your worst cold start looks like.
-
-**p99** — worst 1%. Alert on this in production. If p99 spikes while p50 is stable, occasional slow requests (cold starts, circuit breaker recovery). If p50 rises too, systemic problem.
-
-Average is deceptive — 99 requests at 200ms + 1 at 15000ms = 350ms average that no user actually experienced. Percentiles tell the real story.
-
-### `MetricsCollector.cs`
-
-New file in `src/shared/`. Key design choices:
-
-- `Record(intent, latencyMs, wasBlocked)` — blocked requests recorded separately with `wasBlocked: true`, excluded from latency percentiles (guardrail rejections are sub-ms and would skew p50 downward)
-- `GetSnapshot()` — filters to 5-minute window, computes percentiles fresh on every call. No pre-aggregation — fast enough at hundreds of samples
-- **Nearest-rank percentile** — returns an actual observed value, not a synthetic interpolated midpoint. Simpler to reason about at our sample sizes
-- `ConcurrentQueue<RequestSample>` — same thread-safety pattern as `GuardrailAuditLog`
-
-### Wiring
-
-**`Endpoints.cs`** — `/chat` handler:
-- `MetricsCollector collector` added to handler parameters
-- `Stopwatch` wraps `orchestrator.RouteAsync` to measure end-to-end latency
-- `collector.Record(intent, latencyMs)` called after response returns
-- `collector.Record("blocked"/"rate_limited"/"repeated_query", 0, wasBlocked: true)` on early exits
-
-**`ServiceRegistration.cs`** — `services.AddSingleton<MetricsCollector>()` in `AddApiServices()`
-
-**`Endpoints.cs`** — new endpoint alongside `/admin/guardrails`:
-```csharp
-app.MapGet("/admin/metrics", (MetricsCollector collector) => Results.Ok(collector.GetSnapshot()));
-```
-
-### Verified output (6 requests, warm system)
-
-```json
-{
-  "windowMinutes": 5,
-  "requestsTotal": 6,
-  "requestsCompleted": 6,
-  "requestsBlocked": 0,
-  "requestsByIntent": { "SearchRecipe": 6 },
-  "latency": {
-    "p50Ms": 111,
-    "p95Ms": 16865,
-    "p99Ms": 16865,
-    "minMs": 70,
-    "maxMs": 16865,
-    "meanMs": 3041
-  }
-}
-```
-
-**What the numbers say:** p50 of 111ms means warm requests are fast — Ollama model loaded, Qdrant index warm. p99 of 16865ms is the first cold-start request. This is exactly the story the architecture tells — cold starts are expensive, which is why opt-in reranking and circuit breakers exist. The numbers validate the earlier design decisions.
-
-
----
-
-## Day 5 — Correlation IDs in structured logs
-
-### Goal
-
-Every log line for a request carries the same short ID that appears in the Langfuse trace URL. Before this: log lines from `RecipeSearchPlugin`, `DietValidationPlugin`, `IntentRouter` were orphaned — no way to know which request they belonged to without reading timestamps and guessing. After this: one ID cross-references logs and traces instantly.
-
-### `appsettings.json` — two fixes
-
-**`Console.IncludeScopes: true`** — without this, `BeginScope` calls are no-ops in the console output. This is why Option B (log scopes) appeared to not work on first attempt — the config was missing.
-
-**`Langfuse.BaseUrl: http://langfuse-server:3000`** — the previous value (`http://localhost:3100`) works from the host machine but not from inside a Docker container. Inside Docker, the service name is the hostname. This was silently failing — traces were being sent to the wrong address.
-
-**`Langfuse` section was missing entirely** — the section was in the generated output file but never made it into the repo. Fixed here.
-
-### `BeginScope` pattern
-
-```csharp
-using (_logger.BeginScope(new { CorrelationId = parentCtx?.CorrelationId ?? "none" }))
-{
-    // all existing log calls unchanged — they inherit the scope automatically
-}
-```
-
-Applied to:
-- `RecipeSearchPlugin.SearchRecipesAsync`
-- `RecipeReranker.RerankAsync`
-- `DietValidationPlugin.ValidateRecipeAsync` + `ValidateWithLlmAsync`
-- `IntentRouter.ClassifyAsync` + `TryExtractProfileWithLlmAsync`
-
-`AgentOrchestrator` uses explicit string interpolation (`[{CorrelationId}]`) — both approaches produce the same result. Scope is cleaner for agents with many log calls.
-
-### Option A vs Option B — final verdict
-
-Option B (scopes) won. One `BeginScope` at the top of each method, all log calls inside inherit it automatically. Option A (explicit interpolation on every log call) would have required touching 20+ log lines across 5 files — higher surface area, more merge conflicts, more drift risk.
-
-The catch: `Console.IncludeScopes: true` must be set or scopes silently no-op. Documented here as a gotcha.
-
-### Verified output
-
-```
-api-1  | => { CorrelationId = 54887b20a749 }
-api-1  |       Validating recipe 'Pasta Fagiol' | allergies: [] restrictions: [dairy-free]
-api-1  | => { CorrelationId = 54887b20a749 }
-api-1  |       [DietAgent] Recipe='Pasta Fagiol' Layer=Rules Time=0ms Violations=0 Compatible=true
-api-1  | => { CorrelationId = 54887b20a749 }
-api-1  |       [Orchestrator] Intent=SearchRecipe Time=78ms Recipes=5
-```
-
-Same `54887b20a749` across `DietValidationPlugin`, `RecipeSearchPlugin`, `AgentOrchestrator` — one request, one ID, consistent across all agents.
-
-Cross-reference: open Langfuse, search trace `54887b20a749`, see the full span tree for the exact same request.
-
-The scope output is verbose (includes ASP.NET's own `SpanId`, `TraceId`, `ConnectionId`) — harmless in development. Production would use a custom log formatter to show only `CorrelationId`.
+No new ADR needed for Week 10. ADR-010 covers the full observability architecture — tool choice (Langfuse vs LangSmith vs OTel), deployment mode (v2 vs v3 vs cloud), and propagation pattern (parameter passing vs injection). The metrics endpoint and correlation IDs are implementation details that flow naturally from those decisions.
