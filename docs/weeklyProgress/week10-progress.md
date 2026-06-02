@@ -339,11 +339,12 @@ src/shared/ChefAgent.Shared.csproj           — hosting + options NuGet package
 src/api/appsettings.json                     — Langfuse section
 src/api/ServiceRegistration.cs               — AddObservability() + Tracing + MetricsCollector
 src/api/Endpoints.cs                         — /admin/metrics endpoint + collector.Record in /chat
+src/api/appsettings.json                     — Console.IncludeScopes + Langfuse section + correct BaseUrl
 src/agents/Orchestrator/AgentOrchestrator.cs — RouteAsync(classified, traceCtx), all handler spans
-src/agents/Orchestrator/IntentRouter.cs      — intent.llm_extraction span, traceCtx param
-src/agents/RecipeAgent/RecipeSearchPlugin.cs — parentCtx forwarded to reranker
-src/agents/RecipeAgent/RecipeReranker.cs     — reranker.llm span
-src/agents/DietAgent/DietValidationPlugin.cs — diet.llm_validation span
+src/agents/Orchestrator/IntentRouter.cs      — intent.llm_extraction span + BeginScope(CorrelationId)
+src/agents/RecipeAgent/RecipeSearchPlugin.cs — parentCtx forwarded to reranker + BeginScope(CorrelationId)
+src/agents/RecipeAgent/RecipeReranker.cs     — reranker.llm span + BeginScope(CorrelationId)
+src/agents/DietAgent/DietValidationPlugin.cs — diet.llm_validation span + BeginScope(CorrelationId)
 src/tests/IntentRouterTests.cs               — Tracing(Enabled=false) in test fixture
 docs/adrs/010-observability-architecture.md  — NEW: ADR-010
 ```
@@ -357,9 +358,9 @@ docs/adrs/010-observability-architecture.md  — NEW: ADR-010
 
 ---
 
-## Next: Day 5 — Correlation IDs in structured logs
+## Next: Days 6-7 — Overhead measurement + portfolio screenshots
 
-Add correlation ID to every log line so logs and Langfuse traces are cross-referenceable. Format: `[corr:a8f3b2c1d4e5]` prefix on all agent log messages.
+Measure tracing overhead (20 requests with tracing on vs off, target < 5ms). Screenshot search trace, plan generation trace, and failure trace for portfolio site.
 
 ---
 
@@ -430,3 +431,60 @@ app.MapGet("/admin/metrics", (MetricsCollector collector) => Results.Ok(collecto
 ```
 
 **What the numbers say:** p50 of 111ms means warm requests are fast — Ollama model loaded, Qdrant index warm. p99 of 16865ms is the first cold-start request. This is exactly the story the architecture tells — cold starts are expensive, which is why opt-in reranking and circuit breakers exist. The numbers validate the earlier design decisions.
+
+
+---
+
+## Day 5 — Correlation IDs in structured logs
+
+### Goal
+
+Every log line for a request carries the same short ID that appears in the Langfuse trace URL. Before this: log lines from `RecipeSearchPlugin`, `DietValidationPlugin`, `IntentRouter` were orphaned — no way to know which request they belonged to without reading timestamps and guessing. After this: one ID cross-references logs and traces instantly.
+
+### `appsettings.json` — two fixes
+
+**`Console.IncludeScopes: true`** — without this, `BeginScope` calls are no-ops in the console output. This is why Option B (log scopes) appeared to not work on first attempt — the config was missing.
+
+**`Langfuse.BaseUrl: http://langfuse-server:3000`** — the previous value (`http://localhost:3100`) works from the host machine but not from inside a Docker container. Inside Docker, the service name is the hostname. This was silently failing — traces were being sent to the wrong address.
+
+**`Langfuse` section was missing entirely** — the section was in the generated output file but never made it into the repo. Fixed here.
+
+### `BeginScope` pattern
+
+```csharp
+using (_logger.BeginScope(new { CorrelationId = parentCtx?.CorrelationId ?? "none" }))
+{
+    // all existing log calls unchanged — they inherit the scope automatically
+}
+```
+
+Applied to:
+- `RecipeSearchPlugin.SearchRecipesAsync`
+- `RecipeReranker.RerankAsync`
+- `DietValidationPlugin.ValidateRecipeAsync` + `ValidateWithLlmAsync`
+- `IntentRouter.ClassifyAsync` + `TryExtractProfileWithLlmAsync`
+
+`AgentOrchestrator` uses explicit string interpolation (`[{CorrelationId}]`) — both approaches produce the same result. Scope is cleaner for agents with many log calls.
+
+### Option A vs Option B — final verdict
+
+Option B (scopes) won. One `BeginScope` at the top of each method, all log calls inside inherit it automatically. Option A (explicit interpolation on every log call) would have required touching 20+ log lines across 5 files — higher surface area, more merge conflicts, more drift risk.
+
+The catch: `Console.IncludeScopes: true` must be set or scopes silently no-op. Documented here as a gotcha.
+
+### Verified output
+
+```
+api-1  | => { CorrelationId = 54887b20a749 }
+api-1  |       Validating recipe 'Pasta Fagiol' | allergies: [] restrictions: [dairy-free]
+api-1  | => { CorrelationId = 54887b20a749 }
+api-1  |       [DietAgent] Recipe='Pasta Fagiol' Layer=Rules Time=0ms Violations=0 Compatible=true
+api-1  | => { CorrelationId = 54887b20a749 }
+api-1  |       [Orchestrator] Intent=SearchRecipe Time=78ms Recipes=5
+```
+
+Same `54887b20a749` across `DietValidationPlugin`, `RecipeSearchPlugin`, `AgentOrchestrator` — one request, one ID, consistent across all agents.
+
+Cross-reference: open Langfuse, search trace `54887b20a749`, see the full span tree for the exact same request.
+
+The scope output is verbose (includes ASP.NET's own `SpanId`, `TraceId`, `ConnectionId`) — harmless in development. Production would use a custom log formatter to show only `CorrelationId`.
