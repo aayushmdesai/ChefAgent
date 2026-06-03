@@ -18,6 +18,8 @@ Items are ordered within each section by priority (High → Low).
 | I-5 | "pasta without dairy" classified as ValidateDiet, not SearchRecipe — "without X" is ambiguous             | Week 8 Day 2, TC05            | Low      | Month 3 |
 | I-6 | "hello" / greetings classified as SearchRecipe — no greeting/small-talk signals in IntentRouter           | Week 8 Day 1 TC35, Day 2 TC50 | Low      | Month 3 |
 | I-7 | "whats on monday?" → GeneralQuestion, not GetMealPlan — day-specific plan queries not handled             | Week 8 Day 2, TC25            | Low      | Month 3 |
+| I-8 | Question-form ValidateDiet not recognized — "is X vegan?", "can Z eat X?", "is X safe for Y?" all classified as SearchRecipe | Week 11 E2E eval, cases 25/28/29/30/55/56 | Medium | Month 4 |
+| I-9 | "plan dinners for the week, I'm dairy-free" → SearchRecipe — CreateMealPlan rules don't handle dietary constraint appended to plan phrase | Week 11 E2E eval, case 31 | Medium | Month 4 |
 
 **Fix pattern for I-1 to I-3:** Add phrasing variants to IntentRouter rules. Low effort, additive.
 **Fix pattern for I-4 to I-5:** Tighten ValidateDiet signal — require explicit restriction keywords or question form, not just ingredient names.
@@ -84,6 +86,7 @@ Items are ordered within each section by priority (High → Low).
 | --- | ------------------------------------------------------------------------------------------------- | ------------ | -------- | ------- |
 | G-1 | No global rate limiter tested in e2e (only per-session) — TC41 showed 5/35 throttled              | Week 8 Day 2 | Low      | Month 3 |
 | G-2 | OutputGuard confidence signaling appends note to message — slightly awkward UX for Low confidence | Week 7       | Low      | Month 3 |
+| G-3 | Rate limit test requires multiple separate requests — repeated text in single message doesn't trigger per-session counter | Week 11 E2E eval, case 53 | Low | Month 4 |
 
 ---
 
@@ -111,6 +114,8 @@ Items are ordered within each section by priority (High → Low).
 | T-5 | Profiling script reuses same session+query — repeat detector skews /chat measurements | Week 8 Day 3 finding | Low      | Month 3      |
 | T-6 | No concurrent request testing — all tests are single-threaded                         | Week 8 Day 1 note    | Low      | Month 3      |
 | T-7 | No partial failure testing (Ollama hanging vs down)                                   | Week 8 Day 1 note    | Low      | Month 3      |
+| T-8 | E2E eval case 53 (rate limit) uses wrong trigger pattern — needs setup_messages with 4+ identical requests, not repeated text in one message | Week 11 E2E eval | Low | Month 4 |
+| T-9 | Implicit dietary LLM extraction is non-deterministic — "I can't have gluten, what pasta can I eat?" flips between SearchRecipe and ValidateDiet across runs | Week 11 E2E eval, case 46 | Low | Month 4 |
 
 **T-1 to T-4:** These are Day 5 items — pure logic tests, no Docker needed, fast to write.
 
