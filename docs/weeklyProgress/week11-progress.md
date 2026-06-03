@@ -327,6 +327,7 @@ eval/datasets/e2e_golden_dataset.json                 — NEW: 60 test cases
 eval/datasets/e2e_results.json                        — NEW: e2e harness results
 eval/harnesses/llm_judge.py                           — NEW: LLM-as-judge scorer
 eval/datasets/e2e_judge_results.json                   — NEW: judge scores, 56 cases
+eval/datasets/month3-eval-report.md                   — NEW: consolidated Month 3 eval report
 docs/tech-debt-backlog.md                             — UPDATED: I-8, I-9, G-3, T-8, T-9 added
 ```
 
@@ -344,11 +345,14 @@ docs/tech-debt-backlog.md                             — UPDATED: I-8, I-9, G-3
 
 **Dataset design matters as much as harness design.** Case 53 (rate limit) exposed that the test was invalid — one message with repeated text is not the same as 4 separate requests. The harness ran correctly; the golden dataset had the wrong setup_messages structure.
 
+**The judge layer catches what binary checks miss.** implicit_dietary cases passed the e2e harness (intent classified correctly) but scored H:2.33 with the judge. The system extracted a constraint, classified intent correctly, returned recipes — but the recipes didn't respect the constraint. Pass/fail can't see that. The judge can.
+
+**Safety communication is different from safety detection.** validate_diet safety scored 2.50 not because violations weren't detected — they were — but because the response message didn't clearly communicate the risk. "Recipe contains: sesame (sesame)" is not the same as "This recipe is unsafe for your sesame allergy." Detection and communication are two separate problems.
+
 ---
 
 ## Deferred
 
-- **Month 3 eval report** — consolidated RAGAS + e2e + Langfuse metrics doc not yet written
 - **Nut-free retrieval depth** — push negation into Qdrant `must_not` filter at query time rather than post-retrieval (Month 4)
 - **Stronger LLM judge** — use GPT-4 or Claude as judge model for production eval; `llama3.2` judging its own output has known blind spots
 - **x_free context relevance gap** — filter improves safety at cost of retrieval breadth; acceptable tradeoff documented
