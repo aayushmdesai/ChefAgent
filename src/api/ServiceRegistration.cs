@@ -109,6 +109,7 @@ public static class ServiceRegistration
             var logger = sp.GetRequiredService<ILogger<RecipeSearchPlugin>>();
             var outputGuard = sp.GetRequiredService<OutputGuard>();
             var circuitBreaker = sp.GetRequiredKeyedService<CircuitBreaker>("ollama");
+            var tracing = sp.GetRequiredService<Tracing>();
             var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
             var embeddingModel = config["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
             var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
@@ -122,6 +123,7 @@ public static class ServiceRegistration
                 collection,
                 logger,
                 outputGuard,
+                tracing,
                 new RecipeReranker(
                     httpClient,
                     ollamaUrl,

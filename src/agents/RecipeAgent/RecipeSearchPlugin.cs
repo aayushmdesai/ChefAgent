@@ -29,6 +29,16 @@ public class RecipeSearchPlugin
 
     // Optional preprocessor plugin for negation parsing and query expansion.
     private readonly QueryPreprocessor? _preprocessor;
+    private readonly Tracing _tracing;
+
+    // In-memory embedding cache — query text → vector.
+    // Model-specific: cleared on restart, which is correct (model changes invalidate cached vectors).
+    // Size cap: 1000 entries × 768 floats × 4 bytes ≈ 3MB — negligible.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<
+        string,
+        float[]
+    > _embeddingCache = new(StringComparer.OrdinalIgnoreCase);
+    private const int EmbeddingCacheMaxSize = 1000;
 
     public RecipeSearchPlugin(
         QdrantClient qdrantClient,
@@ -38,6 +48,7 @@ public class RecipeSearchPlugin
         string collectionName,
         ILogger<RecipeSearchPlugin> logger,
         OutputGuard outputGuard,
+        Tracing tracing,
         RecipeReranker? reranker = null,
         QueryPreprocessor? preprocessor = null
     )
@@ -51,6 +62,7 @@ public class RecipeSearchPlugin
         _reranker = reranker;
         _preprocessor = preprocessor;
         _outputGuard = outputGuard;
+        _tracing = tracing;
     }
 
     [KernelFunction("search_recipes")]
@@ -93,7 +105,7 @@ public class RecipeSearchPlugin
             }
 
             // 2. Embed the cleaned/expanded query
-            var queryVector = await GetEmbeddingAsync(searchQuery, cancellationToken);
+            var queryVector = await GetEmbeddingAsync(searchQuery, cancellationToken, parentCtx);
 
             // 3. Build optional Qdrant filter
             Filter? filter = null;
@@ -229,15 +241,71 @@ public class RecipeSearchPlugin
         );
     }
 
-    private async Task<float[]> GetEmbeddingAsync(string text, CancellationToken ct)
+    private async Task<float[]> GetEmbeddingAsync(
+        string text,
+        CancellationToken ct,
+        TraceContext? parentCtx = null
+    )
     {
-        // Request an embedding vector from Ollama for the query text.
+        // Cache hit — skip Ollama entirely
+        if (_embeddingCache.TryGetValue(text, out var cached))
+        {
+            _logger.LogInformation(
+                "[EmbeddingCache] Hit — skipping Ollama for: \"{Text}\" (cache size: {Size})",
+                text,
+                _embeddingCache.Count
+            );
+
+            if (parentCtx is not null)
+            {
+                var hitCtx = _tracing.StartSpan(
+                    parentCtx,
+                    "embed.cache_hit",
+                    input: text,
+                    metadata: new() { ["cache_size"] = _embeddingCache.Count }
+                );
+                _tracing.EndSpan(hitCtx, output: "cache_hit", statusMessage: "ok");
+            }
+
+            return cached;
+        }
+
+        // Cache miss — call Ollama
+        var missCtx = parentCtx is not null
+            ? _tracing.StartSpan(
+                parentCtx,
+                "embed.ollama",
+                input: text,
+                metadata: new() { ["model"] = _embeddingModel }
+            )
+            : TraceContext.None;
+
         var request = new { model = _embeddingModel, input = $"search_query: {text}" };
         var response = await _httpClient.PostAsJsonAsync($"{_ollamaUrl}/api/embed", request, ct);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<OllamaEmbedResponse>(ct);
-        return result!.Embeddings[0];
+        var vector = result!.Embeddings[0];
+
+        if (!missCtx.IsNone)
+            _tracing.EndSpan(
+                missCtx,
+                output: "embedded",
+                statusMessage: "ok",
+                metadata: new() { ["dims"] = vector.Length, ["cache_size"] = _embeddingCache.Count }
+            );
+
+        // Store in cache (simple size cap)
+        if (_embeddingCache.Count < EmbeddingCacheMaxSize)
+            _embeddingCache[text] = vector;
+
+        _logger.LogInformation(
+            "[EmbeddingCache] Miss — embedded via Ollama: \"{Text}\" (cache size: {Size})",
+            text,
+            _embeddingCache.Count
+        );
+
+        return vector;
     }
 
     private static string GetString(IDictionary<string, Value> payload, string key) =>

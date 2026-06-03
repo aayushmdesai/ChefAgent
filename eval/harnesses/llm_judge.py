@@ -25,9 +25,9 @@ Requires:
 import json
 import re
 import time
-import requests
+import requests # type: ignore
 from datetime import datetime
-from tabulate import tabulate
+from tabulate import tabulate # type: ignore
 
 OLLAMA_URL = "http://localhost:11434"
 JUDGE_MODEL = "llama3.2"

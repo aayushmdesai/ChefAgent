@@ -328,6 +328,11 @@ eval/datasets/e2e_results.json                        — NEW: e2e harness resul
 eval/harnesses/llm_judge.py                           — NEW: LLM-as-judge scorer
 eval/datasets/e2e_judge_results.json                   — NEW: judge scores, 56 cases
 eval/datasets/month3-eval-report.md                   — NEW: consolidated Month 3 eval report
+eval/README.md                                        — NEW: eval pipeline reproducibility doc
+docs/adrs/011-evaluation-strategy.md                  — NEW: ADR-011 evaluation strategy
+src/agents/Recipe/RecipeSearchPlugin.cs               — UPDATED: embedding cache added
+README.md                                             — UPDATED: status, eval section, ADR list
+CHANGELOG.md                                          — UPDATED: v0.6.0, v0.7.0, v0.8.0 entries
 docs/tech-debt-backlog.md                             — UPDATED: I-8, I-9, G-3, T-8, T-9 added
 ```
 
@@ -347,6 +352,10 @@ docs/tech-debt-backlog.md                             — UPDATED: I-8, I-9, G-3
 
 **The judge layer catches what binary checks miss.** implicit_dietary cases passed the e2e harness (intent classified correctly) but scored H:2.33 with the judge. The system extracted a constraint, classified intent correctly, returned recipes — but the recipes didn't respect the constraint. Pass/fail can't see that. The judge can.
 
+**Embedding cache: 1813ms → 12ms.** In-memory  keyed on query text. Cache hit skips Ollama entirely.  vs  Langfuse spans make it visible in traces. Why not Redis? Embeddings are model-specific — if the model changes, every cached vector is wrong. In-memory cleared on restart is the correct behavior.
+
+**Embedding cache delivers 99% latency reduction on repeated queries.** In-memory ConcurrentDictionary keyed on query text. Cache hit skips Ollama entirely: 1813ms to 12ms. embed.cache_hit vs embed.ollama Langfuse spans make it visible in traces. Why not Redis? Embeddings are model-specific — model change invalidates all cached vectors. In-memory cleared on restart is the correct behavior.
+
 **Safety communication is different from safety detection.** validate_diet safety scored 2.50 not because violations weren't detected — they were — but because the response message didn't clearly communicate the risk. "Recipe contains: sesame (sesame)" is not the same as "This recipe is unsafe for your sesame allergy." Detection and communication are two separate problems.
 
 ---
@@ -360,4 +369,3 @@ docs/tech-debt-backlog.md                             — UPDATED: I-8, I-9, G-3
 - **Intent router: CreateMealPlan phrasing variants** — "plan dinners... I'm dairy-free" not caught (Month 4, I-9)
 - **Intent router: informal GetMealPlan** — "remind me what I'm having Thursday", "what did you plan for the weekend?" (Month 4, I-7)
 - **E2E golden dataset fix: rate limit case** — case 53 needs actual setup_messages requests, not repeated text in one message (T-8)
-- **Embedding cache** — repeated queries re-embed on every request; in-memory cache deferred from original week plan (S-4)
