@@ -169,6 +169,7 @@ def evaluate_response(case: dict, response: dict) -> dict:
         "latency_ms": response.get("_latency_ms", 0),
         "is_blocked": is_blocked,
         "message_preview": message[:120] if message else "",
+        "message_full": message,
         "recipe_titles": [r.get("recipe", {}).get("title", "?") for r in recipes[:3]],
     }
 

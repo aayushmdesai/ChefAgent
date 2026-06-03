@@ -235,6 +235,36 @@ RUN_ID = datetime.now().strftime("%Y%m%d%H%M%S")
 | Safety | 1-5 | Does the response respect all dietary constraints? |
 | Coherence | 1-5 | Is the response message well-structured and clear? |
 
+### LLM judge results
+
+**Run date:** 2026-06-03 | **Model:** llama3.2 | **Scored:** 56/56 (0 failures)
+
+| Category | n | Helpfulness | Safety | Coherence |
+|----------|---|-------------|--------|-----------|
+| search_simple | 8 | 3.75 | N/A | 3.62 |
+| search_with_diet | 11 | 4.00 | 3.30 | 3.91 |
+| search_negation | 6 | 4.00 | N/A | 3.50 |
+| validate_diet | 9 | 3.33 | 2.50 | 3.56 |
+| create_meal_plan | 3 | 3.33 | N/A | 3.00 |
+| get_meal_plan | 7 | 2.86 | N/A | 3.14 |
+| modify_meal_plan | 4 | 3.50 | N/A | 3.75 |
+| implicit_dietary | 6 | 2.33 | N/A | 3.17 |
+| general_question | 2 | 4.00 | N/A | 4.00 |
+
+### Judge result interpretation
+
+**Strongest: general_question and search_with_diet** — both H:4.0. The system handles constrained searches and cooking Q&A well. When the user intent is clear and the dietary profile is explicit, the pipeline performs consistently.
+
+**Weakest: implicit_dietary H:2.33** — most important signal from the judge. When a user implies a constraint ("I am lactose intolerant", "my kid has a peanut allergy") without formal dietary profile language, the system extracts something but returns wrong results. e2e-047 returned peanut recipes for a peanut allergy request. e2e-045 returned cheese soups for a lactose intolerance request. The binary e2e harness passed these cases (intent was correct), but the judge correctly identified the response quality was poor. This is the value of the judge layer — it catches what pass/fail checks miss.
+
+**get_meal_plan H:2.86** — low because several cases returned no plan content visible in the response message. The judge had no visibility into the mealPlan object — only the message string. Structural limitation of judge scoring on plan responses.
+
+**validate_diet safety 2.50 — lowest safety score.** Cases misclassified as SearchRecipe ran diet validation on search results but did not clearly answer the safety question. "Is hummus safe for sesame allergy?" got S:2 — response said sesame was present but did not state "this is unsafe" clearly enough. The validation ran but the communication of risk was weak.
+
+**implicit_dietary safety all null** — the judge prompt inferred dietary context from category but did not have the actual LLM-extracted profile. Safety scoring requires knowing what constraints were applied. Limitation of current judge design — would need to store the extracted profile in e2e_results to score correctly.
+
+**Known judge limitation:** llama3.2 judging llama3.2 output. The same model that generated wrong results also judged them. For subtler errors the judge may miss what a stronger model would catch. Scores are directionally useful for comparing categories, not absolute quality claims.
+
 ### E2E results
 
 **Run date:** 2026-06-03 | **Run ID:** 20260603155928  
@@ -292,9 +322,11 @@ src/shared/DietaryCategoryMap.cs                      — DELETED (superseded by
 scripts/eval/test_semantic_negation.py                — NEW: 7-case negation test + control
 eval/datasets/week11_negation_test_20260603_0314.json — NEW: negation test results
 eval/experiments/2026-06-03_semantic_negation.json    — NEW: retrieval re-eval experiment
-eval/harnesses/eval_e2e.py                            — NEW: e2e harness
+eval/harnesses/eval_e2e.py                            — NEW: e2e harness (message_full added)
 eval/datasets/e2e_golden_dataset.json                 — NEW: 60 test cases
 eval/datasets/e2e_results.json                        — NEW: e2e harness results
+eval/harnesses/llm_judge.py                           — NEW: LLM-as-judge scorer
+eval/datasets/e2e_judge_results.json                   — NEW: judge scores, 56 cases
 docs/tech-debt-backlog.md                             — UPDATED: I-8, I-9, G-3, T-8, T-9 added
 ```
 
@@ -316,7 +348,6 @@ docs/tech-debt-backlog.md                             — UPDATED: I-8, I-9, G-3
 
 ## Deferred
 
-- **LLM judge (llm_judge.py)** — helpfulness/safety/coherence scoring not yet run; planned for remaining week days
 - **Month 3 eval report** — consolidated RAGAS + e2e + Langfuse metrics doc not yet written
 - **Nut-free retrieval depth** — push negation into Qdrant `must_not` filter at query time rather than post-retrieval (Month 4)
 - **Stronger LLM judge** — use GPT-4 or Claude as judge model for production eval; `llama3.2` judging its own output has known blind spots

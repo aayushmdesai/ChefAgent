@@ -1,0 +1,794 @@
+{
+  "timestamp": "2026-06-03T17:13:10.910918",
+  "judge_model": "llama3.2",
+  "input": "eval/datasets/e2e_results.json",
+  "total_cases": 56,
+  "scored": 56,
+  "failed": 0,
+  "aggregated_by_category": {
+    "search_simple": {
+      "n": 8,
+      "helpfulness": 3.75,
+      "safety": null,
+      "coherence": 3.62
+    },
+    "search_with_diet": {
+      "n": 11,
+      "helpfulness": 4.0,
+      "safety": 3.3,
+      "coherence": 3.91
+    },
+    "search_negation": {
+      "n": 6,
+      "helpfulness": 4.0,
+      "safety": null,
+      "coherence": 3.5
+    },
+    "validate_diet": {
+      "n": 9,
+      "helpfulness": 3.33,
+      "safety": 2.5,
+      "coherence": 3.56
+    },
+    "create_meal_plan": {
+      "n": 3,
+      "helpfulness": 3.33,
+      "safety": null,
+      "coherence": 3.0
+    },
+    "get_meal_plan": {
+      "n": 7,
+      "helpfulness": 2.86,
+      "safety": null,
+      "coherence": 3.14
+    },
+    "modify_meal_plan": {
+      "n": 4,
+      "helpfulness": 3.5,
+      "safety": null,
+      "coherence": 3.75
+    },
+    "implicit_dietary": {
+      "n": 6,
+      "helpfulness": 2.33,
+      "safety": null,
+      "coherence": 3.17
+    },
+    "general_question": {
+      "n": 2,
+      "helpfulness": 4.0,
+      "safety": null,
+      "coherence": 4.0
+    }
+  },
+  "results": [
+    {
+      "id": "e2e-001",
+      "category": "search_simple",
+      "message": "find me a chicken soup recipe",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-002",
+      "category": "search_simple",
+      "message": "I want to make pasta carbonara",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-003",
+      "category": "search_simple",
+      "message": "show me some beef stew recipes",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-004",
+      "category": "search_simple",
+      "message": "what can I make with salmon",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-005",
+      "category": "search_simple",
+      "message": "I need a chocolate cake recipe",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-006",
+      "category": "search_simple",
+      "message": "find breakfast ideas",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-007",
+      "category": "search_simple",
+      "message": "quick weeknight dinner recipes",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-008",
+      "category": "search_simple",
+      "message": "vegetable stir fry",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-009",
+      "category": "search_with_diet",
+      "message": "find me a dairy-free pasta dinner",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 4,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-010",
+      "category": "search_with_diet",
+      "message": "gluten-free breakfast ideas",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-011",
+      "category": "search_with_diet",
+      "message": "vegan dinner recipes",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 3,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-012",
+      "category": "search_with_diet",
+      "message": "nut-free cookies for my kid",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 3,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-013",
+      "category": "search_with_diet",
+      "message": "halal chicken recipes",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 4,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-014",
+      "category": "search_with_diet",
+      "message": "vegetarian soup recipes",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 3,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-015",
+      "category": "search_with_diet",
+      "message": "egg-free baking recipes",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 3,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-016",
+      "category": "search_with_diet",
+      "message": "find me a paleo dinner",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 3,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-017",
+      "category": "search_with_diet",
+      "message": "dairy-free and gluten-free dinner",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 3,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-018",
+      "category": "search_with_diet",
+      "message": "pescatarian pasta recipe",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 4,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-019",
+      "category": "search_negation",
+      "message": "pasta without tomatoes",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-020",
+      "category": "search_negation",
+      "message": "soup without onions or garlic",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-021",
+      "category": "search_negation",
+      "message": "chicken recipe excluding mushrooms",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-022",
+      "category": "search_negation",
+      "message": "cookies with no nuts",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-023",
+      "category": "search_negation",
+      "message": "stir fry without soy sauce",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-024",
+      "category": "search_negation",
+      "message": "find me a cake recipe hold the nuts",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-025",
+      "category": "validate_diet",
+      "message": "is pasta carbonara dairy-free?",
+      "e2e_status": "FAIL",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 3,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-026",
+      "category": "validate_diet",
+      "message": "can I eat beef stew if I'm vegetarian?",
+      "e2e_status": "PASS",
+      "actual_intent": "ValidateDiet",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 3,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-027",
+      "category": "validate_diet",
+      "message": "is hummus safe for a sesame allergy?",
+      "e2e_status": "PASS",
+      "actual_intent": "ValidateDiet",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 2,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-028",
+      "category": "validate_diet",
+      "message": "is guacamole vegan?",
+      "e2e_status": "FAIL",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-029",
+      "category": "validate_diet",
+      "message": "can a nut allergy person eat marzipan?",
+      "e2e_status": "FAIL",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-030",
+      "category": "validate_diet",
+      "message": "is chicken tikka masala gluten-free?",
+      "e2e_status": "FAIL",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-031",
+      "category": "create_meal_plan",
+      "message": "plan dinners for the week, I'm dairy-free",
+      "e2e_status": "FAIL",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-032",
+      "category": "get_meal_plan",
+      "message": "show me my meal plan",
+      "e2e_status": "PASS",
+      "actual_intent": "GetMealPlan",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-033",
+      "category": "modify_meal_plan",
+      "message": "swap Monday dinner to something with chicken",
+      "e2e_status": "FAIL",
+      "actual_intent": "ModifyMealPlan",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-034",
+      "category": "modify_meal_plan",
+      "message": "change Friday to a pasta dish",
+      "e2e_status": "FAIL",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-035",
+      "category": "create_meal_plan",
+      "message": "create a vegan meal plan for the week",
+      "e2e_status": "PASS",
+      "actual_intent": "CreateMealPlan",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-036",
+      "category": "get_meal_plan",
+      "message": "what's my plan for the week?",
+      "e2e_status": "PASS",
+      "actual_intent": "GetMealPlan",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-037",
+      "category": "modify_meal_plan",
+      "message": "swap Wednesday to something with lentils",
+      "e2e_status": "PASS",
+      "actual_intent": "ModifyMealPlan",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-038",
+      "category": "create_meal_plan",
+      "message": "plan my dinners for the week",
+      "e2e_status": "PASS",
+      "actual_intent": "CreateMealPlan",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-039",
+      "category": "get_meal_plan",
+      "message": "show me my plan",
+      "e2e_status": "PASS",
+      "actual_intent": "GetMealPlan",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-040",
+      "category": "modify_meal_plan",
+      "message": "replace Tuesday with something Italian",
+      "e2e_status": "PASS",
+      "actual_intent": "ModifyMealPlan",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-041",
+      "category": "get_meal_plan",
+      "message": "what's for dinner this week?",
+      "e2e_status": "PASS",
+      "actual_intent": "GetMealPlan",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-042",
+      "category": "get_meal_plan",
+      "message": "remind me what I'm having Thursday",
+      "e2e_status": "FAIL",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-043",
+      "category": "get_meal_plan",
+      "message": "show my meal plan",
+      "e2e_status": "PASS",
+      "actual_intent": "GetMealPlan",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-044",
+      "category": "get_meal_plan",
+      "message": "what did you plan for the weekend?",
+      "e2e_status": "FAIL",
+      "actual_intent": "CreateMealPlan",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-045",
+      "category": "implicit_dietary",
+      "message": "I'm lactose intolerant, find me a soup",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-046",
+      "category": "implicit_dietary",
+      "message": "I can't have gluten, what pasta can I eat?",
+      "e2e_status": "FAIL",
+      "actual_intent": "ValidateDiet",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-047",
+      "category": "implicit_dietary",
+      "message": "my kid has a peanut allergy, suggest dinner",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-048",
+      "category": "implicit_dietary",
+      "message": "I don't eat meat or dairy, find me something for dinner",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-049",
+      "category": "implicit_dietary",
+      "message": "I keep kosher, what can I make for dinner?",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-050",
+      "category": "implicit_dietary",
+      "message": "celiac disease safe recipes for breakfast",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-055",
+      "category": "validate_diet",
+      "message": "is beef bourguignon halal?",
+      "e2e_status": "FAIL",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-056",
+      "category": "validate_diet",
+      "message": "can vegans eat honey?",
+      "e2e_status": "FAIL",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 2,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-057",
+      "category": "validate_diet",
+      "message": "is caesar salad safe for a fish allergy?",
+      "e2e_status": "PASS",
+      "actual_intent": "ValidateDiet",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 2,
+        "coherence": 3
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-058",
+      "category": "general_question",
+      "message": "what's the difference between broiling and baking?",
+      "e2e_status": "PASS",
+      "actual_intent": "GeneralQuestion",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-059",
+      "category": "general_question",
+      "message": "how do I know when chicken is fully cooked?",
+      "e2e_status": "PASS",
+      "actual_intent": "GeneralQuestion",
+      "scores": {
+        "helpfulness": 4,
+        "safety": null,
+        "coherence": 4
+      },
+      "skipped": false
+    },
+    {
+      "id": "e2e-060",
+      "category": "search_with_diet",
+      "message": "jain dinner recipes",
+      "e2e_status": "PASS",
+      "actual_intent": "SearchRecipe",
+      "scores": {
+        "helpfulness": 4,
+        "safety": 3,
+        "coherence": 4
+      },
+      "skipped": false
+    }
+  ]
+}

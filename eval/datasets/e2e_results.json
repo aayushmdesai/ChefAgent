@@ -1,6 +1,6 @@
 {
-  "run_id": "20260603155928",
-  "timestamp": "2026-06-03T16:01:20.831063",
+  "run_id": "20260603161649",
+  "timestamp": "2026-06-03T16:18:28.792301",
   "endpoint": "http://localhost:5100/chat",
   "dataset": "eval/datasets/e2e_golden_dataset.json",
   "total": 60,
@@ -32,9 +32,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 115,
+        "latency_ms": 1740,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"a chicken soup\".",
+        "message_full": "Here are 5 recipes for \"a chicken soup\".",
         "recipe_titles": [
           "Best-Ever Chicken Soup",
           "Chicken Soup",
@@ -66,9 +67,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 180,
+        "latency_ms": 130,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"to make pasta carbonara\".",
+        "message_full": "Here are 5 recipes for \"to make pasta carbonara\".",
         "recipe_titles": [
           "Pasta Carbonara",
           "Pasta With Tomatoes And Four Cheeses",
@@ -100,9 +102,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 100,
+        "latency_ms": 99,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"some beef stew\".",
+        "message_full": "Here are 5 recipes for \"some beef stew\".",
         "recipe_titles": [
           "Easy Beef Stew",
           "Hearty Beef Stew",
@@ -134,9 +137,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 82,
+        "latency_ms": 145,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"salmon\".",
+        "message_full": "Here are 5 recipes for \"salmon\".",
         "recipe_titles": [
           "Salmon Spread",
           "Salmon Cakes",
@@ -168,9 +172,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 131,
+        "latency_ms": 95,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"a chocolate cake\".",
+        "message_full": "Here are 5 recipes for \"a chocolate cake\".",
         "recipe_titles": [
           "Chocolate Cake",
           "Chocolate Chocolate Chocolate Cake(With Chocolate Icing)",
@@ -202,9 +207,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 140,
+        "latency_ms": 86,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"breakfast\".",
+        "message_full": "Here are 5 recipes for \"breakfast\".",
         "recipe_titles": [
           "Breakfast Casserole",
           "Breakfast Casserole",
@@ -236,9 +242,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 86,
+        "latency_ms": 209,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"quick weeknight\".",
+        "message_full": "Here are 5 recipes for \"quick weeknight\".",
         "recipe_titles": [
           "Quick Meat Loaf",
           "Quickie Pound Cake",
@@ -270,9 +277,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 112,
+        "latency_ms": 104,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"vegetable stir fry\".",
+        "message_full": "Here are 5 recipes for \"vegetable stir fry\".",
         "recipe_titles": [
           "Stir-Fry Vegetables",
           "Stir Fried Veggies Medley",
@@ -304,9 +312,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 146,
+        "latency_ms": 107,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"a pasta\". 1 are compatible with your dairy-free profile. The rest have notes \u2014 check the details fo",
+        "message_full": "Found 5 recipes for \"a pasta\". 1 are compatible with your dairy-free profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Homemade Pasta",
           "Pasta Ala Renee",
@@ -338,9 +347,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 103,
+        "latency_ms": 85,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"breakfast\". 3 are compatible with your gluten-free profile. The rest have notes \u2014 check the details",
+        "message_full": "Found 5 recipes for \"breakfast\". 3 are compatible with your gluten-free profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Breakfast Casserole",
           "Breakfast In A Hurry",
@@ -372,9 +382,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 100,
+        "latency_ms": 137,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"dinner\". 1 are compatible with your vegan profile. The rest have notes \u2014 check the details for subs",
+        "message_full": "Found 5 recipes for \"dinner\". 1 are compatible with your vegan profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Skillet Dinner",
           "Easy Chicken Dinner",
@@ -406,9 +417,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 95,
+        "latency_ms": 121,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"cookies for my kid\" but none fully matched your nut-free profile. Check the details for substitutio",
+        "message_full": "Found 5 recipes for \"cookies for my kid\" but none fully matched your nut-free profile. Check the details for substitution suggestions.",
         "recipe_titles": [
           "Oven-Shy Cookies(Kids Corner)",
           "Kid'S Quickie Cookies",
@@ -440,9 +452,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 77,
+        "latency_ms": 81,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"chicken\". 4 are compatible with your halal profile. The rest have notes \u2014 check the details for sub",
+        "message_full": "Found 5 recipes for \"chicken\". 4 are compatible with your halal profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Chicken Of The Year",
           "Company Chicken",
@@ -474,9 +487,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 142,
+        "latency_ms": 123,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"soup\". 2 are compatible with your vegetarian profile. The rest have notes \u2014 check the details for s",
+        "message_full": "Found 5 recipes for \"soup\". 2 are compatible with your vegetarian profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Homemade Soup Mix",
           "Cheese Soup",
@@ -508,9 +522,10 @@
         "recipe_count": 1,
         "diet_check_count": 1,
         "confidence": "Medium",
-        "latency_ms": 135,
+        "latency_ms": 111,
         "is_blocked": false,
         "message_preview": "Found 1 recipes for \"egg-free baking\" but none fully matched your egg-free profile. Check the details for substitution s",
+        "message_full": "Found 1 recipes for \"egg-free baking\" but none fully matched your egg-free profile. Check the details for substitution suggestions.",
         "recipe_titles": [
           "Eggless Milkless Applesauce Cake"
         ]
@@ -540,9 +555,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 113,
+        "latency_ms": 87,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"a paleo\". 1 are compatible with your paleo profile. The rest have notes \u2014 check the details for sub",
+        "message_full": "Found 5 recipes for \"a paleo\". 1 are compatible with your paleo profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Hobo Dinner For Two",
           "Palento",
@@ -574,9 +590,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 115,
+        "latency_ms": 87,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"and\". 3 are compatible with your dairy-free, gluten-free profile. The rest have notes \u2014 check the d",
+        "message_full": "Found 5 recipes for \"and\". 3 are compatible with your dairy-free, gluten-free profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Horse-Radish",
           "Golish",
@@ -608,9 +625,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 99,
+        "latency_ms": 146,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"pasta\". 2 are compatible with your pescatarian profile. The rest have notes \u2014 check the details for",
+        "message_full": "Found 5 recipes for \"pasta\". 2 are compatible with your pescatarian profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Pasta Ala Renee",
           "Pasta With Tomatoes And Four Cheeses",
@@ -642,9 +660,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 89,
+        "latency_ms": 138,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"pasta without tomatoes\".",
+        "message_full": "Here are 5 recipes for \"pasta without tomatoes\".",
         "recipe_titles": [
           "Homemade Pasta",
           "Fettuccine Alfredo",
@@ -676,9 +695,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 129,
+        "latency_ms": 97,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"soup without onions or garlic\".",
+        "message_full": "Here are 5 recipes for \"soup without onions or garlic\".",
         "recipe_titles": [
           "Homemade Soup Mix",
           "Cheese Soup",
@@ -710,9 +730,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 139,
+        "latency_ms": 95,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"chicken  excluding mushrooms\".",
+        "message_full": "Here are 5 recipes for \"chicken  excluding mushrooms\".",
         "recipe_titles": [
           "Company Chicken",
           "Chicken Of The Year",
@@ -744,9 +765,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 30458,
+        "latency_ms": 12362,
         "is_blocked": false,
-        "message_preview": "Found 5 recipes for \"cookies with\". 1 are compatible with your vegetarian, vegan, nuts, gluten-free profile. The rest ha",
+        "message_preview": "Found 5 recipes for \"cookies with\". 1 are compatible with your vegetarian, pescatarian, nuts profile. The rest have note",
+        "message_full": "Found 5 recipes for \"cookies with\". 1 are compatible with your vegetarian, pescatarian, nuts profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Bible Cookies",
           "Cookies For A Crowd",
@@ -778,9 +800,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 93,
+        "latency_ms": 104,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"stir fry without soy sauce\".",
+        "message_full": "Here are 5 recipes for \"stir fry without soy sauce\".",
         "recipe_titles": [
           "Spinach Stir-Fry",
           "Shrimp (Stir-Fry) Sauce",
@@ -812,9 +835,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 102,
+        "latency_ms": 135,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"a cake  hold the nuts\".",
+        "message_full": "Here are 5 recipes for \"a cake  hold the nuts\".",
         "recipe_titles": [
           "Scripture Cake",
           "Holy Cake",
@@ -846,9 +870,10 @@
         "recipe_count": 2,
         "diet_check_count": 2,
         "confidence": "Medium",
-        "latency_ms": 129,
+        "latency_ms": 115,
         "is_blocked": false,
         "message_preview": "Found 2 recipes for \"is pasta carbonara dairy-free?\". 1 are compatible with your dairy-free profile. The rest have notes",
+        "message_full": "Found 2 recipes for \"is pasta carbonara dairy-free?\". 1 are compatible with your dairy-free profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Fat-Free Pasta Salad(Use Fat-Free Honey Dijon, Ranch Or Italian Dressing)",
           "Creamy Pasta Salad"
@@ -879,9 +904,10 @@
         "recipe_count": 1,
         "diet_check_count": 1,
         "confidence": "Medium",
-        "latency_ms": 197,
+        "latency_ms": 111,
         "is_blocked": false,
         "message_preview": "\"Easy Beef Stew\" has some issues for your profile. Recipe contains: meat (beef). Suggested swaps: 2 lb. beef, cubed \u2192 le",
+        "message_full": "\"Easy Beef Stew\" has some issues for your profile. Recipe contains: meat (beef). Suggested swaps: 2 lb. beef, cubed \u2192 lentils.",
         "recipe_titles": [
           "Easy Beef Stew"
         ]
@@ -911,9 +937,10 @@
         "recipe_count": 1,
         "diet_check_count": 1,
         "confidence": "Medium",
-        "latency_ms": 148,
+        "latency_ms": 124,
         "is_blocked": false,
         "message_preview": "\"Creamy Hummas\" has some issues for your profile. Recipe contains: sesame (sesame).",
+        "message_full": "\"Creamy Hummas\" has some issues for your profile. Recipe contains: sesame (sesame).",
         "recipe_titles": [
           "Creamy Hummas"
         ]
@@ -943,9 +970,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 135,
+        "latency_ms": 162,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"is guacamole vegan?\". 1 are compatible with your vegan profile. The rest have notes \u2014 check the det",
+        "message_full": "Found 5 recipes for \"is guacamole vegan?\". 1 are compatible with your vegan profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Guacamole",
           "Guacamole",
@@ -977,9 +1005,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 121,
+        "latency_ms": 152,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"can a nut allergy person eat marzipan?\". 2 are compatible with your nuts profile. The rest have not",
+        "message_full": "Found 5 recipes for \"can a nut allergy person eat marzipan?\". 2 are compatible with your nuts profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Delicious Dessert",
           "\"Easy Divinity\"",
@@ -1011,9 +1040,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 153,
+        "latency_ms": 216,
         "is_blocked": false,
         "message_preview": "Here are 5 gluten-free-friendly recipes for \"is chicken tikka masala gluten-free?\".",
+        "message_full": "Here are 5 gluten-free-friendly recipes for \"is chicken tikka masala gluten-free?\".",
         "recipe_titles": [
           "Chicken Of The Year",
           "Tandoori Chicken",
@@ -1045,9 +1075,10 @@
         "recipe_count": 2,
         "diet_check_count": 2,
         "confidence": "Medium",
-        "latency_ms": 162,
+        "latency_ms": 307,
         "is_blocked": false,
         "message_preview": "Here are 2 dairy-free-friendly recipes for \"plan s for the week i'm dairy-free\".",
+        "message_full": "Here are 2 dairy-free-friendly recipes for \"plan s for the week i'm dairy-free\".",
         "recipe_titles": [
           "Dieter'S Delight",
           "Lazy Day Salad"
@@ -1081,6 +1112,7 @@
         "latency_ms": 8,
         "is_blocked": false,
         "message_preview": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
+        "message_full": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
         "recipe_titles": []
       },
       "error": null
@@ -1108,9 +1140,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 8,
+        "latency_ms": 10,
         "is_blocked": false,
         "message_preview": "I couldn't find your meal plan. Try generating one first by saying \"plan my dinners for the week\".",
+        "message_full": "I couldn't find your meal plan. Try generating one first by saying \"plan my dinners for the week\".",
         "recipe_titles": []
       },
       "error": null
@@ -1138,9 +1171,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 146,
+        "latency_ms": 112,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"change friday to a pasta dish\". 1 are compatible with your dairy-free profile. The rest have notes ",
+        "message_full": "Found 5 recipes for \"change friday to a pasta dish\". 1 are compatible with your dairy-free profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Pasta Fagiol",
           "Pasta Fagioli",
@@ -1172,9 +1206,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "Medium",
-        "latency_ms": 2038,
+        "latency_ms": 2342,
         "is_blocked": false,
         "message_preview": "Here's your 7-day full day (breakfast, lunch, and dinner) plan tailored to your vegan profile. You can ask me to swap an",
+        "message_full": "Here's your 7-day full day (breakfast, lunch, and dinner) plan tailored to your vegan profile. You can ask me to swap any day \u2014 just say \"swap Tuesday dinner to something with pasta\".",
         "recipe_titles": []
       },
       "error": null
@@ -1202,9 +1237,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 9,
+        "latency_ms": 10,
         "is_blocked": false,
         "message_preview": "Here is your current full day (breakfast, lunch, and dinner) plan.",
+        "message_full": "Here is your current full day (breakfast, lunch, and dinner) plan.",
         "recipe_titles": []
       },
       "error": null
@@ -1232,9 +1268,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "Medium",
-        "latency_ms": 80,
+        "latency_ms": 128,
         "is_blocked": false,
         "message_preview": "Swapped Wednesday's dinner to Lentil Pilaf (lentils).",
+        "message_full": "Swapped Wednesday's dinner to Lentil Pilaf (lentils).",
         "recipe_titles": []
       },
       "error": null
@@ -1262,9 +1299,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 870,
+        "latency_ms": 826,
         "is_blocked": false,
         "message_preview": "Here's your 7-day dinner plan. You can ask me to swap any day \u2014 just say \"swap Tuesday dinner to something with pasta\".",
+        "message_full": "Here's your 7-day dinner plan. You can ask me to swap any day \u2014 just say \"swap Tuesday dinner to something with pasta\".",
         "recipe_titles": []
       },
       "error": null
@@ -1292,9 +1330,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 9,
+        "latency_ms": 6,
         "is_blocked": false,
         "message_preview": "Here is your current dinner plan.",
+        "message_full": "Here is your current dinner plan.",
         "recipe_titles": []
       },
       "error": null
@@ -1322,9 +1361,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "Medium",
-        "latency_ms": 128,
+        "latency_ms": 234,
         "is_blocked": false,
         "message_preview": "Swapped Tuesday's dinner to Casserole Italiano (something italian).",
+        "message_full": "Swapped Tuesday's dinner to Casserole Italiano (something italian).",
         "recipe_titles": []
       },
       "error": null
@@ -1352,9 +1392,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 9,
+        "latency_ms": 11,
         "is_blocked": false,
         "message_preview": "Here is your current dinner plan.",
+        "message_full": "Here is your current dinner plan.",
         "recipe_titles": []
       },
       "error": null
@@ -1382,9 +1423,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 134,
+        "latency_ms": 199,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"remind me what i'm having thursday\".",
+        "message_full": "Here are 5 recipes for \"remind me what i'm having thursday\".",
         "recipe_titles": [
           "Lazy Day Salad",
           "Mrs. Irene'S Tea Tidbits",
@@ -1416,9 +1458,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 14,
+        "latency_ms": 7,
         "is_blocked": false,
         "message_preview": "Here is your current full day (breakfast, lunch, and dinner) plan.",
+        "message_full": "Here is your current full day (breakfast, lunch, and dinner) plan.",
         "recipe_titles": []
       },
       "error": null
@@ -1446,9 +1489,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "Medium",
-        "latency_ms": 2006,
+        "latency_ms": 2344,
         "is_blocked": false,
         "message_preview": "Here's your 7-day full day (breakfast, lunch, and dinner) plan tailored to your gluten-free profile. You can ask me to s",
+        "message_full": "Here's your 7-day full day (breakfast, lunch, and dinner) plan tailored to your gluten-free profile. You can ask me to swap any day \u2014 just say \"swap Tuesday dinner to something with pasta\".",
         "recipe_titles": []
       },
       "error": null
@@ -1476,9 +1520,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 6166,
+        "latency_ms": 5372,
         "is_blocked": false,
-        "message_preview": "Found 5 recipes for \"i'm lactose intolerant a soup\" but none fully matched your vegetarian, jain, nuts profile. Check th",
+        "message_preview": "Found 5 recipes for \"i'm lactose intolerant a soup\". 1 are compatible with your vegetarian, pescatarian, nuts profile. T",
+        "message_full": "Found 5 recipes for \"i'm lactose intolerant a soup\". 1 are compatible with your vegetarian, pescatarian, nuts profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Cheese Soup",
           "Cheese Soup",
@@ -1500,20 +1545,23 @@
         "checks": {
           "intent_match": false,
           "response_not_empty": true,
-          "has_recipes": false,
+          "has_recipes": true,
           "diet_check_ran": null,
           "blocked_correctly": null,
           "not_blocked_unexpectedly": true,
           "confidence_valid": true
         },
         "actual_intent": "ValidateDiet",
-        "recipe_count": 0,
-        "diet_check_count": 0,
-        "confidence": "High",
-        "latency_ms": 8052,
+        "recipe_count": 1,
+        "diet_check_count": 1,
+        "confidence": "Medium",
+        "latency_ms": 5895,
         "is_blocked": false,
-        "message_preview": "I'd be happy to check a recipe for you \u2014 could you tell me which recipe and any dietary restrictions you have?",
-        "recipe_titles": []
+        "message_preview": "\"Skallops Parmesan\" has some issues for your profile. Recipe contains: dairy (cheese, cheese). Suggested swaps: 1/4 c. P",
+        "message_full": "\"Skallops Parmesan\" has some issues for your profile. Recipe contains: dairy (cheese, cheese). Suggested swaps: 1/4 c. Parmesan cheese, grated \u2192 nutritional yeast, 1/2 lb. Mozzarella cheese, grated \u2192 nutritional yeast.",
+        "recipe_titles": [
+          "Skallops Parmesan"
+        ]
       },
       "error": null
     },
@@ -1540,9 +1588,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 103,
+        "latency_ms": 102,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"my kid has a peanut allergy\".",
+        "message_full": "Here are 5 recipes for \"my kid has a peanut allergy\".",
         "recipe_titles": [
           "Caramel Peanut Nests",
           "Peanut Cluster Candy",
@@ -1572,11 +1621,12 @@
         },
         "actual_intent": "SearchRecipe",
         "recipe_count": 5,
-        "diet_check_count": 5,
-        "confidence": "Medium",
-        "latency_ms": 5909,
+        "diet_check_count": 0,
+        "confidence": "High",
+        "latency_ms": 9386,
         "is_blocked": false,
-        "message_preview": "Found 5 recipes for \"i don't eat meat or dairy something for\" but none fully matched your vegetarian, jain, nuts, dairy ",
+        "message_preview": "Here are 5 recipes for \"i don't eat meat or dairy something for\".",
+        "message_full": "Here are 5 recipes for \"i don't eat meat or dairy something for\".",
         "recipe_titles": [
           "Nonfat Yogurt Cheese",
           "Easy Meat Loaf",
@@ -1608,9 +1658,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 153,
+        "latency_ms": 143,
         "is_blocked": false,
         "message_preview": "Here are 5 kosher-friendly recipes for \"i keep what can i make for ?\".",
+        "message_full": "Here are 5 kosher-friendly recipes for \"i keep what can i make for ?\".",
         "recipe_titles": [
           "Recipe For Preserving Children",
           "Lazy Day Salad",
@@ -1642,9 +1693,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 106,
+        "latency_ms": 149,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"celiac disease safe\".",
+        "message_full": "Here are 5 recipes for \"celiac disease safe\".",
         "recipe_titles": [
           "Norma Hill'S Far East Celery",
           "Raw Gluten",
@@ -1676,9 +1728,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 2,
+        "latency_ms": 3,
         "is_blocked": true,
         "message_preview": "I can help you find recipes, plan meals, and check dietary compatibility. What would you like to do?",
+        "message_full": "I can help you find recipes, plan meals, and check dietary compatibility. What would you like to do?",
         "recipe_titles": []
       },
       "error": null
@@ -1706,9 +1759,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 5,
+        "latency_ms": 3,
         "is_blocked": true,
         "message_preview": "I can help you find recipes, plan meals, and check dietary compatibility. What would you like to do?",
+        "message_full": "I can help you find recipes, plan meals, and check dietary compatibility. What would you like to do?",
         "recipe_titles": []
       },
       "error": null
@@ -1736,9 +1790,10 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 163,
+        "latency_ms": 340,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"chicken  chicken  chicken  chicken  chicken  chicken  chicken  chicken  chicken  chicken\".",
+        "message_full": "Here are 5 recipes for \"chicken  chicken  chicken  chicken  chicken  chicken  chicken  chicken  chicken  chicken\".",
         "recipe_titles": [
           "Chicken Spectacular",
           "Chicken Casserole",
@@ -1770,9 +1825,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 2,
+        "latency_ms": 3,
         "is_blocked": true,
         "message_preview": "I can help you find recipes, plan meals, and check dietary compatibility. What would you like to do?",
+        "message_full": "I can help you find recipes, plan meals, and check dietary compatibility. What would you like to do?",
         "recipe_titles": []
       },
       "error": null
@@ -1800,9 +1856,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 146,
+        "latency_ms": 152,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"is beef bourguignon halal?\". 2 are compatible with your halal profile. The rest have notes \u2014 check ",
+        "message_full": "Found 5 recipes for \"is beef bourguignon halal?\". 2 are compatible with your halal profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Veal With Cream Sherry(Chicken May Be Substituted)",
           "Beef-A-La-Lindstrom(Bof A La Linstrom)",
@@ -1834,9 +1891,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 135,
+        "latency_ms": 167,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"can vegans eat honey?\". 1 are compatible with your vegan profile. The rest have notes \u2014 check the d",
+        "message_full": "Found 5 recipes for \"can vegans eat honey?\". 1 are compatible with your vegan profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Honey(Without Bees)",
           "Berry Honey Shake",
@@ -1868,9 +1926,10 @@
         "recipe_count": 1,
         "diet_check_count": 1,
         "confidence": "Medium",
-        "latency_ms": 154,
+        "latency_ms": 241,
         "is_blocked": false,
         "message_preview": "\"Caesar Salad\" has some issues for your profile. Recipe contains: seafood (caesar dressing).",
+        "message_full": "\"Caesar Salad\" has some issues for your profile. Recipe contains: seafood (caesar dressing).",
         "recipe_titles": [
           "Caesar Salad"
         ]
@@ -1900,9 +1959,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "Medium",
-        "latency_ms": 8986,
+        "latency_ms": 7202,
         "is_blocked": false,
-        "message_preview": "Broiling is a high-heat cooking method where food is directly exposed to the heat of a broiler, often for a short period",
+        "message_preview": "Broiling is similar to baking, but it's cooked at a higher temperature for a shorter period, often with direct heat from",
+        "message_full": "Broiling is similar to baking, but it's cooked at a higher temperature for a shorter period, often with direct heat from an oven. This method gives foods a crispy exterior and a caramelized flavor. In contrast, baking uses convection or traditional heating to cook food evenly.\n\nFor example, broiled steak cooks quickly on the outside while remaining rare in the middle, while baked chicken might be overcooked on the outside before reaching the desired doneness within.",
         "recipe_titles": []
       },
       "error": null
@@ -1930,9 +1990,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "Medium",
-        "latency_ms": 5183,
+        "latency_ms": 7647,
         "is_blocked": false,
-        "message_preview": "You can check for doneness by using the finger test or the internal temperature guide. The finger test involves pinching",
+        "message_preview": "To check if chicken is fully cooked, it's essential to use the right internal temperature. Use a food thermometer to ins",
+        "message_full": "To check if chicken is fully cooked, it's essential to use the right internal temperature. Use a food thermometer to insert into the thickest part of the breast or thigh, avoiding any bones or fat. The recommended internal temperatures are: \n\n- 165\u00b0F (74\u00b0C) for boneless, skinless breasts and thighs.\n- 180\u00b0F (82\u00b0C) for ground chicken.\n\nRemember, undercooked chicken can be a food safety risk, so always err on the side of caution and cook it until it reaches a safe temperature.",
         "recipe_titles": []
       },
       "error": null
@@ -1960,9 +2021,10 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 101,
+        "latency_ms": 88,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"dinner\" but none fully matched your jain profile. Check the details for substitution suggestions.",
+        "message_full": "Found 5 recipes for \"dinner\" but none fully matched your jain profile. Check the details for substitution suggestions.",
         "recipe_titles": [
           "Skillet Dinner",
           "Easy Chicken Dinner",
