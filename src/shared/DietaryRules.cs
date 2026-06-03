@@ -996,6 +996,23 @@ public static class DietaryRules
         return violations;
     }
 
+    /// <summary>
+    /// Returns the ingredient set for a named X-free category.
+    /// Used by QueryPreprocessor to expand negation terms at query time.
+    /// Returns null if the category is unknown — caller falls back to raw term.
+    /// </summary>
+    public static IReadOnlySet<string>? GetCategoryIngredients(string category) =>
+        category.ToLowerInvariant() switch
+        {
+            "dairy" => DairyIngredients,
+            "gluten" => GlutenIngredients,
+            "nuts" => NutIngredients,
+            "eggs" => EggIngredients,
+            "soy" => SoyIngredients,
+            "sesame" => SesameIngredients,
+            _ => null,
+        };
+
     private static bool IngredientContains(string ingredient, HashSet<string> ruleSet) =>
         ruleSet.Any(rule => ingredient.Contains(rule, StringComparison.OrdinalIgnoreCase));
 }

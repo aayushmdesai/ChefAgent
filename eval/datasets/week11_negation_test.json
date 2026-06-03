@@ -1,0 +1,137 @@
+{
+  "timestamp": "2026-06-03T03:14:45.666377",
+  "endpoint": "http://localhost:5100/recipes/search",
+  "passed": 6,
+  "failed": 1,
+  "errors": 0,
+  "cases": [
+    {
+      "query": "dairy-free pasta dinner",
+      "category": "dairy",
+      "status": "PASS",
+      "recipe_count": 5,
+      "violations": [],
+      "titles": [
+        "Fat-Free Pasta Salad(Use Fat-Free Honey Dijon, Ranch Or Italian Dressing)",
+        "Chicken And Pasta Salad",
+        "Creamy Pasta Salad",
+        "Pasta Salad",
+        "Seafood And Pasta Salad"
+      ]
+    },
+    {
+      "query": "dairy-free soup",
+      "category": "dairy",
+      "status": "PASS",
+      "recipe_count": 4,
+      "violations": [],
+      "titles": [
+        "Fat Free Vegetable Soup",
+        "Cheese Soup",
+        "No Calorie Soup",
+        "Perfect Gravy"
+      ]
+    },
+    {
+      "query": "dairy-free chicken recipe",
+      "category": "dairy",
+      "status": "PASS",
+      "recipe_count": 0,
+      "violations": [],
+      "titles": []
+    },
+    {
+      "query": "gluten-free pasta",
+      "category": "gluten",
+      "status": "PASS",
+      "recipe_count": 7,
+      "violations": [],
+      "titles": [
+        "Seafood Pasta",
+        "Pasta Marco Polo(Cold Pasta Salad)",
+        "Rainbow Twirls Alfredo",
+        "Fettuccine Alfredo",
+        "Chicken And Pasta Salad",
+        "Pasta Salad",
+        "Pasta In A Pot"
+      ]
+    },
+    {
+      "query": "gluten-free bread recipe",
+      "category": "gluten",
+      "status": "PASS",
+      "recipe_count": 10,
+      "violations": [],
+      "titles": [
+        "Bread",
+        "The Best Bread Recipe In The World",
+        "Homemade Bread",
+        "One Big Beautiful Loaf Of Bread",
+        "Homemade Bread",
+        "Sweet Bread",
+        "Quick Bread",
+        "Lithuanian Sweet Bread(Pyragas; A Simplified Version Of A Traditional Holiday Bread)",
+        "Break-Away Bread",
+        "Short'Nen Bread"
+      ]
+    },
+    {
+      "query": "nut-free cookies",
+      "category": "nuts",
+      "status": "FAIL",
+      "recipe_count": 3,
+      "violations": [
+        {
+          "title": "Nut Cookies",
+          "violations": [
+            "'1/2 lb. pecans, chopped' matched 'pecans'"
+          ]
+        },
+        {
+          "title": "Sure Thing Sugar Cookies",
+          "violations": [
+            "'1/2 tsp. almond flavoring' matched 'almond'"
+          ]
+        }
+      ],
+      "titles": [
+        "Nut Cookies",
+        "Nikki'S No Bake Cookies",
+        "Sure Thing Sugar Cookies"
+      ]
+    },
+    {
+      "query": "nut-free chocolate cake",
+      "category": "nuts",
+      "status": "PASS",
+      "recipe_count": 10,
+      "violations": [],
+      "titles": [
+        "Delicious Low Calorie Chocolate Cake",
+        "Mother J'S Chocolate Cake(Delicious!)",
+        "Chocolate Pound Cake",
+        "Mrs. Anthony'S Chocolate Cake",
+        "Mayonnaise Chocolate Cake",
+        "Neapolitan Cake",
+        "Chocolate Caramel Cake",
+        "Chocolate Oatmeal Cake",
+        "Death By Chocolate",
+        "Chocolate Pound Cake"
+      ]
+    },
+    {
+      "query": "pasta with cream sauce",
+      "category": "none",
+      "status": "CONTROL",
+      "recipe_count": 5,
+      "violations": [],
+      "titles": [
+        "Pasta With Pink Vodka Sauce",
+        "Pasta In A Pot",
+        "Fettuccine Alfredo",
+        "Summer Tomato Sauce",
+        "Creamy Pasta Salad"
+      ]
+    }
+  ]
+}

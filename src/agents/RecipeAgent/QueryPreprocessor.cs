@@ -1,5 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
+using ChefAgent.Agents.Diet;
+using ChefAgent.Shared;
 using ChefAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 
@@ -260,10 +262,32 @@ public class QueryPreprocessor
         }
 
         // Handle "X-free" patterns, e.g. "gluten-free" or "dairy-free".
+        // Expand category name to full ingredient set using DietaryCategoryMap.
+        // "dairy-free" → exclude milk, cream, butter, cheese, etc. (not just "dairy")
         var freeMatches = FreePattern.Matches(cleanedQuery);
         foreach (Match match in freeMatches)
         {
-            excludedTerms.Add(match.Groups[1].Value.ToLowerInvariant());
+            var category = match.Groups[1].Value.ToLowerInvariant();
+            var ingredients = DietaryRules.GetCategoryIngredients(category);
+
+            if (ingredients is not null)
+            {
+                excludedTerms.AddRange(ingredients);
+                _logger.LogInformation(
+                    "[QueryPreprocessor] Expanded '{Category}-free' → {Count} exclusion terms",
+                    category,
+                    ingredients.Count
+                );
+            }
+            else
+            {
+                // Unknown category — fall back to raw term (old behavior)
+                excludedTerms.Add(category);
+                _logger.LogInformation(
+                    "[QueryPreprocessor] Unknown category '{Category}-free' — using raw term as exclusion",
+                    category
+                );
+            }
         }
 
         if (excludedTerms.Count > 0)

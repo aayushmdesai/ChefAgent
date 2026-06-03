@@ -33,7 +33,7 @@ Portfolio screenshots (take manually from browser at http://localhost:3100):
     trace_injection_blocked.png     — session obs-inject-1
 """
 
-import requests
+import requests  # type: ignore
 import json
 import time
 import os
@@ -42,21 +42,24 @@ from datetime import datetime
 BASE = "http://localhost:5100"
 SCREENSHOTS_DIR = "docs/architecture/screenshots"
 
-GREEN  = "\033[92m"
-RED    = "\033[91m"
+GREEN = "\033[92m"
+RED = "\033[91m"
 YELLOW = "\033[93m"
-BLUE   = "\033[94m"
-RESET  = "\033[0m"
-BOLD   = "\033[1m"
+BLUE = "\033[94m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def sep(title):
     print(f"\n{BLUE}{BOLD}{'─' * 60}{RESET}")
     print(f"{BLUE}{BOLD}  {title}{RESET}")
     print(f"{BLUE}{BOLD}{'─' * 60}{RESET}")
 
+
 results = []
+
 
 def chat(message, session_id, dietary_profile=None, label=None):
     label = label or message[:60]
@@ -101,8 +104,10 @@ def chat(message, session_id, dietary_profile=None, label=None):
         return {}
     except Exception as e:
         print(f"  {RED}✗ ERROR: {e}{RESET}")
-        results.append({"label": label, "session": session_id, "status": "error", "response": str(e)})
+        results.append({"label": label, "session": session_id,
+                       "status": "error", "response": str(e)})
         return {}
+
 
 def get(path, label):
     try:
@@ -113,6 +118,7 @@ def get(path, label):
         print(f"  {RED}✗ {label} ERROR: {e}{RESET}")
         return {}
 
+
 def save_json(filename, data):
     os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
     path = os.path.join(SCREENSHOTS_DIR, filename)
@@ -120,6 +126,7 @@ def save_json(filename, data):
         json.dump(data, f, indent=2)
     print(f"  {GREEN}✓{RESET} Saved → {path}")
     return path
+
 
 def save_markdown(filename, content):
     os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
@@ -131,6 +138,7 @@ def save_markdown(filename, content):
 
 # ── Test scenarios ────────────────────────────────────────────────────────────
 
+
 sep("1. Basic recipe search (no profile)")
 chat("find me a quick chicken dinner", "obs-basic-1",
      label="quick chicken dinner")
@@ -140,7 +148,8 @@ sep("2. Dairy-free pasta — diet_agent.validate x5")
 chat(
     "find me dairy-free pasta",
     "obs-dairy-1",
-    dietary_profile={"restrictions": ["dairy-free"], "allergies": [], "cuisinePreferences": []},
+    dietary_profile={"restrictions": [
+        "dairy-free"], "allergies": [], "cuisinePreferences": []},
     label="dairy-free pasta"
 )
 time.sleep(1)
@@ -149,7 +158,8 @@ sep("3. Nut-free + dairy-free — merged profile")
 chat(
     "I need nut-free pasta ideas",
     "obs-dairy-1",
-    dietary_profile={"restrictions": ["nut-free"], "allergies": [], "cuisinePreferences": []},
+    dietary_profile={"restrictions": ["nut-free"],
+                     "allergies": [], "cuisinePreferences": []},
     label="nut-free pasta (merged with dairy-free)"
 )
 time.sleep(1)
@@ -163,7 +173,8 @@ sep("5. Meal plan generation — 7-day dinners (most impressive trace)")
 chat(
     "plan my dinners for the week",
     "obs-plan-1",
-    dietary_profile={"restrictions": ["dairy-free"], "allergies": [], "cuisinePreferences": []},
+    dietary_profile={"restrictions": [
+        "dairy-free"], "allergies": [], "cuisinePreferences": []},
     label="plan dinners for the week (dairy-free)"
 )
 print(f"  {YELLOW}→ Find this trace in Langfuse for portfolio Screenshot 2{RESET}")
@@ -195,7 +206,8 @@ sep("10. ValidateDiet intent — direct diet validation")
 chat(
     "is pasta carbonara safe for my diet?",
     "obs-diet-1",
-    dietary_profile={"restrictions": ["dairy-free"], "allergies": [], "cuisinePreferences": []},
+    dietary_profile={"restrictions": [
+        "dairy-free"], "allergies": [], "cuisinePreferences": []},
     label="is pasta carbonara dairy-free?"
 )
 time.sleep(1)
@@ -233,7 +245,8 @@ guardrails = get("/admin/guardrails", "GET /admin/guardrails")
 if guardrails:
     print(f"\n  {BOLD}Recent guardrail events ({len(guardrails)} total):{RESET}")
     for evt in guardrails[-5:]:
-        print(f"    [{evt.get('eventType')}] session={evt.get('sessionId')} {evt.get('detail', '')[:60]}")
+        print(
+            f"    [{evt.get('eventType')}] session={evt.get('sessionId')} {evt.get('detail', '')[:60]}")
     save_json("guardrails_snapshot.json", guardrails)
 
 # ── Generate test summary markdown ────────────────────────────────────────────
