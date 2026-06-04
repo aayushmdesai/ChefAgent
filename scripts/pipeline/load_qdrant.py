@@ -5,28 +5,38 @@ Qdrant Index Loader
 Creates a Qdrant collection and uploads recipe documents with embeddings.
 
 Usage:
-    python scripts/load_qdrant.py \
+    python scripts/pipeline/load_qdrant.py \
         --input data/embeddings/recipe_vectors.jsonl \
+        --collection recipes
+
+    # Cloud:
+    python scripts/pipeline/load_qdrant.py \
+        --qdrant-url https://your-cluster.cloud.qdrant.io:6334 \
+        --api-key YOUR_KEY \
         --collection recipes
 
 Dependencies:
     pip install qdrant-client tqdm
-
-Prerequisite:
-    Qdrant running locally (docker compose up qdrant)
 """
 
 import argparse
 import json
+import os
 from pathlib import Path
 from tqdm import tqdm
+from urllib.parse import urlparse
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Load recipe vectors into Qdrant")
-    parser.add_argument("--input", type=str, default="data/embeddings/recipe_vectors.jsonl")
+    parser = argparse.ArgumentParser(
+        description="Load recipe vectors into Qdrant")
+    parser.add_argument("--input", type=str,
+                        default="data/embeddings/recipe_vectors.jsonl")
     parser.add_argument("--collection", type=str, default="recipes")
-    parser.add_argument("--qdrant-url", type=str, default="http://localhost:6333")
+    parser.add_argument("--qdrant-url", type=str,
+                        default="http://localhost:6333")
+    parser.add_argument("--api-key", type=str,
+                        default=os.getenv("QDRANT_API_KEY"))
     parser.add_argument("--batch-size", type=int, default=200)
     args = parser.parse_args()
 
@@ -37,11 +47,20 @@ def main():
         PointStruct,
     )
 
-    client = QdrantClient(url=args.qdrant_url)
+    parsed = urlparse(args.qdrant_url)
+    client = QdrantClient(
+        host=parsed.hostname,
+        port=parsed.port or 6333,
+        https=parsed.scheme == "https",
+        api_key=args.api_key,
+        check_compatibility=False,
+        prefer_grpc=False
+    )
 
     # Load documents
     input_path = Path(args.input)
-    docs = [json.loads(line) for line in input_path.read_text().strip().split("\n")]
+    docs = [json.loads(line)
+            for line in input_path.read_text().strip().split("\n")]
     print(f"Loaded {len(docs)} documents with embeddings")
 
     # Detect embedding dimension from first doc
@@ -89,8 +108,9 @@ def main():
     info = client.get_collection(args.collection)
     print(f"\n🎉 Collection '{args.collection}' is ready!")
     print(f"   Points: {info.points_count}")
-    print(f"   Vectors: dim={info.config.params.vectors.size}, distance={info.config.params.vectors.distance}")
-    print(f"   Qdrant dashboard: http://localhost:6333/dashboard")
+    print(
+        f"   Vectors: dim={info.config.params.vectors.size}, distance={info.config.params.vectors.distance}")
+    print(f"   Qdrant dashboard: {args.qdrant_url}/dashboard")
 
 
 if __name__ == "__main__":
