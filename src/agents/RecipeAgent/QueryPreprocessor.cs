@@ -311,6 +311,9 @@ public class QueryPreprocessor
         return AbstractSignals.Any(signal => lower.Contains(signal));
     }
 
+    // TODO(Month4-cleanup): Wire ILlmProvider here.
+    // ExpandQueryAsync fires rarely (opt-in, abstract queries only).
+    // Direct Ollama call retained for now.
     /// <summary>
     /// Expands a vague query into concrete food search terms via LLM.
     /// "something warm and comforting" → "soup, stew, chili, casserole, pot roast"

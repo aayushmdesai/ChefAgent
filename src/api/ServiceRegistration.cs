@@ -71,6 +71,50 @@ public static class ServiceRegistration
             // Local — plain gRPC no TLS
             return new QdrantClient(uri.Host, uri.Port);
         });
+        // ── LLM Provider — config-driven, swap without code changes ──────────────
+        var llmProvider = config["LlmProvider"] ?? "ollama";
+        var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
+        var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
+
+        services.AddSingleton<ILlmProvider>(sp =>
+        {
+            var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
+
+            if (llmProvider == "groq")
+            {
+                var apiKey =
+                    config["Groq:ApiKey"]
+                    ?? throw new InvalidOperationException(
+                        "Groq:ApiKey required when LlmProvider=groq"
+                    );
+                var model = config["Groq:Model"] ?? "llama-3.2-3b-preview";
+                return new GroqProvider(httpClient, apiKey, model);
+            }
+
+            return new OllamaLlmProvider(httpClient, ollamaUrl, chatModel);
+        });
+
+        // ── Embedding Provider — config-driven ───────────────────────────────────
+        var embeddingProvider = config["EmbeddingProvider"] ?? "ollama";
+
+        services.AddSingleton<IEmbeddingProvider>(sp =>
+        {
+            var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
+
+            if (embeddingProvider == "huggingface")
+            {
+                var apiKey =
+                    config["HuggingFace:ApiKey"]
+                    ?? throw new InvalidOperationException(
+                        "HuggingFace:ApiKey required when EmbeddingProvider=huggingface"
+                    );
+                var model = config["HuggingFace:Model"] ?? "nomic-ai/nomic-embed-text-v1";
+                return new HuggingFaceEmbeddingProvider(httpClient, apiKey, model);
+            }
+
+            var embeddingModel = config["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
+            return new OllamaEmbeddingProvider(httpClient, ollamaUrl, embeddingModel);
+        });
 
         // Ollama HTTP client — shared across all agents
         // Timeout is long because LLM inference on CPU can take 30+ seconds
@@ -127,18 +171,18 @@ public static class ServiceRegistration
             var tracing = sp.GetRequiredService<Tracing>();
             var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
             var embeddingModel = config["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
+            var embeddingProvider = sp.GetRequiredService<IEmbeddingProvider>();
             var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
             var collection = config["Qdrant:CollectionName"] ?? "recipes";
 
             return new RecipeSearchPlugin(
                 qdrant,
                 httpClient,
-                ollamaUrl,
-                embeddingModel,
                 collection,
                 logger,
                 outputGuard,
                 tracing,
+                embeddingProvider,
                 new RecipeReranker(
                     httpClient,
                     ollamaUrl,
@@ -169,14 +213,8 @@ public static class ServiceRegistration
     {
         services.AddSingleton(sp =>
         {
-            var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
-            var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
-            var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
-
             return new DietValidationPlugin(
-                httpClient,
-                ollamaUrl,
-                chatModel,
+                sp.GetRequiredService<ILlmProvider>(),
                 sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
                 sp.GetRequiredService<Tracing>(),
                 sp.GetRequiredService<ILogger<DietValidationPlugin>>()
@@ -262,18 +300,12 @@ public static class ServiceRegistration
         // AgentOrchestrator — resolves agents registered above
         services.AddSingleton(sp =>
         {
-            var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
-            var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
-            var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
-
             return new AgentOrchestrator(
                 sp.GetRequiredService<RecipeSearchPlugin>(),
                 sp.GetRequiredService<DietValidationPlugin>(),
                 sp.GetRequiredService<MealPlannerPlugin>(),
                 sp.GetRequiredService<SessionStore>(),
-                httpClient,
-                ollamaUrl,
-                chatModel,
+                sp.GetRequiredService<ILlmProvider>(),
                 sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
                 sp.GetRequiredService<GuardrailAuditLog>(),
                 sp.GetRequiredService<Tracing>(),

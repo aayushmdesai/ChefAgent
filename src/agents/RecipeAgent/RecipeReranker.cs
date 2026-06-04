@@ -164,6 +164,9 @@ public class RecipeReranker
         return sb.ToString();
     }
 
+    // TODO(Month4-cleanup): Wire ILlmProvider here.
+    // RerankAsync is opt-in (rerank=true flag), off by default.
+    // Direct Ollama call retained for now.
     private async Task<string?> CallOllamaAsync(string prompt, CancellationToken ct)
     {
         var request = new

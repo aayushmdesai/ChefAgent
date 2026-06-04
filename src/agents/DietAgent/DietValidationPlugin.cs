@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 /// Two-layer design:
 ///   Layer 1 — DietaryRules  : static knowledge base, instant, zero LLM calls.
 ///                              Handles the common 80% of cases.
-///   Layer 2 — Ollama LLM    : called only when rules are insufficient.
+///   Layer 2 — LLM           : called only when rules are insufficient.
 ///                              Handles edge cases, ambiguous ingredients,
 ///                              and unknown restriction types.
 ///
@@ -28,9 +28,7 @@ using Microsoft.Extensions.Logging;
 /// </summary>
 public class DietValidationPlugin
 {
-    private readonly HttpClient _httpClient;
-    private readonly string _ollamaUrl;
-    private readonly string _chatModel;
+    private readonly ILlmProvider _llmProvider;
     private readonly CircuitBreaker _circuitBreaker;
     private readonly ILogger<DietValidationPlugin> _logger;
     private readonly Tracing _tracing;
@@ -179,17 +177,13 @@ public class DietValidationPlugin
     ];
 
     public DietValidationPlugin(
-        HttpClient httpClient,
-        string ollamaUrl,
-        string chatModel,
+        ILlmProvider llmProvider,
         CircuitBreaker circuitBreaker,
         Tracing tracing,
         ILogger<DietValidationPlugin> logger
     )
     {
-        _httpClient = httpClient;
-        _ollamaUrl = ollamaUrl;
-        _chatModel = chatModel;
+        _llmProvider = llmProvider;
         _circuitBreaker = circuitBreaker;
         _tracing = tracing;
         _logger = logger;
@@ -488,7 +482,7 @@ public class DietValidationPlugin
                         // same shape as the existing catch block fallback
                     };
                 }
-                var raw = await CallOllamaAsync(prompt);
+                var raw = await CallLlmAsync(prompt);
                 _circuitBreaker.RecordSuccess();
 
                 _tracing.EndSpan(spanCtx, output: new { latency = "ok" });
@@ -666,7 +660,7 @@ public class DietValidationPlugin
                 );
                 return [];
             }
-            var raw = await CallOllamaAsync(prompt);
+            var raw = await CallLlmAsync(prompt);
             _circuitBreaker.RecordSuccess();
             var json = raw.Replace("```json", "").Replace("```", "").Trim();
             var items =
@@ -692,26 +686,12 @@ public class DietValidationPlugin
         }
     }
 
-    // ── Ollama HTTP ───────────────────────────────────────────────────────────
+    // ── LLM HTTP ───────────────────────────────────────────────────────────
 
-    private async Task<string> CallOllamaAsync(string prompt)
+    private async Task<string> CallLlmAsync(string prompt, CancellationToken ct = default)
     {
-        var payload = new
-        {
-            model = _chatModel,
-            stream = false,
-            messages = new[] { new { role = "user", content = prompt } },
-        };
-
-        var json = JsonSerializer.Serialize(payload);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_ollamaUrl}/api/chat", content);
-        response.EnsureSuccessStatusCode();
-
-        var responseBody = await response.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(responseBody);
-        return doc.RootElement.GetProperty("message").GetProperty("content").GetString()
-            ?? string.Empty;
+        var messages = new[] { new ChatMessage("user", prompt) };
+        return await _llmProvider.ChatAsync(messages, ct);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

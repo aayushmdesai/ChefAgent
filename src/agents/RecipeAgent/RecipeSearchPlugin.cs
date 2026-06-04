@@ -11,17 +11,15 @@ namespace ChefAgent.Agents.Recipe;
 
 /// <summary>
 /// Semantic Kernel plugin that performs vector search over the recipe corpus in Qdrant.
-/// Embeds the query via Ollama, then searches Qdrant for similar recipes.
+/// Embeds the query via LLM, then searches Qdrant for similar recipes.
 /// </summary>
 public class RecipeSearchPlugin
 {
     private readonly QdrantClient _qdrantClient;
     private readonly HttpClient _httpClient;
     private readonly string _collectionName;
-    private readonly string _ollamaUrl;
-    private readonly string _embeddingModel;
     private readonly ILogger<RecipeSearchPlugin> _logger;
-
+    private readonly IEmbeddingProvider _embeddingProvider;
     private readonly OutputGuard _outputGuard;
 
     // Optional reranker plugin for LLM-based candidate reordering.
@@ -43,26 +41,24 @@ public class RecipeSearchPlugin
     public RecipeSearchPlugin(
         QdrantClient qdrantClient,
         HttpClient httpClient,
-        string ollamaUrl,
-        string embeddingModel,
         string collectionName,
         ILogger<RecipeSearchPlugin> logger,
         OutputGuard outputGuard,
         Tracing tracing,
+        IEmbeddingProvider embeddingProvider,
         RecipeReranker? reranker = null,
         QueryPreprocessor? preprocessor = null
     )
     {
         _qdrantClient = qdrantClient;
         _httpClient = httpClient;
-        _ollamaUrl = ollamaUrl;
-        _embeddingModel = embeddingModel;
         _collectionName = collectionName;
         _logger = logger;
         _reranker = reranker;
         _preprocessor = preprocessor;
         _outputGuard = outputGuard;
         _tracing = tracing;
+        _embeddingProvider = embeddingProvider;
     }
 
     [KernelFunction("search_recipes")]
@@ -247,11 +243,11 @@ public class RecipeSearchPlugin
         TraceContext? parentCtx = null
     )
     {
-        // Cache hit — skip Ollama entirely
+        // Cache hit — skip embedding provider entirely
         if (_embeddingCache.TryGetValue(text, out var cached))
         {
             _logger.LogInformation(
-                "[EmbeddingCache] Hit — skipping Ollama for: \"{Text}\" (cache size: {Size})",
+                "[EmbeddingCache] Hit — skipping embedding for: \"{Text}\" (cache size: {Size})",
                 text,
                 _embeddingCache.Count
             );
@@ -270,22 +266,12 @@ public class RecipeSearchPlugin
             return cached;
         }
 
-        // Cache miss — call Ollama
+        // Cache miss — call embedding provider (LLM or HuggingFace)
         var missCtx = parentCtx is not null
-            ? _tracing.StartSpan(
-                parentCtx,
-                "embed.ollama",
-                input: text,
-                metadata: new() { ["model"] = _embeddingModel }
-            )
+            ? _tracing.StartSpan(parentCtx, "embed.provider", input: text)
             : TraceContext.None;
 
-        var request = new { model = _embeddingModel, input = $"search_query: {text}" };
-        var response = await _httpClient.PostAsJsonAsync($"{_ollamaUrl}/api/embed", request, ct);
-        response.EnsureSuccessStatusCode();
-
-        var result = await response.Content.ReadFromJsonAsync<OllamaEmbedResponse>(ct);
-        var vector = result!.Embeddings[0];
+        var vector = await _embeddingProvider.EmbedAsync(text, ct);
 
         if (!missCtx.IsNone)
             _tracing.EndSpan(
@@ -295,12 +281,12 @@ public class RecipeSearchPlugin
                 metadata: new() { ["dims"] = vector.Length, ["cache_size"] = _embeddingCache.Count }
             );
 
-        // Store in cache (simple size cap)
+        // Store in cache
         if (_embeddingCache.Count < EmbeddingCacheMaxSize)
             _embeddingCache[text] = vector;
 
         _logger.LogInformation(
-            "[EmbeddingCache] Miss — embedded via Ollama: \"{Text}\" (cache size: {Size})",
+            "[EmbeddingCache] Miss — embedded via provider: \"{Text}\" (cache size: {Size})",
             text,
             _embeddingCache.Count
         );
@@ -321,6 +307,4 @@ public class RecipeSearchPlugin
             return [];
         return v.ListValue.Values.Select(x => x.StringValue ?? "").Where(s => s != "").ToList();
     }
-
-    private record OllamaEmbedResponse(float[][] Embeddings);
 }

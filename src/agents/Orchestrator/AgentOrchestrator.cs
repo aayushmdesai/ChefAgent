@@ -20,7 +20,7 @@ using Microsoft.Extensions.Logging;
 ///   ValidateDiet                → Diet Agent only
 ///   CreateMealPlan              → Planner Agent (with profile if present)
 ///   ModifyMealPlan              → Planner Agent (with profile if present)
-///   GeneralQuestion             → Ollama direct (conversational)
+///   GeneralQuestion             → LLM direct (conversational)
 ///   Unknown                     → ask user to clarify
 ///
 /// Failure handling:
@@ -35,9 +35,7 @@ public class AgentOrchestrator
     private readonly DietValidationPlugin _dietAgent;
     private readonly MealPlannerPlugin _plannerAgent;
     private readonly SessionStore _sessionStore;
-    private readonly HttpClient _httpClient;
-    private readonly string _ollamaUrl;
-    private readonly string _chatModel;
+    private readonly ILlmProvider _llmProvider;
     private readonly CircuitBreaker _circuitBreaker;
     private readonly GuardrailAuditLog _audit;
     private readonly Tracing _tracing;
@@ -53,9 +51,7 @@ public class AgentOrchestrator
         DietValidationPlugin dietAgent,
         MealPlannerPlugin plannerAgent,
         SessionStore sessionStore,
-        HttpClient httpClient,
-        string ollamaUrl,
-        string chatModel,
+        ILlmProvider llmProvider,
         CircuitBreaker circuitBreaker,
         GuardrailAuditLog audit,
         Tracing tracing,
@@ -64,11 +60,9 @@ public class AgentOrchestrator
     {
         _recipeAgent = recipeAgent;
         _dietAgent = dietAgent;
-        _httpClient = httpClient;
+        _llmProvider = llmProvider;
         _sessionStore = sessionStore;
         _plannerAgent = plannerAgent;
-        _ollamaUrl = ollamaUrl;
-        _chatModel = chatModel;
         _circuitBreaker = circuitBreaker;
         _audit = audit;
         _tracing = tracing;
@@ -931,7 +925,7 @@ public class AgentOrchestrator
     {
         var genCtx = _tracing.StartSpan(
             parentCtx,
-            "ollama.general_question",
+            "llm.general_question",
             input: new { query = classified.SearchQuery }
         );
 
@@ -953,7 +947,7 @@ public class AgentOrchestrator
             }
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            var answer = await AskOllamaAsync(classified.SearchQuery);
+            var answer = await AskLlmAsync(classified.SearchQuery);
             sw.Stop();
 
             _circuitBreaker.RecordSuccess();
@@ -962,7 +956,7 @@ public class AgentOrchestrator
             _tracing.LogGeneration(
                 genCtx,
                 name: "general_question",
-                model: _chatModel,
+                model: _llmProvider.ModelName,
                 prompt: classified.SearchQuery,
                 completion: answer,
                 estimatedTokens: (classified.SearchQuery.Length + answer.Length) / 4,
@@ -984,7 +978,7 @@ public class AgentOrchestrator
         {
             _logger.LogWarning(
                 ex,
-                "Ollama failed for GeneralQuestion '{Query}'",
+                "LLM failed for GeneralQuestion '{Query}'",
                 classified.SearchQuery
             );
             _circuitBreaker.RecordFailure();
@@ -1068,34 +1062,20 @@ public class AgentOrchestrator
         return sb.ToString();
     }
 
-    // ── Ollama Direct (GeneralQuestion) ───────────────────────────────────────
+    // ── LLM Direct (GeneralQuestion) ───────────────────────────────────────
 
-    private async Task<string> AskOllamaAsync(string question)
+    private async Task<string> AskLlmAsync(string question, CancellationToken ct = default)
     {
-        var payload = new
+        var messages = new[]
         {
-            model = _chatModel,
-            stream = false,
-            messages = new[]
-            {
-                new
-                {
-                    role = "system",
-                    content = "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences.",
-                },
-                new { role = "user", content = question },
-            },
+            new ChatMessage(
+                "system",
+                "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences."
+            ),
+            new ChatMessage("user", question),
         };
 
-        var json = JsonSerializer.Serialize(payload);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_ollamaUrl}/api/chat", content);
-        response.EnsureSuccessStatusCode();
-
-        var body = await response.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(body);
-        return doc.RootElement.GetProperty("message").GetProperty("content").GetString()
-            ?? string.Empty;
+        return await _llmProvider.ChatAsync(messages, ct);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
