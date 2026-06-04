@@ -1,13 +1,13 @@
 .PHONY: up down build logs reload-vectors frontend pull-models health check-vectors fresh
 
 up:
-	docker compose up -d
+	docker compose --env-file .env.local up -d
 
 down:
 	docker compose down
 
 build:
-	docker compose up --build api
+	docker compose --env-file .env.local up --build api
 
 logs:
 	docker compose logs api -f
