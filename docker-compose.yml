@@ -7,7 +7,8 @@ services:
       - "5100:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - Qdrant__Endpoint=http://qdrant:6334
+      - Qdrant__Endpoint=https://8a41b47b-679f-45f7-a66f-522be49a16a2.us-east-2-0.aws.cloud.qdrant.io:6334
+      - Qdrant__ApiKey=${QDRANT_API_KEY}
       - Qdrant__CollectionName=recipes
       - Ollama__Endpoint=http://ollama:11434
       - Ollama__ChatModel=llama3.2:1b

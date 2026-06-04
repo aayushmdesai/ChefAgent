@@ -21,6 +21,7 @@ using ChefAgent.Agents.Orchestrator;
 using ChefAgent.Agents.PlannerAgent;
 using ChefAgent.Agents.Recipe;
 using ChefAgent.Shared;
+using Microsoft.Extensions.DependencyInjection;
 using Qdrant.Client;
 using StackExchange.Redis;
 
@@ -53,7 +54,21 @@ public static class ServiceRegistration
         services.AddSingleton(sp =>
         {
             var endpoint = config["Qdrant:Endpoint"] ?? "http://localhost:6334";
+            var apiKey = config["Qdrant:ApiKey"];
             var uri = new Uri(endpoint);
+
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                // Cloud — use host/port with https + apiKey
+                return new QdrantClient(
+                    host: uri.Host,
+                    port: uri.Port,
+                    https: true,
+                    apiKey: apiKey
+                );
+            }
+
+            // Local — plain gRPC no TLS
             return new QdrantClient(uri.Host, uri.Port);
         });
 
