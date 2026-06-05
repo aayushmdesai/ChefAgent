@@ -7,13 +7,13 @@
 
 ## Goals
 
-- Migrate all services to free-tier cloud equivalents
-- Prove provider-agnostic architecture claims from ADRs 001, 002, 003
-- Deploy API to Railway with zero local dependencies
-- Deploy React frontend to Vercel
-- Verify Langfuse Cloud traces from deployed API
-- Load test and document performance comparison local vs cloud
-- Write ADR-012, Month 3 retrospective, v1.0.0 tag
+- Migrate all services to free-tier cloud equivalents ✅
+- Prove provider-agnostic architecture claims from ADRs 001, 002, 003 ✅
+- Deploy API to Railway with zero local dependencies ✅
+- Deploy React frontend to Vercel ✅
+- Verify Langfuse Cloud traces from deployed API ✅
+- Load test and document performance comparison local vs cloud (Day 5)
+- Write ADR-012, Month 3 retrospective, v1.0.0 tag (Day 6-7)
 
 ---
 
@@ -47,7 +47,7 @@ If you have to modify agent logic, the abstraction leaked somewhere. No agent co
 
 ### What Was Done
 
-Created all cloud accounts (Qdrant Cloud, Upstash, Groq, HuggingFace, Langfuse Cloud, Railway, Nomic).
+Created all cloud accounts (Qdrant Cloud, Upstash, Groq, Langfuse Cloud, Railway, Nomic).
 
 Parameterized `scripts/pipeline/load_qdrant.py`:
 - Added `--qdrant-url` and `--api-key` CLI args
@@ -104,15 +104,15 @@ public interface IEmbeddingProvider
 public record ChatMessage(string Role, string Content);
 ```
 
-Five implementations:
+Four active implementations:
 
-| Class | Provider | Notes |
-|-------|----------|-------|
-| `OllamaLlmProvider` | Ollama `/api/chat` | Existing code refactored |
-| `GroqProvider` | Groq OpenAI-compatible API | 429 → retry with backoff |
-| `OllamaEmbeddingProvider` | Ollama `/api/embed` | `search_query:` prefix internal |
-| `HuggingFaceEmbeddingProvider` | HF Inference API | Implemented, blocked by DNS |
-| `NomicEmbeddingProvider` | Nomic Atlas API | Final cloud embedding provider |
+| Class | Provider | Status |
+|-------|----------|--------|
+| `OllamaLlmProvider` | Ollama `/api/chat` | ✅ Local fallback |
+| `GroqProvider` | Groq OpenAI-compatible API | ✅ Production LLM |
+| `OllamaEmbeddingProvider` | Ollama `/api/embed` | ✅ Local fallback |
+| `NomicEmbeddingProvider` | Nomic Atlas API | ✅ Production embeddings |
+| `HuggingFaceEmbeddingProvider` | HF Inference API | ⚠️ Implemented, not used — DNS blocked in Codespaces and Railway |
 
 Config-driven registration — `"Cloud"` HttpClient for external APIs, `"Ollama"` for local:
 
@@ -151,18 +151,12 @@ These are different failure modes. Circuit breaker unchanged — still guards Ol
 
 ### HuggingFace DNS Blocker — Decision Trail
 
-`api-inference.huggingface.co` is blocked at DNS level in both Codespaces and Railway:
-```
-curl: (6) Could not resolve host: api-inference.huggingface.co
-```
-
-This is not a code issue — `HuggingFaceEmbeddingProvider.cs` is implemented correctly. Both environments block the domain at the network level. HuggingFace Inference Endpoints (paid GPU instances) would work but violate the free-tier constraint.
+The initial plan was HuggingFace Inference API for embeddings. During deployment it was discovered that `api-inference.huggingface.co` is blocked at DNS level in both Codespaces and Railway — not a code issue, a network restriction.
 
 **Decision: Nomic Atlas API.** Nomic built `nomic-embed-text` and hosts it at `api-atlas.nomic.ai`. Key advantages:
 - Same model as stored vectors — zero re-embedding, zero vector space mismatch
-- `api-atlas.nomic.ai` reachable from both Codespaces and Railway
-- Free tier sufficient for portfolio demo
-- `search_query:` prefix convention identical — `NomicEmbeddingProvider` is a drop-in replacement
+- Reachable from both Codespaces and Railway
+- `HuggingFaceEmbeddingProvider` retained in codebase for environments without this restriction — but not used in production
 
 ### Lean Local Stack
 
@@ -181,48 +175,70 @@ Created `docker-compose.local.yml` — drops services now on cloud:
 ### Railway Deployment
 
 - Dockerfile path: `infra/docker/Dockerfile.api`
-- Builder: Dockerfile (not Railpack — Railpack can't detect .NET in nested directory)
+- Builder: Dockerfile (not Railpack — can't detect .NET in nested directory)
 - All secrets set as Railway environment variables
 - Auto-deploy on push to main
+- Public URL: `https://chefagent-production.up.railway.app`
 
 ### Smoke Test Results (Railway)
 
 | Intent | Query | Result |
 |--------|-------|--------|
 | SearchRecipe | "find me pasta recipes" | ✅ "Homemade Pasta" |
-| GeneralQuestion | "what is blanching?" | ✅ Correct answer |
-| CreateMealPlan | "plan my dinners for the week" | ✅ 7-day plan |
+| GeneralQuestion | "what is blanching?" | ✅ Correct answer, 651ms |
+| CreateMealPlan | "plan my dinners for the week" | ✅ 7-day plan, Redis session persisted |
 | Guardrail | injection attempt | ✅ Blocked |
 
-### Nomic Verification
+---
 
-Definitive test — Ollama stopped, Nomic returns results:
-```bash
-docker compose stop ollama
-curl .../chat → "Homemade Pasta"  ✅
+## Day 4 — Vercel Frontend ✅
+
+### What Was Done
+
+Updated `getApiUrl()` in `App.jsx` to handle three environments:
+
+```javascript
+function getApiUrl() {
+  const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1')
+    return 'http://localhost:5100/chat';
+  if (hostname.includes('github.dev') || hostname.includes('githubpreview.dev'))
+    return `${window.location.protocol}//${hostname.replace('-5173', '-5100')}/chat`;
+  // Production
+  return 'https://chefagent-production.up.railway.app/chat';
+}
 ```
 
-### Langfuse Cloud
+Built and deployed to Vercel:
+```bash
+cd src/frontend && npm run build
+npx vercel --prod
+```
 
-Traces flowing to `us.cloud.langfuse.com` — every request from Railway appears as a trace with full span tree.
+- **Frontend:** `https://chefagent.vercel.app`
+- **API:** `https://chefagent-production.up.railway.app`
+
+### Full Pipeline Verified via UI
+
+With dairy allergy set in the sidebar, "find me pasta dinner" produced:
+- Nomic embed: 182ms (cache hit on repeat)
+- Qdrant search: 5 recipes found
+- DietAgent Rules: Homemade Pasta compatible, Spaghetti Casserole incompatible (2 violations)
+- DietAgent LLM (Groq): Spaghetti Pasta Salad escalated — ambiguous ingredients + allergy → 662ms
+- Total: 739ms for full search + dietary validation pipeline
+
+### Known Limitation: GeneralQuestion Statelessness
+
+`AskLlmAsync` sends only the current question to Groq — no conversation history. Follow-up questions like "how to make it" lose context of what "it" refers to. `ResolveReferencesAsync` handles reference resolution for `SearchRecipe` and `ModifyMealPlan` but not `GeneralQuestion`.
+
+Fix deferred to Month 4 — pass last N history turns to `AskLlmAsync`.
 
 ---
 
-## Day 4 — Frontend + Load Test (Planned)
+## Day 5 — Observability (Planned)
 
-- Deploy React UI to Vercel
-- Update API URL in frontend to Railway endpoint
-- Run `scripts/eval/load_test.py` — 10 concurrent requests
-- Document p95 latency, success rate
-
----
-
-## Day 5 — Observability + ADR-012 (Planned)
-
-- Verify Langfuse Cloud trace quality from Railway
-- Performance comparison table: local vs cloud
-- Write `docs/adrs/012-cloud-deployment.md`
-- Update README with live demo link
+- Performance comparison table: local vs cloud with actual Railway numbers
+- Langfuse Cloud trace quality review
 
 ---
 
@@ -230,7 +246,7 @@ Traces flowing to `us.cloud.langfuse.com` — every request from Railway appears
 
 - `docs/month3-retrospective.md`
 - `CHANGELOG.md` v0.9.0 + v1.0.0
-- Final README polish
+- Final README polish with live demo links
 - `git tag v1.0.0`
 
 ---
@@ -244,13 +260,14 @@ src/shared/IEmbeddingProvider.cs           — NEW: embedding provider interface
 src/shared/OllamaLlmProvider.cs            — NEW: Ollama chat implementation
 src/shared/GroqProvider.cs                 — NEW: Groq OpenAI-compatible, 429 retry
 src/shared/OllamaEmbeddingProvider.cs      — NEW: Ollama embed, search_query: prefix
-src/shared/HuggingFaceEmbeddingProvider.cs — NEW: implemented, blocked by DNS egress
-src/shared/NomicEmbeddingProvider.cs       — NEW: Nomic Atlas API, same model as stored vectors
-src/api/ServiceRegistration.cs             — config-driven provider registration, Cloud/Ollama clients
+src/shared/HuggingFaceEmbeddingProvider.cs — NEW: implemented, not used (DNS blocked)
+src/shared/NomicEmbeddingProvider.cs       — NEW: Nomic Atlas API, production embeddings
+src/api/ServiceRegistration.cs             — config-driven provider registration
 src/api/Endpoints.cs                       — stack info shows active providers
 src/agents/Orchestrator/AgentOrchestrator.cs — ILlmProvider wired, AskLlmAsync
 src/agents/DietAgent/DietValidationPlugin.cs — ILlmProvider wired, CallLlmAsync
 src/agents/RecipeAgent/RecipeSearchPlugin.cs — IEmbeddingProvider wired
+src/frontend/src/App.jsx                   — getApiUrl() handles localhost/Codespaces/Vercel
 docker-compose.yml                         — full local stack (offline dev)
 docker-compose.local.yml                   — NEW: lean cloud stack (API + Ollama only)
 Makefile                                   — make up → local.yml, make up-full → full
@@ -259,38 +276,42 @@ Makefile                                   — make up → local.yml, make up-fu
 
 ---
 
-## Performance Summary (Days 1-3)
+## Performance Summary (Days 1-4)
 
 | Operation | Before (Local) | After (Cloud) | Notes |
 |-----------|---------------|---------------|-------|
 | Vector upload (10K) | N/A | 16s | One-time migration |
-| Recipe search | ~1,500ms | ~1,361ms | Qdrant Cloud + Nomic embed |
+| Recipe search | ~1,500ms | ~499ms | Qdrant Cloud + Nomic embed (warm cache) |
+| Full search + diet validation | ~1,500ms | ~739ms | Groq LLM diet validation included |
 | GeneralQuestion | ~14,000ms | 651ms | Groq Llama 3.3 70B — 21x faster |
-| Nomic embed call | N/A | ~615ms | Cold; cached on repeat |
-| Railway deployment | N/A | ✅ live | https://chefagent-production.up.railway.app |
+| Nomic embed (cold) | N/A | ~615ms | Cached on repeat |
+| Nomic embed (warm) | N/A | ~182ms | Cache hit |
+| Frontend | local only | ✅ live | https://chefagent.vercel.app |
+| API | local only | ✅ live | https://chefagent-production.up.railway.app |
 
 ---
 
 ## Key Learnings
 
-**HuggingFace free inference API is DNS-blocked in both Codespaces and Railway.** Not a code issue — the domain `api-inference.huggingface.co` simply doesn't resolve. Switched to Nomic Atlas API which hosts the same model and is reachable everywhere. The `HuggingFaceEmbeddingProvider` remains in the codebase as a documented alternative for environments without this restriction.
+**HuggingFace free inference API is DNS-blocked in both Codespaces and Railway.** Not a code issue. Switched to Nomic Atlas API — same model, same vector space, reachable everywhere. `HuggingFaceEmbeddingProvider` retained but not used in production.
 
-**Same model = zero re-embedding.** The critical constraint when switching embedding providers is vector space compatibility. Stored vectors were generated with `nomic-embed-text-v1` via Ollama. Nomic's API serves the same model. Cosine similarity scores remain meaningful — no 10K vector re-upload needed.
+**Same model = zero re-embedding.** Vector space compatibility is a hard constraint on provider selection. `nomic-embed-text-v1` stored vectors require the same model at query time — this eliminated every alternative except Nomic's own API.
 
-**`env_file` over `${VAR}` substitution.** Docker Compose `${VAR}` substitution is fragile — requires exact naming match between env file and compose file, fails silently when mismatched. Using `env_file: .env.local` directly on the service injects all variables as-is, eliminating the naming mismatch problem entirely.
+**`env_file` over `${VAR}` substitution.** Direct file injection avoids silent naming mismatch failures.
 
-**Railpack can't auto-detect .NET in nested directories.** Railway's default builder (Railpack) scans the repo root and couldn't find the .NET project in `src/`. Fix: switch builder to Dockerfile and specify `infra/docker/Dockerfile.api` explicitly.
+**Railpack can't auto-detect .NET in nested directories.** Switch to Dockerfile builder explicitly.
 
-**Named HTTP clients separate concerns.** `"Ollama"` client has 120s timeout (CPU inference is slow). `"Cloud"` client has 30s timeout (cloud APIs should be fast). Using the wrong client for the wrong provider would either timeout too quickly or wait too long on failures.
+**Named HTTP clients separate concerns.** `"Ollama"` 120s, `"Cloud"` 30s — wrong timeout for wrong provider causes either premature failures or long waits on crashes.
 
-**The abstraction boundary is `ServiceRegistration.cs`.** All provider selection in one file. Groq swap: 30 minutes. Nomic swap: 15 minutes. Zero agent code touched either time.
+**`GeneralQuestion` is stateless.** Groq receives only the current question, not history. Follow-up context ("how to make it") is lost. Reference resolution exists for SearchRecipe/ModifyMealPlan but not GeneralQuestion — Month 4 fix.
+
+**The abstraction boundary is `ServiceRegistration.cs`.** All provider selection in one file. Groq swap: 30 min. Nomic swap: 15 min. Zero agent code touched either time.
 
 ---
 
 ## Deferred
 
-- Full `ILlmProvider` wiring for `IntentRouter`, `QueryPreprocessor`, `RecipeReranker` (Month 4 cleanup)
-- `HuggingFaceEmbeddingProvider` — implemented, usable in environments without DNS restriction
-- Vercel frontend deployment (Day 4)
-- Load test p95 latency (Day 4)
-- ADR-012 final version with Railway performance numbers (Day 5)
+- Full `ILlmProvider` wiring for `IntentRouter`, `QueryPreprocessor`, `RecipeReranker` (Month 4)
+- `GeneralQuestion` conversation history for context resolution (Month 4)
+- `HuggingFaceEmbeddingProvider` — implemented, available for DNS-unrestricted environments
+- Load test p95 latency (Day 5)
