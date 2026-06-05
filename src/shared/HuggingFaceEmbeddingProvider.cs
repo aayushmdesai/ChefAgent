@@ -18,17 +18,18 @@ public class HuggingFaceEmbeddingProvider : IEmbeddingProvider
 {
     private readonly HttpClient _httpClient;
     private readonly string _model;
-    private const string BaseUrl =
-        "https://api-inference.huggingface.co/pipeline/feature-extraction";
+    private readonly string _baseUrl;
 
     public HuggingFaceEmbeddingProvider(
         HttpClient httpClient,
         string apiKey,
-        string model = "nomic-ai/nomic-embed-text-v1"
+        string model = "nomic-ai/nomic-embed-text-v1",
+        string baseUrl = "https://api-inference.huggingface.co/models"
     )
     {
         _httpClient = httpClient;
         _model = model;
+        _baseUrl = baseUrl.TrimEnd('/');
         _httpClient.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
     }
@@ -41,7 +42,7 @@ public class HuggingFaceEmbeddingProvider : IEmbeddingProvider
             options = new { wait_for_model = true }, // blocks until model warm, avoids 503
         };
 
-        var response = await _httpClient.PostAsJsonAsync($"{BaseUrl}/{_model}", request, ct);
+        var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/{_model}", request, ct);
         response.EnsureSuccessStatusCode();
 
         // HuggingFace returns float[][] for batch or float[] for single

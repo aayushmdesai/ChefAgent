@@ -109,7 +109,8 @@ public static class ServiceRegistration
                         "HuggingFace:ApiKey required when EmbeddingProvider=huggingface"
                     );
                 var model = config["HuggingFace:Model"] ?? "nomic-ai/nomic-embed-text-v1";
-                return new HuggingFaceEmbeddingProvider(httpClient, apiKey, model);
+                var baseUrl = config["HuggingFace:BaseUrl"] ?? "https://api-inference.huggingface.co/models";
+                return new HuggingFaceEmbeddingProvider(httpClient, apiKey, model, baseUrl);
             }
 
             var embeddingModel = config["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
