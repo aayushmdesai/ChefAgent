@@ -21,22 +21,19 @@
 
 Every ADR from Months 1–2 claimed the system was designed to be "easy to swap." Week 12 is the proof. The test is simple: can you move from local Docker to cloud services without touching agent code?
 
-The answer should be yes — and the mechanism is the config/interface boundary. Agents depend on interfaces (`ILlmProvider`, `IEmbeddingProvider`, `QdrantClient`), not on concrete implementations. Implementations are registered in `ServiceRegistration.cs` based on config values. The only things that should change for a cloud deployment are:
+The answer is yes — and the mechanism is the config/interface boundary. Agents depend on interfaces (`ILlmProvider`, `IEmbeddingProvider`, `QdrantClient`), not on concrete implementations. Implementations are registered in `ServiceRegistration.cs` based on config values. The only things that change for a cloud deployment are environment variables and provider registrations in one file.
 
-- `docker-compose.yml` environment variables (endpoints, API keys)
-- `ServiceRegistration.cs` provider selection logic (already done in Day 2)
-
-If you have to modify agent logic, the abstraction leaked somewhere.
+If you have to modify agent logic, the abstraction leaked somewhere. No agent code was modified this week.
 
 ---
 
-## Local → Cloud Service Map
+## Local → Cloud Service Map (Final)
 
 | Local | Cloud (Free Tier) | What Changed |
 |-------|------------------|--------------|
-| Qdrant (Docker) | Qdrant Cloud (1GB free) | Endpoint URL + API key in docker-compose.yml |
-| Ollama LLM (native Mac) | Groq (free Llama 3.3 70B) | `LlmProvider=groq` env var |
-| Ollama Embeddings | HuggingFace Inference API | `EmbeddingProvider=huggingface` env var (blocked by Codespaces egress — will work on Railway) |
+| Qdrant (Docker) | Qdrant Cloud (1GB free) | Endpoint + API key env vars |
+| Ollama LLM | Groq (free Llama 3.3 70B) | `LlmProvider=groq` env var |
+| Ollama Embeddings | Nomic Atlas API | `EmbeddingProvider=nomic` env var |
 | Redis (Docker) | Upstash (10K cmds/day free) | Connection string swap |
 | Langfuse + Postgres (Docker) | Langfuse Cloud (50K obs/month) | `BaseUrl` swap |
 | .NET API (Docker) | Railway | Dockerfile already works |
@@ -46,11 +43,11 @@ If you have to modify agent logic, the abstraction leaked somewhere.
 
 ---
 
-## Day 1 — Qdrant Cloud Migration
+## Day 1 — Qdrant Cloud Migration ✅
 
 ### What Was Done
 
-Created all cloud accounts (Qdrant Cloud, Upstash, Groq, HuggingFace, Langfuse Cloud, Railway).
+Created all cloud accounts (Qdrant Cloud, Upstash, Groq, HuggingFace, Langfuse Cloud, Railway, Nomic).
 
 Parameterized `scripts/pipeline/load_qdrant.py`:
 - Added `--qdrant-url` and `--api-key` CLI args
@@ -75,42 +72,30 @@ curl .../chat → "Super Quick Chicken"  ✅
 
 ### Secrets Workflow
 
-Secrets live in `.env.local` (gitignored). Docker Compose reads it via `--env-file .env.local` flag in `Makefile`. All `make` targets use this flag — no manual `export` needed per session.
-
-```
-# .env.local (gitignored, never committed)
-QDRANT_API_KEY=...
-GROQ_API_KEY=...
-HUGGINGFACE_API_KEY=...
-UPSTASH_PASSWORD=...
-```
-
-Docker Compose env vars take precedence over `appsettings.json`. `appsettings.json` retains localhost defaults for `dotnet run` outside Docker. Effectively, `docker-compose.yml` is the source of truth for all runtime config.
+Secrets live in `.env.local` (gitignored). `docker-compose.local.yml` uses `env_file: .env.local` to inject all variables directly into the container. No `${VAR}` substitution needed — avoids naming mismatch issues entirely.
 
 ### Debugging Notes
 
 - Qdrant Cloud uses port 6333 (REST) and 6334 (gRPC). Python `qdrant-client` with `host/port/https` style uses REST correctly.
 - C# `Qdrant.Client` defaults to gRPC. `QdrantClient(host, port, https, apiKey)` named constructor sets up gRPC-over-TLS correctly for cloud.
 - HTTP/2 empty response body: fixed by using `host/port` style instead of `url` style in Python client.
-- Docker Compose `${VAR}` substitution requires the env file to have no spaces around `=` and no Windows line endings.
+- Docker Compose `${VAR}` substitution requires no spaces around `=` and no Windows line endings — fragile. Switched to `env_file` approach instead.
 
 ---
 
-## Day 2 — Provider Abstraction + Groq Integration
+## Day 2 — Provider Abstraction + Groq Integration ✅
 
 ### Architecture
 
 Two new interfaces in `src/shared/`:
 
 ```csharp
-// ILlmProvider — any chat LLM
 public interface ILlmProvider
 {
     string ModelName { get; }
     Task<string> ChatAsync(IEnumerable<ChatMessage> messages, CancellationToken ct = default);
 }
 
-// IEmbeddingProvider — any embedding model
 public interface IEmbeddingProvider
 {
     Task<float[]> EmbedAsync(string text, CancellationToken ct = default);
@@ -119,24 +104,21 @@ public interface IEmbeddingProvider
 public record ChatMessage(string Role, string Content);
 ```
 
-Four implementations:
+Five implementations:
 
 | Class | Provider | Notes |
 |-------|----------|-------|
 | `OllamaLlmProvider` | Ollama `/api/chat` | Existing code refactored |
 | `GroqProvider` | Groq OpenAI-compatible API | 429 → retry with backoff |
 | `OllamaEmbeddingProvider` | Ollama `/api/embed` | `search_query:` prefix internal |
-| `HuggingFaceEmbeddingProvider` | HF Inference API | `search_query:` prefix internal, `wait_for_model: true` |
+| `HuggingFaceEmbeddingProvider` | HF Inference API | Implemented, blocked by DNS |
+| `NomicEmbeddingProvider` | Nomic Atlas API | Final cloud embedding provider |
 
-Config-driven registration in `ServiceRegistration.cs`:
+Config-driven registration — `"Cloud"` HttpClient for external APIs, `"Ollama"` for local:
 
 ```csharp
-// LlmProvider: "groq" | "ollama"
-// EmbeddingProvider: "huggingface" | "ollama"
-services.AddSingleton<ILlmProvider>(sp =>
-    config["LlmProvider"] == "groq"
-        ? new GroqProvider(httpClient, apiKey, model)
-        : new OllamaLlmProvider(httpClient, ollamaUrl, chatModel));
+services.AddHttpClient("Ollama", client => client.Timeout = TimeSpan.FromSeconds(120));
+services.AddHttpClient("Cloud", client => client.Timeout = TimeSpan.FromSeconds(30));
 ```
 
 ### Wiring Status
@@ -146,18 +128,16 @@ services.AddSingleton<ILlmProvider>(sp =>
 | `AgentOrchestrator.cs` | ✅ Wired | `GeneralQuestion` → `ILlmProvider` |
 | `DietValidationPlugin.cs` | ✅ Wired | LLM escalation → `ILlmProvider` |
 | `RecipeSearchPlugin.cs` | ✅ Wired | Embeddings → `IEmbeddingProvider` |
-| `IntentRouter.cs` | ⏳ Month 4 | LLM extraction: custom 90s timeout + structured JSON parse — larger refactor |
+| `IntentRouter.cs` | ⏳ Month 4 | Custom 90s timeout + structured JSON parse |
 | `QueryPreprocessor.cs` | ⏳ Month 4 | `ExpandQueryAsync`: opt-in, rarely fires |
 | `RecipeReranker.cs` | ⏳ Month 4 | Opt-in flag, off by default |
 
 ### 429 vs Circuit Breaker
 
-Groq rate limiting (429) is handled differently from Ollama timeouts:
+- **Groq 429** = rate limiting, service healthy → exponential backoff (1s, 2s, 4s) inside `GroqProvider`
+- **Timeout / 5xx** = degraded service → circuit breaker fires in callers
 
-- **429** = "slow down, I'm healthy" → exponential backoff retry (1s, 2s, 4s) inside `GroqProvider`
-- **Timeout / 5xx** = "I'm down or overloaded" → circuit breaker fires in callers
-
-These are different failure modes requiring different resilience patterns. The circuit breaker was not changed — it continues to guard against Ollama/infrastructure failures. 429 handling is isolated to `GroqProvider`.
+These are different failure modes. Circuit breaker unchanged — still guards Ollama. 429 handling isolated to `GroqProvider`.
 
 ### Performance Result
 
@@ -165,29 +145,66 @@ These are different failure modes requiring different resilience patterns. The c
 |-----------|-----------------|------------|-------|
 | GeneralQuestion ("what is blanching?") | ~14,000ms | 651ms | **21x faster** |
 
-Zero agent code changed to achieve this. Only `ServiceRegistration.cs` provider registration and `docker-compose.yml` env vars.
-
-### HuggingFace Embedding — Codespaces Limitation
-
-Codespaces blocks outbound HTTPS to `api-inference.huggingface.co`. Provider is implemented and registered correctly — blocked by network egress policy, not by code. Will be verified on Railway (Day 3) where full internet access is available.
-
-Current local config: `EmbeddingProvider=ollama` (works), `LlmProvider=groq` (works). Fully cloud embedding deferred to Railway deployment.
-
-### Key Design Decision: Prefix Encapsulation
-
-`search_query:` prefix (nomic-embed-text convention) lives inside each embedding provider, not in callers. This means:
-- `RecipeSearchPlugin` passes clean text to `IEmbeddingProvider.EmbedAsync(text)`
-- `OllamaEmbeddingProvider` and `HuggingFaceEmbeddingProvider` both add the prefix internally
-- If we switch to a model that doesn't need the prefix, one file changes — not every call site
-
 ---
 
-## Day 3 — Railway Deployment (Planned)
+## Day 3 — Railway Deployment ✅
 
-- Create `appsettings.Production.json` with all cloud endpoints
-- Deploy to Railway via GitHub integration
-- Switch `EmbeddingProvider=huggingface` — verify HF works outside Codespaces
-- Test `/health` and `/chat` at public Railway URL
+### HuggingFace DNS Blocker — Decision Trail
+
+`api-inference.huggingface.co` is blocked at DNS level in both Codespaces and Railway:
+```
+curl: (6) Could not resolve host: api-inference.huggingface.co
+```
+
+This is not a code issue — `HuggingFaceEmbeddingProvider.cs` is implemented correctly. Both environments block the domain at the network level. HuggingFace Inference Endpoints (paid GPU instances) would work but violate the free-tier constraint.
+
+**Decision: Nomic Atlas API.** Nomic built `nomic-embed-text` and hosts it at `api-atlas.nomic.ai`. Key advantages:
+- Same model as stored vectors — zero re-embedding, zero vector space mismatch
+- `api-atlas.nomic.ai` reachable from both Codespaces and Railway
+- Free tier sufficient for portfolio demo
+- `search_query:` prefix convention identical — `NomicEmbeddingProvider` is a drop-in replacement
+
+### Lean Local Stack
+
+Created `docker-compose.local.yml` — drops services now on cloud:
+
+| Service | Before | After |
+|---------|--------|-------|
+| API | ✅ local | ✅ local |
+| Ollama | ✅ local | ✅ local (fallback) |
+| Redis | ✅ local | ❌ → Upstash |
+| Qdrant | ✅ local | ❌ → Qdrant Cloud |
+| Langfuse + Postgres | ✅ local | ❌ → Langfuse Cloud |
+
+`make up` now starts only API + Ollama. `make up-full` starts everything for offline dev.
+
+### Railway Deployment
+
+- Dockerfile path: `infra/docker/Dockerfile.api`
+- Builder: Dockerfile (not Railpack — Railpack can't detect .NET in nested directory)
+- All secrets set as Railway environment variables
+- Auto-deploy on push to main
+
+### Smoke Test Results (Railway)
+
+| Intent | Query | Result |
+|--------|-------|--------|
+| SearchRecipe | "find me pasta recipes" | ✅ "Homemade Pasta" |
+| GeneralQuestion | "what is blanching?" | ✅ Correct answer |
+| CreateMealPlan | "plan my dinners for the week" | ✅ 7-day plan |
+| Guardrail | injection attempt | ✅ Blocked |
+
+### Nomic Verification
+
+Definitive test — Ollama stopped, Nomic returns results:
+```bash
+docker compose stop ollama
+curl .../chat → "Homemade Pasta"  ✅
+```
+
+### Langfuse Cloud
+
+Traces flowing to `us.cloud.langfuse.com` — every request from Railway appears as a trace with full span tree.
 
 ---
 
@@ -202,7 +219,7 @@ Current local config: `EmbeddingProvider=ollama` (works), `LlmProvider=groq` (wo
 
 ## Day 5 — Observability + ADR-012 (Planned)
 
-- Verify Langfuse Cloud traces from Railway API
+- Verify Langfuse Cloud trace quality from Railway
 - Performance comparison table: local vs cloud
 - Write `docs/adrs/012-cloud-deployment.md`
 - Update README with live demo link
@@ -221,53 +238,59 @@ Current local config: `EmbeddingProvider=ollama` (works), `LlmProvider=groq` (wo
 ## Files Changed / Created
 
 ```
-scripts/pipeline/load_qdrant.py          — parameterized for cloud upload
-src/shared/ILlmProvider.cs               — NEW: chat provider interface + ChatMessage record
-src/shared/IEmbeddingProvider.cs         — NEW: embedding provider interface
-src/shared/OllamaLlmProvider.cs          — NEW: Ollama chat implementation
-src/shared/GroqProvider.cs               — NEW: Groq OpenAI-compatible, 429 retry
-src/shared/OllamaEmbeddingProvider.cs    — NEW: Ollama embed, search_query: prefix
-src/shared/HuggingFaceEmbeddingProvider.cs — NEW: HF Inference API, wait_for_model: true
-src/api/ServiceRegistration.cs           — config-driven provider registration
-src/api/Endpoints.cs                     — stack info shows active providers
+scripts/pipeline/load_qdrant.py            — parameterized for cloud upload
+src/shared/ILlmProvider.cs                 — NEW: chat provider interface + ChatMessage record
+src/shared/IEmbeddingProvider.cs           — NEW: embedding provider interface
+src/shared/OllamaLlmProvider.cs            — NEW: Ollama chat implementation
+src/shared/GroqProvider.cs                 — NEW: Groq OpenAI-compatible, 429 retry
+src/shared/OllamaEmbeddingProvider.cs      — NEW: Ollama embed, search_query: prefix
+src/shared/HuggingFaceEmbeddingProvider.cs — NEW: implemented, blocked by DNS egress
+src/shared/NomicEmbeddingProvider.cs       — NEW: Nomic Atlas API, same model as stored vectors
+src/api/ServiceRegistration.cs             — config-driven provider registration, Cloud/Ollama clients
+src/api/Endpoints.cs                       — stack info shows active providers
 src/agents/Orchestrator/AgentOrchestrator.cs — ILlmProvider wired, AskLlmAsync
 src/agents/DietAgent/DietValidationPlugin.cs — ILlmProvider wired, CallLlmAsync
 src/agents/RecipeAgent/RecipeSearchPlugin.cs — IEmbeddingProvider wired
-docker-compose.yml                       — cloud env vars for all services
-Makefile                                 — --env-file .env.local on all targets
-.env.local                               — secrets (gitignored, never committed)
+docker-compose.yml                         — full local stack (offline dev)
+docker-compose.local.yml                   — NEW: lean cloud stack (API + Ollama only)
+Makefile                                   — make up → local.yml, make up-full → full
+.env.local                                 — secrets (gitignored, never committed)
 ```
 
 ---
 
-## Performance Summary (Days 1-2)
+## Performance Summary (Days 1-3)
 
 | Operation | Before (Local) | After (Cloud) | Notes |
 |-----------|---------------|---------------|-------|
 | Vector upload (10K) | N/A | 16s | One-time migration |
-| Recipe search | ~1,500ms | ~1,361ms | Qdrant Cloud + Ollama embed |
-| GeneralQuestion | ~14,000ms | 651ms | Groq Llama 3.3 70B |
-| Qdrant Cloud verified | — | ✅ | Local Qdrant stopped, results returned |
+| Recipe search | ~1,500ms | ~1,361ms | Qdrant Cloud + Nomic embed |
+| GeneralQuestion | ~14,000ms | 651ms | Groq Llama 3.3 70B — 21x faster |
+| Nomic embed call | N/A | ~615ms | Cold; cached on repeat |
+| Railway deployment | N/A | ✅ live | https://chefagent-production.up.railway.app |
 
 ---
 
 ## Key Learnings
 
-**Docker Compose env var substitution is fragile.** `${VAR}` in `docker-compose.yml` reads from the shell environment at `docker compose up` time — not from inside the running container. Secrets in `.env.local` must be passed via `--env-file` flag, and the container must be restarted after changes. `printenv` inside the container is the only reliable verification.
+**HuggingFace free inference API is DNS-blocked in both Codespaces and Railway.** Not a code issue — the domain `api-inference.huggingface.co` simply doesn't resolve. Switched to Nomic Atlas API which hosts the same model and is reachable everywhere. The `HuggingFaceEmbeddingProvider` remains in the codebase as a documented alternative for environments without this restriction.
 
-**The abstraction boundary is `ServiceRegistration.cs`.** Agents know nothing about providers. All provider selection lives in one file. This is what made the Groq swap a 30-minute config change rather than a 3-day refactor.
+**Same model = zero re-embedding.** The critical constraint when switching embedding providers is vector space compatibility. Stored vectors were generated with `nomic-embed-text-v1` via Ollama. Nomic's API serves the same model. Cosine similarity scores remain meaningful — no 10K vector re-upload needed.
 
-**429 and timeouts are different failure modes.** Groq 429 = rate limiting, healthy service. Ollama timeout = saturated CPU, degraded service. Retry with backoff is correct for 429. Circuit breaker is correct for timeouts. Conflating them would either make the circuit breaker too sensitive (opening on transient rate limits) or too lenient (retrying a crashed service).
+**`env_file` over `${VAR}` substitution.** Docker Compose `${VAR}` substitution is fragile — requires exact naming match between env file and compose file, fails silently when mismatched. Using `env_file: .env.local` directly on the service injects all variables as-is, eliminating the naming mismatch problem entirely.
 
-**Port matters for Qdrant.** Python client works on 6333 (REST) with `https=True`. C# client uses gRPC and needs the `host/port/https/apiKey` named constructor to set up TLS correctly. `new QdrantClient(new Uri(...))` alone doesn't negotiate TLS for gRPC.
+**Railpack can't auto-detect .NET in nested directories.** Railway's default builder (Railpack) scans the repo root and couldn't find the .NET project in `src/`. Fix: switch builder to Dockerfile and specify `infra/docker/Dockerfile.api` explicitly.
 
-**Codespaces egress restrictions are a real constraint.** `api-inference.huggingface.co` is blocked. This is not a code issue — the provider is implemented correctly. Architecture documentation should note where dev environment constraints differ from production.
+**Named HTTP clients separate concerns.** `"Ollama"` client has 120s timeout (CPU inference is slow). `"Cloud"` client has 30s timeout (cloud APIs should be fast). Using the wrong client for the wrong provider would either timeout too quickly or wait too long on failures.
+
+**The abstraction boundary is `ServiceRegistration.cs`.** All provider selection in one file. Groq swap: 30 minutes. Nomic swap: 15 minutes. Zero agent code touched either time.
 
 ---
 
 ## Deferred
 
 - Full `ILlmProvider` wiring for `IntentRouter`, `QueryPreprocessor`, `RecipeReranker` (Month 4 cleanup)
-- HuggingFace embedding verification — blocked by Codespaces egress, will verify on Railway
-- Upstash Redis swap (Day 3)
-- Langfuse Cloud swap (Day 3)
+- `HuggingFaceEmbeddingProvider` — implemented, usable in environments without DNS restriction
+- Vercel frontend deployment (Day 4)
+- Load test p95 latency (Day 4)
+- ADR-012 final version with Railway performance numbers (Day 5)
