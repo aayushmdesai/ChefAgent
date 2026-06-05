@@ -1,7 +1,7 @@
 # Week 12 Progress — Cloud Deployment
 
 **Month 3, Week 12 | Dates: June 2026**  
-**Tag: v0.9.0 (in progress)**
+**Tag: v0.9.0 → v1.0.0**
 
 ---
 
@@ -12,8 +12,8 @@
 - Deploy API to Railway with zero local dependencies ✅
 - Deploy React frontend to Vercel ✅
 - Verify Langfuse Cloud traces from deployed API ✅
-- Load test and document performance comparison local vs cloud (Day 5)
-- Write ADR-012, Month 3 retrospective, v1.0.0 tag (Day 6-7)
+- Load test and document performance comparison local vs cloud ✅
+- Write ADR-012, Month 3 retrospective, v1.0.0 tag ✅
 
 ---
 
@@ -104,7 +104,7 @@ public interface IEmbeddingProvider
 public record ChatMessage(string Role, string Content);
 ```
 
-Four active implementations:
+Five implementations:
 
 | Class | Provider | Status |
 |-------|----------|--------|
@@ -112,7 +112,7 @@ Four active implementations:
 | `GroqProvider` | Groq OpenAI-compatible API | ✅ Production LLM |
 | `OllamaEmbeddingProvider` | Ollama `/api/embed` | ✅ Local fallback |
 | `NomicEmbeddingProvider` | Nomic Atlas API | ✅ Production embeddings |
-| `HuggingFaceEmbeddingProvider` | HF Inference API | ⚠️ Implemented, not used — DNS blocked in Codespaces and Railway |
+| `HuggingFaceEmbeddingProvider` | HF Inference API | ⚠️ Implemented, not used — DNS blocked |
 
 Config-driven registration — `"Cloud"` HttpClient for external APIs, `"Ollama"` for local:
 
@@ -137,7 +137,7 @@ services.AddHttpClient("Cloud", client => client.Timeout = TimeSpan.FromSeconds(
 - **Groq 429** = rate limiting, service healthy → exponential backoff (1s, 2s, 4s) inside `GroqProvider`
 - **Timeout / 5xx** = degraded service → circuit breaker fires in callers
 
-These are different failure modes. Circuit breaker unchanged — still guards Ollama. 429 handling isolated to `GroqProvider`.
+Circuit breaker unchanged — still guards Ollama. 429 handling isolated to `GroqProvider`.
 
 ### Performance Result
 
@@ -151,16 +151,19 @@ These are different failure modes. Circuit breaker unchanged — still guards Ol
 
 ### HuggingFace DNS Blocker — Decision Trail
 
-The initial plan was HuggingFace Inference API for embeddings. During deployment it was discovered that `api-inference.huggingface.co` is blocked at DNS level in both Codespaces and Railway — not a code issue, a network restriction.
+`api-inference.huggingface.co` blocked at DNS level in both Codespaces and Railway. Not a code issue — network restriction.
 
-**Decision: Nomic Atlas API.** Nomic built `nomic-embed-text` and hosts it at `api-atlas.nomic.ai`. Key advantages:
-- Same model as stored vectors — zero re-embedding, zero vector space mismatch
-- Reachable from both Codespaces and Railway
-- `HuggingFaceEmbeddingProvider` retained in codebase for environments without this restriction — but not used in production
+**Decision: Nomic Atlas API.** Same model (`nomic-embed-text-v1`), same vector space, reachable everywhere. `HuggingFaceEmbeddingProvider` retained for DNS-unrestricted environments.
+
+Verified — Ollama stopped, Nomic returns results:
+```bash
+docker compose stop ollama
+curl .../chat → "Homemade Pasta"  ✅
+```
 
 ### Lean Local Stack
 
-Created `docker-compose.local.yml` — drops services now on cloud:
+`docker-compose.local.yml` — drops services now on cloud:
 
 | Service | Before | After |
 |---------|--------|-------|
@@ -170,13 +173,12 @@ Created `docker-compose.local.yml` — drops services now on cloud:
 | Qdrant | ✅ local | ❌ → Qdrant Cloud |
 | Langfuse + Postgres | ✅ local | ❌ → Langfuse Cloud |
 
-`make up` now starts only API + Ollama. `make up-full` starts everything for offline dev.
+`make up` → lean stack. `make up-full` → full local for offline dev.
 
 ### Railway Deployment
 
 - Dockerfile path: `infra/docker/Dockerfile.api`
-- Builder: Dockerfile (not Railpack — can't detect .NET in nested directory)
-- All secrets set as Railway environment variables
+- Builder: Dockerfile (Railpack can't detect .NET in nested directory)
 - Auto-deploy on push to main
 - Public URL: `https://chefagent-production.up.railway.app`
 
@@ -185,17 +187,15 @@ Created `docker-compose.local.yml` — drops services now on cloud:
 | Intent | Query | Result |
 |--------|-------|--------|
 | SearchRecipe | "find me pasta recipes" | ✅ "Homemade Pasta" |
-| GeneralQuestion | "what is blanching?" | ✅ Correct answer, 651ms |
-| CreateMealPlan | "plan my dinners for the week" | ✅ 7-day plan, Redis session persisted |
+| GeneralQuestion | "what is blanching?" | ✅ 651ms via Groq |
+| CreateMealPlan | "plan my dinners for the week" | ✅ 7-day plan |
 | Guardrail | injection attempt | ✅ Blocked |
 
 ---
 
 ## Day 4 — Vercel Frontend ✅
 
-### What Was Done
-
-Updated `getApiUrl()` in `App.jsx` to handle three environments:
+Updated `getApiUrl()` in `App.jsx`:
 
 ```javascript
 function getApiUrl() {
@@ -204,15 +204,8 @@ function getApiUrl() {
     return 'http://localhost:5100/chat';
   if (hostname.includes('github.dev') || hostname.includes('githubpreview.dev'))
     return `${window.location.protocol}//${hostname.replace('-5173', '-5100')}/chat`;
-  // Production
   return 'https://chefagent-production.up.railway.app/chat';
 }
-```
-
-Built and deployed to Vercel:
-```bash
-cd src/frontend && npm run build
-npx vercel --prod
 ```
 
 - **Frontend:** `https://chefagent.vercel.app`
@@ -220,34 +213,100 @@ npx vercel --prod
 
 ### Full Pipeline Verified via UI
 
-With dairy allergy set in the sidebar, "find me pasta dinner" produced:
+With dairy allergy set, "find me pasta dinner":
 - Nomic embed: 182ms (cache hit on repeat)
-- Qdrant search: 5 recipes found
-- DietAgent Rules: Homemade Pasta compatible, Spaghetti Casserole incompatible (2 violations)
-- DietAgent LLM (Groq): Spaghetti Pasta Salad escalated — ambiguous ingredients + allergy → 662ms
-- Total: 739ms for full search + dietary validation pipeline
+- Qdrant: 5 recipes
+- DietAgent Rules: 2 violations detected instantly
+- DietAgent LLM (Groq): ambiguous ingredient escalation → 662ms
+- Total: **739ms** end-to-end
 
 ### Known Limitation: GeneralQuestion Statelessness
 
-`AskLlmAsync` sends only the current question to Groq — no conversation history. Follow-up questions like "how to make it" lose context of what "it" refers to. `ResolveReferencesAsync` handles reference resolution for `SearchRecipe` and `ModifyMealPlan` but not `GeneralQuestion`.
-
-Fix deferred to Month 4 — pass last N history turns to `AskLlmAsync`.
+`AskLlmAsync` sends only the current question to Groq. "how to make it" loses context of what "it" refers to. `ResolveReferencesAsync` handles this for `SearchRecipe` and `ModifyMealPlan` but not `GeneralQuestion`. Deferred to Month 4.
 
 ---
 
-## Day 5 — Observability (Planned)
+## Day 5 — Observability + Load Test ✅
 
-- Performance comparison table: local vs cloud with actual Railway numbers
-- Langfuse Cloud trace quality review
+### Langfuse Cloud Traces
+
+174 observations visible in `us.cloud.langfuse.com` across full session history. Full span tree per request:
+
+```
+chat
+  └── orchestrator
+        ├── session.load_profile
+        ├── session.append_user_message
+        ├── recipe_agent.search
+        │     └── embed.provider / embed.cache_hit
+        ├── diet_agent.validate (×5)
+        │     └── diet.llm_validation (when escalated)
+        └── session.append_assistant_message
+```
+
+LLM generations captured with model name, prompt, completion, token estimates, latency.
+
+### Performance Comparison: Local vs Cloud
+
+| Operation | Local (Codespaces) | Cloud (Railway) | Notes |
+|-----------|-------------------|-----------------|-------|
+| GeneralQuestion | ~14,000ms | 287–651ms | Groq LPU, 21x faster |
+| Recipe search (cold embed) | ~1,500ms | ~443–499ms | Nomic + Qdrant Cloud |
+| Recipe search (warm cache) | ~12ms | ~65ms | Cache hit |
+| Full pipeline + diet LLM | ~1,500ms | ~739ms | Groq diet validation |
+| MealPlan generation | ~640ms | ~1,118ms | 7 Qdrant searches |
+| session.load_profile | ~1ms | ~3,000ms first / ~0ms warm | Upstash cold connection |
+
+### Upstash Cold Start
+
+`session.load_profile` and `session.append_user_message` both show ~3,000ms on first request per session. This is Upstash TCP connection cold-start on free tier — not a query latency issue. Subsequent calls in the same session: 0-1ms. Fix: connection pre-warm on API startup (dummy Redis ping). Deferred to Month 4.
+
+### Load Test Results
+
+10 concurrent requests against `https://chefagent-production.up.railway.app/chat`:
+
+```
+Query                          Status    Latency
+--------------------------------------------------
+chicken dinner                      ✅     4548ms
+vegan soup                          ✅     4316ms
+pasta recipes                       ✅     4309ms
+what is a roux                      ✅     4290ms
+plan my dinners                     ✅     5287ms
+dairy-free cookies                  ✅     4315ms
+gluten-free bread                   ✅     4314ms
+quick breakfast ideas               ✅     4314ms
+find me a salad                     ✅     4310ms
+mexican dinner                      ✅     4306ms
+
+Success rate : 10/10
+p50 latency  : 4,314ms
+p95 latency  : 5,287ms
+Max latency  : 5,287ms
+Min latency  : 4,290ms
+```
+
+**Success rate: 100%.** Latency dominated by Upstash cold connection (~3,000ms per new session). Actual processing (embed + Qdrant + intent) is 300-700ms per the Langfuse traces.
 
 ---
 
-## Day 6-7 — Month 3 Retrospective + v1.0.0 (Planned)
+## Day 6-7 — Month 3 Complete ✅
 
-- `docs/month3-retrospective.md`
-- `CHANGELOG.md` v0.9.0 + v1.0.0
-- Final README polish with live demo links
-- `git tag v1.0.0`
+### Delivered
+
+- `docs/month3-retrospective.md` — full retrospective including eval story, observability story, deployment story, interview talking points
+- `CHANGELOG.md` — v0.9.0 + v1.0.0 entries
+- `README.md` — Live Demo section, updated tech stack, updated performance numbers, ADR-012 listed
+- `docs/adrs/012-cloud-deployment.md` — cloud deployment ADR
+- `git tag v1.0.0` — Month 3 complete
+
+### Tag: v1.0.0
+
+This is the version referenced on resume and LinkedIn. It represents:
+- A fully evaluated system (RAGAS + E2E + LLM judge)
+- Full observability (Langfuse Cloud traces)
+- Production deployment (Railway + Vercel)
+- Provider-agnostic architecture validated in production
 
 ---
 
@@ -255,37 +314,43 @@ Fix deferred to Month 4 — pass last N history turns to `AskLlmAsync`.
 
 ```
 scripts/pipeline/load_qdrant.py            — parameterized for cloud upload
+scripts/eval/load_test.py                  — NEW: 10 concurrent async load test
 src/shared/ILlmProvider.cs                 — NEW: chat provider interface + ChatMessage record
 src/shared/IEmbeddingProvider.cs           — NEW: embedding provider interface
 src/shared/OllamaLlmProvider.cs            — NEW: Ollama chat implementation
-src/shared/GroqProvider.cs                 — NEW: Groq OpenAI-compatible, 429 retry
-src/shared/OllamaEmbeddingProvider.cs      — NEW: Ollama embed, search_query: prefix
+src/shared/GroqProvider.cs                 — NEW: Groq, 429 retry backoff
+src/shared/OllamaEmbeddingProvider.cs      — NEW: Ollama embed
 src/shared/HuggingFaceEmbeddingProvider.cs — NEW: implemented, not used (DNS blocked)
 src/shared/NomicEmbeddingProvider.cs       — NEW: Nomic Atlas API, production embeddings
 src/api/ServiceRegistration.cs             — config-driven provider registration
 src/api/Endpoints.cs                       — stack info shows active providers
-src/agents/Orchestrator/AgentOrchestrator.cs — ILlmProvider wired, AskLlmAsync
-src/agents/DietAgent/DietValidationPlugin.cs — ILlmProvider wired, CallLlmAsync
+src/agents/Orchestrator/AgentOrchestrator.cs — ILlmProvider wired
+src/agents/DietAgent/DietValidationPlugin.cs — ILlmProvider wired
 src/agents/RecipeAgent/RecipeSearchPlugin.cs — IEmbeddingProvider wired
-src/frontend/src/App.jsx                   — getApiUrl() handles localhost/Codespaces/Vercel
+src/frontend/src/App.jsx                   — getApiUrl() for all environments
 docker-compose.yml                         — full local stack (offline dev)
-docker-compose.local.yml                   — NEW: lean cloud stack (API + Ollama only)
-Makefile                                   — make up → local.yml, make up-full → full
-.env.local                                 — secrets (gitignored, never committed)
+docker-compose.local.yml                   — NEW: lean cloud stack
+Makefile                                   — make up uses local.yml
+docs/adrs/012-cloud-deployment.md          — NEW: cloud deployment ADR
+docs/month3-retrospective.md               — NEW: Month 3 retrospective
+CHANGELOG.md                               — v0.9.0 + v1.0.0 entries
+README.md                                  — live demo, updated stack, performance
+week12-progress.md                         — this file
 ```
 
 ---
 
-## Performance Summary (Days 1-4)
+## Final Performance Summary
 
 | Operation | Before (Local) | After (Cloud) | Notes |
 |-----------|---------------|---------------|-------|
-| Vector upload (10K) | N/A | 16s | One-time migration |
-| Recipe search | ~1,500ms | ~499ms | Qdrant Cloud + Nomic embed (warm cache) |
-| Full search + diet validation | ~1,500ms | ~739ms | Groq LLM diet validation included |
-| GeneralQuestion | ~14,000ms | 651ms | Groq Llama 3.3 70B — 21x faster |
-| Nomic embed (cold) | N/A | ~615ms | Cached on repeat |
-| Nomic embed (warm) | N/A | ~182ms | Cache hit |
+| Vector upload (10K) | N/A | 16s | One-time |
+| Recipe search (warm cache) | ~12ms | ~65ms | Cache hit |
+| Recipe search (cold embed) | ~1,500ms | ~499ms | Nomic + Qdrant Cloud |
+| Full pipeline + diet LLM | ~1,500ms | ~739ms | Groq validation |
+| GeneralQuestion | ~14,000ms | 651ms | **21x faster** |
+| Load test p50 (10 concurrent) | — | 4,314ms | Upstash cold start |
+| Load test success rate | — | 10/10 | 100% |
 | Frontend | local only | ✅ live | https://chefagent.vercel.app |
 | API | local only | ✅ live | https://chefagent-production.up.railway.app |
 
@@ -293,25 +358,29 @@ Makefile                                   — make up → local.yml, make up-fu
 
 ## Key Learnings
 
-**HuggingFace free inference API is DNS-blocked in both Codespaces and Railway.** Not a code issue. Switched to Nomic Atlas API — same model, same vector space, reachable everywhere. `HuggingFaceEmbeddingProvider` retained but not used in production.
+**HuggingFace free inference API is DNS-blocked.** Not a code issue. Switched to Nomic — same model, same vector space, reachable everywhere.
 
-**Same model = zero re-embedding.** Vector space compatibility is a hard constraint on provider selection. `nomic-embed-text-v1` stored vectors require the same model at query time — this eliminated every alternative except Nomic's own API.
+**Same model = zero re-embedding.** Vector space compatibility is a hard constraint on embedding provider selection. `nomic-embed-text-v1` stored vectors require the same model at query time.
 
-**`env_file` over `${VAR}` substitution.** Direct file injection avoids silent naming mismatch failures.
+**`env_file` over `${VAR}` substitution.** Direct injection avoids silent naming mismatch failures.
 
-**Railpack can't auto-detect .NET in nested directories.** Switch to Dockerfile builder explicitly.
+**Railpack can't auto-detect .NET in nested directories.** Use Dockerfile builder explicitly.
 
-**Named HTTP clients separate concerns.** `"Ollama"` 120s, `"Cloud"` 30s — wrong timeout for wrong provider causes either premature failures or long waits on crashes.
+**Named HTTP clients separate concerns.** `"Ollama"` 120s, `"Cloud"` 30s — wrong client = premature timeout or 120s wait on crashes.
 
-**`GeneralQuestion` is stateless.** Groq receives only the current question, not history. Follow-up context ("how to make it") is lost. Reference resolution exists for SearchRecipe/ModifyMealPlan but not GeneralQuestion — Month 4 fix.
+**Upstash cold start dominates load test latency.** ~3,000ms per new session TCP connection. Processing time is 300-700ms. Pre-warm on startup fixes this.
 
-**The abstraction boundary is `ServiceRegistration.cs`.** All provider selection in one file. Groq swap: 30 min. Nomic swap: 15 min. Zero agent code touched either time.
+**`GeneralQuestion` is stateless.** Groq call sends no history. Reference resolution exists for search/plan intents but not general questions.
+
+**The abstraction boundary is `ServiceRegistration.cs`.** All provider selection in one file. Groq swap: 30 min. Nomic swap: 15 min. Zero agent code touched.
 
 ---
 
-## Deferred
+## Deferred to Month 4
 
-- Full `ILlmProvider` wiring for `IntentRouter`, `QueryPreprocessor`, `RecipeReranker` (Month 4)
-- `GeneralQuestion` conversation history for context resolution (Month 4)
-- `HuggingFaceEmbeddingProvider` — implemented, available for DNS-unrestricted environments
-- Load test p95 latency (Day 5)
+- `ILlmProvider` wiring: `IntentRouter`, `QueryPreprocessor`, `RecipeReranker`
+- `GeneralQuestion` conversation history
+- Upstash connection pre-warm on API startup
+- Intent router: question-form ValidateDiet ("is X vegan?")
+- Intent router: CreateMealPlan phrasing variants
+- MCP server project begins
