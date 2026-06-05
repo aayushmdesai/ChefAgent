@@ -181,3 +181,67 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 [v0.3.0]: https://github.com/aayushmdesai/ChefAgent/releases/tag/v0.3.0
 [v0.2.0]: https://github.com/aayushmdesai/ChefAgent/releases/tag/v0.2.0
 [v0.1.0]: https://github.com/aayushmdesai/ChefAgent/releases/tag/v0.1.0
+
+## [v1.0.0] — Week 12 (Month 3 Complete)
+
+### Summary
+Month 3 complete. ChefAgent is evaluated, observable, and deployed at a public URL with zero local dependencies.
+
+**Live demo:**
+- Frontend: https://chefagent.vercel.app
+- API: https://chefagent-production.up.railway.app
+
+---
+
+## [v0.9.0] — Week 12 (Cloud Deployment)
+
+### Added
+- **`ILlmProvider` interface** (`src/shared/ILlmProvider.cs`) — chat provider abstraction with `ChatAsync(IEnumerable<ChatMessage>)` and `ModelName`. `ChatMessage` record.
+- **`IEmbeddingProvider` interface** (`src/shared/IEmbeddingProvider.cs`) — embedding provider abstraction with `EmbedAsync(string text)`.
+- **`OllamaLlmProvider`** — existing Ollama chat code refactored into `ILlmProvider`.
+- **`GroqProvider`** — Groq OpenAI-compatible API. Llama 3.3 70B. 429 → exponential backoff retry (1s, 2s, 4s). Separate from circuit breaker — 429 means rate-limited, not down.
+- **`OllamaEmbeddingProvider`** — existing Ollama embed code refactored into `IEmbeddingProvider`. `search_query:` prefix internal.
+- **`HuggingFaceEmbeddingProvider`** — HF Inference API implementation. `wait_for_model: true`. Implemented but not used in production — `api-inference.huggingface.co` blocked by DNS in Codespaces and Railway.
+- **`NomicEmbeddingProvider`** — Nomic Atlas API. `nomic-embed-text-v1` — same model as stored vectors, zero re-embedding. Production embedding provider.
+- **Named HTTP clients** — `"Ollama"` (120s timeout, CPU inference) and `"Cloud"` (30s timeout, external APIs). Cloud providers use `"Cloud"` client.
+- **Config-driven provider registration** in `ServiceRegistration.cs` — `LlmProvider=groq|ollama`, `EmbeddingProvider=nomic|huggingface|ollama`. Single file, zero agent changes.
+- **`docker-compose.local.yml`** — lean local stack: API + Ollama only. Qdrant, Redis, Langfuse all cloud.
+- **Railway deployment** — `infra/docker/Dockerfile.api`, Dockerfile builder (not Railpack). Auto-deploy on push. Public URL: `https://chefagent-production.up.railway.app`
+- **Vercel frontend** — `getApiUrl()` handles localhost / Codespaces / Vercel→Railway routing. Live at `https://chefagent.vercel.app`
+- **`scripts/eval/load_test.py`** — 10 concurrent async requests, p50/p95/max/min latency report.
+- **ADR-012** (`docs/adrs/012-cloud-deployment.md`) — free-tier composition rationale, HuggingFace DNS decision trail, provider abstraction proof.
+- **Langfuse Cloud** — migrated from self-hosted v2 to `us.cloud.langfuse.com`. `Langfuse__BaseUrl` env var swap, zero code changes.
+- **Upstash Redis** — migrated from local Docker Redis. Connection string swap, zero code changes.
+- **Qdrant Cloud** — 10K vectors uploaded (16s, 50 batches). `Qdrant__Endpoint` + `Qdrant__ApiKey` env vars.
+
+### Changed
+- `AgentOrchestrator.cs` — `AskOllamaAsync` replaced by `AskLlmAsync` using `ILlmProvider`. Removed `_httpClient`, `_ollamaUrl`, `_chatModel` fields.
+- `DietValidationPlugin.cs` — `CallOllamaAsync` replaced by `CallLlmAsync` using `ILlmProvider`.
+- `RecipeSearchPlugin.cs` — `GetEmbeddingAsync` now calls `IEmbeddingProvider.EmbedAsync`. Removed direct Ollama HTTP call. Log message updated to provider-agnostic "embedded via provider".
+- `Endpoints.cs` — stack info reports active providers: `llm: "Groq"`, `embedding: "Nomic"`.
+- `Makefile` — `make up` uses `docker-compose.local.yml`. `make up-full` uses full `docker-compose.yml`.
+- `load_qdrant.py` — parameterized with `--qdrant-url`, `--api-key`. Defaults via `os.getenv`. `https` auto-detected from URL scheme.
+
+### Deferred to Month 4
+- `ILlmProvider` wiring for `IntentRouter`, `QueryPreprocessor`, `RecipeReranker` — opt-in LLM paths that rarely fire; larger refactor due to custom timeouts and structured JSON parsing.
+- `GeneralQuestion` conversation history — stateless Groq call loses "how to make it" context.
+- Upstash connection pre-warm — eliminate ~3,000ms cold start on first session per container restart.
+
+### Cloud performance (Railway)
+
+| Operation | Latency | vs Local |
+|-----------|---------|----------|
+| GeneralQuestion | 287–651ms | 21x faster (was ~14,000ms Ollama CPU) |
+| Recipe search (warm embed cache) | 65ms | Faster |
+| Recipe search (cold embed) | 443–499ms | Similar |
+| Full pipeline + diet LLM | 739ms | — |
+| Load test p50 (10 concurrent) | 4,314ms | — |
+| Load test p95 (10 concurrent) | 5,287ms | — |
+| Load test success rate | 10/10 (100%) | — |
+
+Note: load test latency dominated by Upstash cold connection (~3,000ms per new session), not processing time.
+
+---
+
+[v1.0.0]: https://github.com/aayushmdesai/ChefAgent/releases/tag/v1.0.0
+[v0.9.0]: https://github.com/aayushmdesai/ChefAgent/releases/tag/v0.9.0
