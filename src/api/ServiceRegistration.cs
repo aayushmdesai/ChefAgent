@@ -50,7 +50,24 @@ public static class ServiceRegistration
         IConfiguration config
     )
     {
-        // Qdrant — vector database for recipe embeddings
+        // ── HTTP Clients — registered first, used by providers below ─────────────
+        var ollamaTimeout = config.GetValue<int>("Ollama:TimeoutSeconds", 120);
+        services.AddHttpClient(
+            "Ollama",
+            client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(ollamaTimeout);
+            }
+        );
+        services.AddHttpClient(
+            "Cloud",
+            client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(30);
+            }
+        );
+
+        // ── Qdrant — vector database ──────────────────────────────────────────────
         services.AddSingleton(sp =>
         {
             var endpoint = config["Qdrant:Endpoint"] ?? "http://localhost:6334";
@@ -78,20 +95,20 @@ public static class ServiceRegistration
 
         services.AddSingleton<ILlmProvider>(sp =>
         {
-            var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
-
             if (llmProvider == "groq")
             {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Cloud");
                 var apiKey =
                     config["Groq:ApiKey"]
                     ?? throw new InvalidOperationException(
                         "Groq:ApiKey required when LlmProvider=groq"
                     );
-                var model = config["Groq:Model"] ?? "llama-3.2-3b-preview";
+                var model = config["Groq:Model"] ?? "llama-3.3-70b-versatile";
                 return new GroqProvider(httpClient, apiKey, model);
             }
 
-            return new OllamaLlmProvider(httpClient, ollamaUrl, chatModel);
+            var ollamaClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
+            return new OllamaLlmProvider(ollamaClient, ollamaUrl, chatModel);
         });
 
         // ── Embedding Provider — config-driven ───────────────────────────────────
@@ -99,37 +116,40 @@ public static class ServiceRegistration
 
         services.AddSingleton<IEmbeddingProvider>(sp =>
         {
-            var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
-
             if (embeddingProvider == "huggingface")
             {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Cloud");
                 var apiKey =
                     config["HuggingFace:ApiKey"]
                     ?? throw new InvalidOperationException(
                         "HuggingFace:ApiKey required when EmbeddingProvider=huggingface"
                     );
                 var model = config["HuggingFace:Model"] ?? "nomic-ai/nomic-embed-text-v1";
-                var baseUrl = config["HuggingFace:BaseUrl"] ?? "https://api-inference.huggingface.co/models";
+                var baseUrl =
+                    config["HuggingFace:BaseUrl"] ?? "https://api-inference.huggingface.co/models";
                 return new HuggingFaceEmbeddingProvider(httpClient, apiKey, model, baseUrl);
             }
 
+            if (embeddingProvider == "nomic")
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Cloud");
+                var apiKey =
+                    config["Nomic:ApiKey"]
+                    ?? throw new InvalidOperationException(
+                        "Nomic:ApiKey required when EmbeddingProvider=nomic"
+                    );
+                var model = config["Nomic:Model"] ?? "nomic-embed-text-v1";
+                var baseUrl =
+                    config["Nomic:BaseUrl"] ?? "https://api-atlas.nomic.ai/v1/embedding/text";
+                return new NomicEmbeddingProvider(httpClient, apiKey, model, baseUrl);
+            }
+
+            var ollamaClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
             var embeddingModel = config["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
-            return new OllamaEmbeddingProvider(httpClient, ollamaUrl, embeddingModel);
+            return new OllamaEmbeddingProvider(ollamaClient, ollamaUrl, embeddingModel);
         });
 
-        // Ollama HTTP client — shared across all agents
-        // Timeout is long because LLM inference on CPU can take 30+ seconds
-        // In AddInfrastructure — Ollama HTTP client
-        var ollamaTimeout = config.GetValue<int>("Ollama:TimeoutSeconds", 120);
-        services.AddHttpClient(
-            "Ollama",
-            client =>
-            {
-                client.Timeout = TimeSpan.FromSeconds(ollamaTimeout);
-            }
-        );
-
-        // Serialize enums as strings in JSON responses (e.g. "SearchRecipe" not 1)
+        // Serialize enums as strings in JSON responses
         services.ConfigureHttpJsonOptions(options =>
             options.SerializerOptions.Converters.Add(new JsonStringEnumConverter())
         );

@@ -19,12 +19,15 @@ services:
       - Langfuse__PublicKey=pk-lf-local
       - Langfuse__SecretKey=sk-lf-local
       - LlmProvider=groq
-      - EmbeddingProvider=ollama
       - Groq__ApiKey=${GROQ_API_KEY}
       - Groq__Model=llama-3.3-70b-versatile
       - HuggingFace__ApiKey=${HUGGINGFACE_API_KEY}
       - HuggingFace__Model=nomic-ai/nomic-embed-text-v1
       - HuggingFace__BaseUrl=https://api-inference.huggingface.co/models
+      - EmbeddingProvider=nomic
+      - Nomic__ApiKey=${NOMIC_API_KEY}
+      - Nomic__Model=${NOMIC_MODEL}
+      - Nomic__BaseUrl=${NOMIC_BASE_URL}
     depends_on:
       redis:
         condition: service_healthy

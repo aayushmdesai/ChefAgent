@@ -61,9 +61,12 @@ public static class Endpoints
                     {
                         vectorDb = "Qdrant Cloud",
                         llm = app.Configuration["LlmProvider"] == "groq" ? "Groq" : "Ollama",
-                        embedding = app.Configuration["EmbeddingProvider"] == "huggingface"
-                            ? "HuggingFace"
-                            : "Ollama",
+                        embedding = app.Configuration["EmbeddingProvider"] switch
+                        {
+                            "huggingface" => "HuggingFace",
+                            "nomic" => "Nomic",
+                            _ => "Ollama",
+                        },
                         memory = "Redis",
                         observability = "Langfuse",
                     },
