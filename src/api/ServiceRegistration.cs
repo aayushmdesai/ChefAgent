@@ -21,6 +21,7 @@ using ChefAgent.Agents.Orchestrator;
 using ChefAgent.Agents.PlannerAgent;
 using ChefAgent.Agents.Recipe;
 using ChefAgent.Shared;
+using Microsoft.Extensions.DependencyInjection;
 using Qdrant.Client;
 using StackExchange.Redis;
 
@@ -49,17 +50,7 @@ public static class ServiceRegistration
         IConfiguration config
     )
     {
-        // Qdrant — vector database for recipe embeddings
-        services.AddSingleton(sp =>
-        {
-            var endpoint = config["Qdrant:Endpoint"] ?? "http://localhost:6334";
-            var uri = new Uri(endpoint);
-            return new QdrantClient(uri.Host, uri.Port);
-        });
-
-        // Ollama HTTP client — shared across all agents
-        // Timeout is long because LLM inference on CPU can take 30+ seconds
-        // In AddInfrastructure — Ollama HTTP client
+        // ── HTTP Clients — registered first, used by providers below ─────────────
         var ollamaTimeout = config.GetValue<int>("Ollama:TimeoutSeconds", 120);
         services.AddHttpClient(
             "Ollama",
@@ -68,8 +59,97 @@ public static class ServiceRegistration
                 client.Timeout = TimeSpan.FromSeconds(ollamaTimeout);
             }
         );
+        services.AddHttpClient(
+            "Cloud",
+            client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(30);
+            }
+        );
 
-        // Serialize enums as strings in JSON responses (e.g. "SearchRecipe" not 1)
+        // ── Qdrant — vector database ──────────────────────────────────────────────
+        services.AddSingleton(sp =>
+        {
+            var endpoint = config["Qdrant:Endpoint"] ?? "http://localhost:6334";
+            var apiKey = config["Qdrant:ApiKey"];
+            var uri = new Uri(endpoint);
+
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                // Cloud — use host/port with https + apiKey
+                return new QdrantClient(
+                    host: uri.Host,
+                    port: uri.Port,
+                    https: true,
+                    apiKey: apiKey
+                );
+            }
+
+            // Local — plain gRPC no TLS
+            return new QdrantClient(uri.Host, uri.Port);
+        });
+        // ── LLM Provider — config-driven, swap without code changes ──────────────
+        var llmProvider = config["LlmProvider"] ?? "ollama";
+        var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
+        var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
+
+        services.AddSingleton<ILlmProvider>(sp =>
+        {
+            if (llmProvider == "groq")
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Cloud");
+                var apiKey =
+                    config["Groq:ApiKey"]
+                    ?? throw new InvalidOperationException(
+                        "Groq:ApiKey required when LlmProvider=groq"
+                    );
+                var model = config["Groq:Model"] ?? "llama-3.3-70b-versatile";
+                return new GroqProvider(httpClient, apiKey, model);
+            }
+
+            var ollamaClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
+            return new OllamaLlmProvider(ollamaClient, ollamaUrl, chatModel);
+        });
+
+        // ── Embedding Provider — config-driven ───────────────────────────────────
+        var embeddingProvider = config["EmbeddingProvider"] ?? "ollama";
+
+        services.AddSingleton<IEmbeddingProvider>(sp =>
+        {
+            if (embeddingProvider == "huggingface")
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Cloud");
+                var apiKey =
+                    config["HuggingFace:ApiKey"]
+                    ?? throw new InvalidOperationException(
+                        "HuggingFace:ApiKey required when EmbeddingProvider=huggingface"
+                    );
+                var model = config["HuggingFace:Model"] ?? "nomic-ai/nomic-embed-text-v1";
+                var baseUrl =
+                    config["HuggingFace:BaseUrl"] ?? "https://api-inference.huggingface.co/models";
+                return new HuggingFaceEmbeddingProvider(httpClient, apiKey, model, baseUrl);
+            }
+
+            if (embeddingProvider == "nomic")
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Cloud");
+                var apiKey =
+                    config["Nomic:ApiKey"]
+                    ?? throw new InvalidOperationException(
+                        "Nomic:ApiKey required when EmbeddingProvider=nomic"
+                    );
+                var model = config["Nomic:Model"] ?? "nomic-embed-text-v1";
+                var baseUrl =
+                    config["Nomic:BaseUrl"] ?? "https://api-atlas.nomic.ai/v1/embedding/text";
+                return new NomicEmbeddingProvider(httpClient, apiKey, model, baseUrl);
+            }
+
+            var ollamaClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
+            var embeddingModel = config["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
+            return new OllamaEmbeddingProvider(ollamaClient, ollamaUrl, embeddingModel);
+        });
+
+        // Serialize enums as strings in JSON responses
         services.ConfigureHttpJsonOptions(options =>
             options.SerializerOptions.Converters.Add(new JsonStringEnumConverter())
         );
@@ -112,18 +192,18 @@ public static class ServiceRegistration
             var tracing = sp.GetRequiredService<Tracing>();
             var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
             var embeddingModel = config["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
+            var embeddingProvider = sp.GetRequiredService<IEmbeddingProvider>();
             var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
             var collection = config["Qdrant:CollectionName"] ?? "recipes";
 
             return new RecipeSearchPlugin(
                 qdrant,
                 httpClient,
-                ollamaUrl,
-                embeddingModel,
                 collection,
                 logger,
                 outputGuard,
                 tracing,
+                embeddingProvider,
                 new RecipeReranker(
                     httpClient,
                     ollamaUrl,
@@ -154,14 +234,8 @@ public static class ServiceRegistration
     {
         services.AddSingleton(sp =>
         {
-            var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
-            var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
-            var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
-
             return new DietValidationPlugin(
-                httpClient,
-                ollamaUrl,
-                chatModel,
+                sp.GetRequiredService<ILlmProvider>(),
                 sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
                 sp.GetRequiredService<Tracing>(),
                 sp.GetRequiredService<ILogger<DietValidationPlugin>>()
@@ -247,18 +321,12 @@ public static class ServiceRegistration
         // AgentOrchestrator — resolves agents registered above
         services.AddSingleton(sp =>
         {
-            var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
-            var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
-            var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
-
             return new AgentOrchestrator(
                 sp.GetRequiredService<RecipeSearchPlugin>(),
                 sp.GetRequiredService<DietValidationPlugin>(),
                 sp.GetRequiredService<MealPlannerPlugin>(),
                 sp.GetRequiredService<SessionStore>(),
-                httpClient,
-                ollamaUrl,
-                chatModel,
+                sp.GetRequiredService<ILlmProvider>(),
                 sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
                 sp.GetRequiredService<GuardrailAuditLog>(),
                 sp.GetRequiredService<Tracing>(),

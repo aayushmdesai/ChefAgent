@@ -59,8 +59,14 @@ public static class Endpoints
                     status = "running",
                     stack = new
                     {
-                        vectorDb = "Qdrant",
-                        llm = "Ollama",
+                        vectorDb = "Qdrant Cloud",
+                        llm = app.Configuration["LlmProvider"] == "groq" ? "Groq" : "Ollama",
+                        embedding = app.Configuration["EmbeddingProvider"] switch
+                        {
+                            "huggingface" => "HuggingFace",
+                            "nomic" => "Nomic",
+                            _ => "Ollama",
+                        },
                         memory = "Redis",
                         observability = "Langfuse",
                     },

@@ -509,10 +509,9 @@ public class IntentRouter
         ImplicitConstraintSignals.Any(s => normalized.Contains(s));
 
     /// <summary>
-    /// Calls Ollama to extract dietary constraints from natural language.
-    /// Passes conversation history + existing profile so the LLM has full context
-    /// and doesn't re-extract already-known constraints.
-    /// Returns null on timeout or parse failure — graceful degradation.
+    // TODO(Month4-cleanup): Wire ILlmProvider here.
+    // Custom 90s timeout + structured JSON response makes this a larger refactor.
+    // TryExtractProfileWithLlmAsync still calls Ollama directly for now.
     /// </summary>
     private async Task<DietaryProfile?> TryExtractProfileWithLlmAsync(
         string message,

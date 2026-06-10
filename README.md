@@ -1,230 +1,73 @@
 ![CI](https://github.com/aayushmdesai/ChefAgent/actions/workflows/ci.yml/badge.svg)
 
-# ChefAgent 🍳
+# ChefAgent
 
-A multi-agent system where specialized AI agents collaborate to handle recipe search, dietary reasoning, and meal planning — built with production-grade orchestration, guardrails, and observability.
+A multi-agent AI cooking assistant built with C#/.NET and Semantic Kernel. Ask it to find recipes, validate dietary restrictions, or plan a week of meals — in plain language.
 
-**100% open-source stack. No cloud subscriptions required.**
+**Latest tag:** `v1.0.0`
+
+---
+
+## Live Demo
+
+| | URL |
+|--|--|
+| **Frontend** | https://chefagent.vercel.app |
+| **API** | https://chefagent-production.up.railway.app |
+
+```bash
+# Try it now
+curl -X POST https://chefagent-production.up.railway.app/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "find me a quick dairy-free pasta dinner", "sessionId": "demo"}'
+```
 
 ---
 
 ## Current Status
 
-| Component | Status | Notes |
+| Milestone | Status | Notes |
 |---|---|---|
-| **Recipe Agent** | ✅ Week 2 complete | Multi-stage retrieval — negation, filtering, reranking, spell-check, embedding cache |
-| **Diet Agent** | ✅ Week 3 complete | Two-layer validation + substitutions (94% rules coverage) |
-| **Orchestrator** | ✅ Week 4 complete | Intent routing, /chat endpoint, React UI |
-| **Planner Agent** | ✅ Week 5 complete | Stateful meal plans, Redis session memory, multi-slot, swap UI |
-| **Memory & State** | ✅ Week 6 complete | Conversation history, profile persistence, reference resolution |
-| **Guardrails** | ✅ Week 7 complete | Input validation, output guard, circuit breaker, rate limiting, audit log |
-| **Failure Matrix** | ✅ Week 8 complete | 36/36 failure modes tested, e2e sweep, 68 unit tests |
-| **Eval Pipeline** | ✅ Week 9 complete | 100-query golden dataset, RAGAS-style eval, spell-check +0.175 |
-| **Observability** | ✅ Week 10 complete | Self-hosted Langfuse v2, 14 span types, < 1ms overhead, p50/p95/p99 |
-| **E2E Eval + Fixes** | ✅ Week 11 complete | Semantic negation fix, 60-case e2e harness, LLM judge, Month 3 report |
-
-**Latest tag:** `v0.8.0`
-
----
-
-## Evaluation
-
-Three measurement layers. See [`eval/README.md`](eval/README.md) for full pipeline docs.
-
-| Layer | Tool | What It Measures |
-|---|---|---|
-| Retrieval quality | RAGAS-style scorer | Vector search finds right documents |
-| E2E quality | LLM judge (/chat) | Full pipeline produces useful responses |
-| Performance | Langfuse traces | Latency per operation |
-
-### Retrieval quality (RAGAS pipeline, 100 queries)
-
-| Metric | Baseline | + Spell-Check | + Semantic Negation |
-|--------|----------|---------------|---------------------|
-| Context Relevance | 0.470 | 0.524 | 0.482 |
-| Faithfulness | 0.489 | 0.444 | 0.488 |
-| Answer Relevancy | 0.267 | 0.234 | 0.249 |
-
-| Category | Baseline | Latest | Delta |
-|---|---|---|---|
-| misspelling | 0.442 | 0.617 | **+0.175** |
-| x_free | 0.438 | 0.525 | **+0.087** |
-| dietary | 0.408 | 0.475 | **+0.067** |
-| exact_match | 0.525 | 0.588 | **+0.063** |
-| by_ingredients | — | 0.700 | — |
-
-### End-to-end quality (LLM judge, 60 cases via /chat)
-
-| Category | Helpfulness | Safety | Coherence |
-|---|---|---|---|
-| general_question | **4.00** | N/A | **4.00** |
-| search_with_diet | **4.00** | 3.30 | 3.91 |
-| search_negation | **4.00** | N/A | 3.50 |
-| search_simple | 3.75 | N/A | 3.62 |
-| validate_diet | 3.33 | **2.50** | 3.56 |
-| implicit_dietary | **2.33** | N/A | 3.17 |
-
-E2E pass rate: **47/60 (78%)**, **49/57 (86%) adjusted** (excluding cascading failures).  
-Intent accuracy: 78% — intent classifier is the weakest link; all other layers perform correctly once routed.
-
-### System performance (Langfuse, Week 10)
-
-| Operation | p50 | p95 | Notes |
-|---|---|---|---|
-| SearchRecipe | ~100ms | ~300ms | Embedding + Qdrant |
-| SearchRecipe (cache hit) | ~12ms | ~12ms | Embedding cache, skip Ollama |
-| GetMealPlan | ~15ms | ~15ms | Redis only |
-| CreateMealPlan | ~640ms | ~2400ms | 7 sequential embedding calls |
-| GeneralQuestion | ~9800ms | ~9800ms | Ollama CPU inference |
-| Guardrail blocked | ~4ms | ~4ms | No agent calls |
-
-Tracing overhead: **< 1ms per request**.
-
-```bash
-# Run retrieval eval
-python eval/harnesses/retrieve.py
-# upload to Colab, run score_simple.py, download result
-python eval/harnesses/compare_experiments.py \
-    eval/experiments/2026-06-01_baseline.json \
-    eval/experiments/2026-06-07_spell_check.json
-
-# Run e2e eval
-python eval/harnesses/eval_e2e.py
-python eval/harnesses/llm_judge.py
-```
+| **RAG Pipeline** | ✅ Week 1 complete | 10K recipes, Qdrant vector search, Nomic embeddings |
+| **Multi-stage Retrieval** | ✅ Week 2 complete | Negation parsing, spell correction, query expansion |
+| **Diet Agent** | ✅ Week 3 complete | 420+ phrase rules, 12 dietary categories, LLM fallback |
+| **Orchestrator + UI** | ✅ Week 4 complete | IntentRouter, /chat endpoint, React frontend |
+| **Planner + Memory** | ✅ Weeks 5–6 complete | 7-day meal plans, Redis session memory, profile persistence |
+| **Guardrails** | ✅ Week 7 complete | Input/output guard, circuit breaker, rate limiter, audit log |
+| **CI + Perf baseline** | ✅ Week 8 complete | GitHub Actions, load test (10 concurrent), failure mode matrix |
+| **Eval pipeline** | ✅ Week 9 complete | RAGAS-style scorer, 100-query golden dataset, spell correction |
+| **Observability** | ✅ Week 10 complete | Langfuse tracing, 14 span types, embedding cache (1813ms → 12ms) |
+| **E2E eval + Negation fix** | ✅ Week 11 complete | 60-case harness, LLM judge, semantic X-free expansion |
+| **Cloud Deployment** | ✅ Week 12 complete | Railway API + Vercel UI, 21x LLM speedup (Groq), zero agent code changed |
 
 ---
 
 ## Architecture
 
 ```
-User /chat message
-    │
-    ├─ InputGuard           injection detection · sanitization · length limits
-    ├─ RateLimiter          30 req/min per session · repeated query detection
-    │
-    ├─ IntentRouter         rules <1ms · LLM entity extraction (opt-in)
-    │                       entity extraction cache (Redis) — 90s → 13ms on hit
-    │
-    ├─ AgentOrchestrator    routes by intent · history · profile persistence
-    │       ├─ ResolveReferences   "the first one" → recipe title from history
-    │       └─ AppendDisclaimer    confidence flags · allergy warnings
-    │
-    ├──────────────────────────────────────────────────┐
-    │                    │                             │
-    ▼                    ▼                             ▼
-Recipe Agent         Diet Agent               Planner Agent
-search · filter      rules 94%                generate · modify
-rerank · expand      LLM fallback             variety enforcement
-embedding cache      substitutions
-    │                    │                             │
-    ├── Qdrant            ├── Rules engine              ├── calls Recipe ×7
-    │   10K vectors       │   420+ phrases              ├── calls Diet ×7
-    │                     │   12 categories             │
-    └── Ollama            └── Ollama                    └── Redis SessionStore
-        nomic-embed-text      llama3.2 fallback             plan · profile · history
-        in-memory cache       CircuitBreaker                TTL 7 days
-        CircuitBreaker        OutputGuard
-        OutputGuard
-    │
-    ├─ Langfuse (self-hosted v2)
-    │   14 span types · fire-and-forget · < 1ms overhead
-    │   embed.cache_hit / embed.ollama visible in traces
-    │
-    └─ OrchestratorResponse
-           recipes · dietary validation · message · meal plan · confidence
+User message (React UI)
+        │
+        ▼
+POST /chat  (ASP.NET Core Minimal API)
+        │
+        ├─ InputGuard          — length, injection detection (two-signal)
+        │
+        ├─ IntentRouter        — rules-based classification, < 1ms
+        │       SearchRecipe · ValidateDiet · CreateMealPlan
+        │       ModifyMealPlan · GetMealPlan · GeneralQuestion
+        │
+        ├─ AgentOrchestrator
+        │       ├─ Recipe Agent     — RAG: embed → Qdrant → rerank
+        │       ├─ Diet Agent       — 420+ rules → LLM fallback
+        │       └─ Planner Agent    — 7× Recipe Agent, Redis persistence
+        │
+        ├─ OutputGuard         — response validation, confidence signals
+        │
+        └─ OrchestratorResponse
+                recipes + dietary notes + meal plan + confidence flag
 ```
 
----
-
-## Guardrails (Week 7)
-
-Five independent layers protect every `/chat` request.
-
-```
-Request → InputGuard → RateLimiter → RepeatCheck → Classify → Route
-                                                        ↓
-                                            CircuitBreaker (optional LLM)
-                                            OutputGuard (LLM responses)
-                                                        ↓
-                                            AppendConfidenceDisclaimer
-                                                        ↓
-                                            GuardrailAuditLog
-```
-
-| Layer | Component | What it does |
-|---|---|---|
-| Input | `InputGuard` | Two-signal injection detection, sanitization, length limits |
-| Output | `OutputGuard` | JSON schema validation, recipe sanity, retry/fallback |
-| Resilience | `CircuitBreaker` | 3-state breaker — skips LLM after 3 failures, auto-recovers |
-| Abuse | `RateLimiter` | 30 req/min per session, repeated query detection |
-| Trust | Confidence + `GuardrailAuditLog` | Disclaimers, allergy warnings, observable audit trail |
-
-Two circuit breakers: `ollama` (60s cooldown) and `redis` (30s cooldown).
-
----
-
-## Memory & State (Week 6)
-
-```
-Session memory (Redis, TTL 7 days):
-    session:{id}:plan       → MealPlan (JSON)
-    session:{id}:profile    → DietaryProfile (JSON)
-    session:{id}:history    → ConversationEntry[] (Redis list, 20-entry window)
-    session:{id}:extraction → Cached LLM entity extraction result (JSON)
-```
-
----
-
-## Agents
-
-### Recipe Agent (Weeks 1–2 + Weeks 9 + 11)
-
-```
-Query
-  ├─ [0] Spell correction       SymSpell + food domain dict
-  ├─ [1] Negation parsing       regex, instant — "pasta without tomatoes" → excluded: ["tomatoes"]
-  ├─ [2] X-free expansion       "dairy-free" → 35 ingredient exclusions via DietaryRules
-  ├─ [3] Query expansion        Ollama opt-in — "cozy" → "soup, stew, chili"
-  ├─ [4] Embedding cache        ConcurrentDictionary — cache hit skips Ollama (~12ms vs ~1800ms)
-  ├─ [5] Qdrant vector search   cosine similarity + maxIngredients/maxSteps filter
-  ├─ [6] OutputGuard sanity     drops empty titles, missing ingredients, score < 0.3
-  ├─ [7] Negation filter        removes excluded ingredients post-retrieval
-  └─ [8] LLM re-rank            Ollama opt-in
-```
-
-### Diet Agent (Week 3)
-
-Two-layer validation: fast rules engine → LLM fallback for edge cases.
-
-**12 restriction categories:** dairy, gluten, nuts, eggs, soy, sesame, seafood, meat, jain, sattvic, paleo, halal/kosher
-
-### Orchestrator (Week 4)
-
-| Intent | Agents | Confidence |
-|---|---|---|
-| `SearchRecipe` (no profile) | Recipe Agent | High |
-| `SearchRecipe` (with profile) | Recipe + Diet | Medium |
-| `ValidateDiet` | Recipe + Diet | Medium |
-| `GetMealPlan` | Redis read only | High |
-| `CreateMealPlan` | Planner Agent | Medium |
-| `ModifyMealPlan` | Planner Agent | Medium |
-| `GeneralQuestion` | Ollama direct | Medium |
-
----
-
-## Endpoints
-
-| Endpoint | Description |
-|---|---|
-| `GET /health` | Health check |
-| `POST /chat` | Orchestrator — natural language → agents |
-| `POST /recipes/search` | Recipe Agent only |
-| `POST /recipes/search-validated` | Recipe Agent + Diet Agent |
-| `GET /profile/{sessionId}` | Load stored dietary profile |
-| `POST /profile/{sessionId}` | Save dietary profile |
-| `GET /admin/guardrails` | Live guardrail audit log (last 50 events) |
-| `GET /admin/metrics` | p50/p95/p99 latency per intent (5-min window) |
+**Provider abstraction:** `ILlmProvider` and `IEmbeddingProvider` interfaces decouple agents from specific LLM/embedding backends. Cloud migration (Ollama → Groq + Nomic) required zero agent code changes.
 
 ---
 
@@ -233,51 +76,86 @@ Two-layer validation: fast rules engine → LLM fallback for edge cases.
 | Layer | Technology |
 |---|---|
 | **Orchestration** | Semantic Kernel (C#) |
-| **LLM** | Ollama — llama3.2 (local, CPU) |
-| **Embeddings** | Ollama — nomic-embed-text (768d) + in-memory cache |
-| **Vector DB** | Qdrant (self-hosted, Docker) |
-| **Session state** | Redis (Docker, TTL 7 days) |
+| **LLM** | Groq — Llama 3.3 70B (cloud) / Ollama llama3.2 (local fallback) |
+| **Embeddings** | Nomic Atlas API — nomic-embed-text-v1 (cloud) / Ollama (local fallback) |
+| **Vector DB** | Qdrant Cloud (1GB free) / Qdrant Docker (local) |
+| **Session state** | Upstash Redis (cloud) / Redis Docker (local) |
 | **Spell correction** | SymSpell + food domain dictionary |
-| **Backend** | ASP.NET Core Minimal API |
-| **Frontend** | React + Tailwind (Vite) |
-| **Observability** | Langfuse v2 (self-hosted, Docker) |
+| **Backend** | ASP.NET Core Minimal API (.NET 8) |
+| **Frontend** | React + Tailwind (Vite), deployed on Vercel |
+| **Observability** | Langfuse Cloud (50K obs/month free) |
 | **Eval** | RAGAS-style scorer + LLM judge + Colab GPU runner |
+| **Hosting** | Railway (API) + Vercel (frontend) |
+
+---
+
+## Performance
+
+| Operation | Local | Cloud | Notes |
+|---|---|---|---|
+| SearchRecipe | ~100ms | ~499ms cold / ~65ms warm | Nomic embed + Qdrant Cloud |
+| SearchRecipe (cache hit) | ~12ms | ~65ms | Embedding cache, skip embed |
+| GetMealPlan | ~15ms | ~15ms | Redis only |
+| CreateMealPlan | ~640ms | ~1,118ms | 7 Qdrant searches |
+| GeneralQuestion | ~14,000ms | ~340ms | **21x faster via Groq** |
+| Full pipeline + diet LLM | — | ~739ms | Groq LLM validation included |
+| Load test p50 (10 concurrent) | — | 4,314ms | Upstash cold start dominates |
 
 ---
 
 ## Quick Start
 
+### Local development
+
+Requires Docker and .NET 8 SDK.
+
 ```bash
-# 1. Clone and start infrastructure
 git clone https://github.com/aayushmdesai/ChefAgent.git
 cd ChefAgent
-docker compose up -d        # Qdrant + Redis + Langfuse
+docker compose up -d          # Qdrant + Redis
+ollama pull nomic-embed-text  # embeddings
+ollama pull llama3.2          # LLM
+dotnet run --project src/api
+```
 
-# 2. Start Ollama natively
-brew install ollama
-ollama pull nomic-embed-text
-ollama pull llama3.2
+The API runs on `http://localhost:5000`. The React frontend is in `frontend/`.
 
-# 3. Data pipeline
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r scripts/requirements.txt
-python3 scripts/prepare_recipes.py
-python3 scripts/load_qdrant.py
-# GPU embedding: use chefagent_embeddings.ipynb on Google Colab
+### Cloud deployment (Railway)
 
-# 4. Run the API
-cd src/api && dotnet run     # http://localhost:5100
+```bash
+# All environment variables set as Railway Variables in the dashboard.
+# Auto-deploys on push to main.
 
-# 5. Run the frontend
-cd src/frontend && npm install && npm run dev   # http://localhost:5173
+# Required Railway Variables:
+# Qdrant__Endpoint, Qdrant__ApiKey, Qdrant__CollectionName
+# LlmProvider=groq, Groq__ApiKey, Groq__Model
+# EmbeddingProvider=nomic, Nomic__ApiKey, Nomic__Model, Nomic__BaseUrl
+# Redis__ConnectionString (Upstash)
+# Langfuse__Enabled, Langfuse__BaseUrl, Langfuse__PublicKey, Langfuse__SecretKey
+# ASPNETCORE_ENVIRONMENT=Production
+```
 
-# 6. Test
-curl -X POST http://localhost:5100/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "find me a dairy-free pasta dinner", "sessionId": "test"}'
+---
 
-# Check performance metrics
-curl http://localhost:5100/admin/metrics | python3 -m json.tool
+## Evaluation
+
+Three eval layers, each catching different failure modes:
+
+| Layer | What it measures | Tool |
+|---|---|---|
+| Retrieval quality | Does vector search find the right documents? | RAGAS-style scorer (Colab GPU) |
+| Pipeline correctness | Does the full system route and respond correctly? | E2E harness, 60 cases |
+| Response quality | Is the answer actually helpful? | LLM-as-judge |
+
+**Results (v1.0.0):** 86% e2e pass rate (after cascading failure exclusion). Remaining failures trace to intent classifier vocabulary gaps — question-form `ValidateDiet`, informal `CreateMealPlan` phrasing.
+
+Run the eval pipeline:
+```bash
+cd eval
+python harnesses/retrieve.py          # local retrieval step
+# upload retrieved_contexts.json to Colab, run score_simple.py
+python harnesses/eval_e2e.py          # full pipeline e2e
+python harnesses/llm_judge.py         # subjective quality scoring
 ```
 
 ---
@@ -287,85 +165,52 @@ curl http://localhost:5100/admin/metrics | python3 -m json.tool
 ```
 ChefAgent/
 ├── src/
+│   ├── api/                          # ASP.NET Core Minimal API, endpoints, DI
 │   ├── agents/
-│   │   ├── RecipeAgent/
-│   │   │   ├── RecipeSearchPlugin.cs         # Multi-stage retrieval, embedding cache
-│   │   │   ├── RecipeReranker.cs             # LLM rerank via OutputGuard
-│   │   │   └── QueryPreprocessor.cs          # Spell-check, negation, X-free expansion
-│   │   ├── DietAgent/
-│   │   │   └── DietValidationPlugin.cs       # Two-layer validation, CircuitBreaker
-│   │   ├── PlannerAgent/
-│   │   │   └── MealPlannerPlugin.cs          # Generate + Modify + variety enforcement
-│   │   └── Orchestrator/
-│   │       ├── IntentRouter.cs               # Rules classifier + LLM entity extraction
-│   │       └── AgentOrchestrator.cs          # Dispatch + history + confidence
-│   ├── api/
-│   │   ├── Endpoints.cs                      # /chat, /profile, /admin/*
-│   │   └── ServiceRegistration.cs
-│   ├── frontend/
-│   │   └── src/components/
-│   └── shared/
-│       ├── DietaryRules.cs                   # 420+ rules, 12 categories, GetCategoryIngredients()
-│       ├── Models.cs                         # All domain records + enums
-│       ├── SessionStore.cs                   # Redis — plan, profile, history, extraction cache
-│       ├── Tracing.cs                        # Langfuse fire-and-forget client
-│       ├── MetricsCollector.cs               # p50/p95/p99 sliding window
-│       ├── TraceContext.cs                   # Lightweight trace context record
-│       ├── InputGuard.cs                     # Two-signal injection detection
-│       ├── OutputGuard.cs                    # JSON validation, sanity, retry/fallback
-│       ├── CircuitBreaker.cs                 # 3-state breaker (ollama + redis instances)
-│       ├── RateLimiter.cs                    # Per-session sliding window
-│       └── GuardrailAuditLog.cs              # In-memory ring buffer, 9 event types
+│   │   ├── Orchestrator/             # IntentRouter, AgentOrchestrator
+│   │   ├── RecipeAgent/              # RAG pipeline, QueryPreprocessor, embeddings
+│   │   ├── DietAgent/                # DietValidationPlugin, DietaryRules
+│   │   └── PlannerAgent/             # MealPlanGenerator, slot modification
+│   ├── shared/
+│   │   ├── Guards/                   # InputGuard, OutputGuard
+│   │   ├── Resilience/               # CircuitBreaker, RateLimiter
+│   │   ├── Tracing/                  # Langfuse client, MetricsCollector
+│   │   ├── SessionStore.cs           # Redis abstraction
+│   │   ├── ILlmProvider.cs           # Chat provider interface + ChatMessage record
+│   │   ├── IEmbeddingProvider.cs     # Embedding provider interface
+│   │   ├── OllamaLlmProvider.cs      # Ollama chat implementation
+│   │   ├── GroqProvider.cs           # Groq OpenAI-compatible, 429 retry backoff
+│   │   ├── OllamaEmbeddingProvider.cs # Ollama embed, search_query: prefix
+│   │   ├── HuggingFaceEmbeddingProvider.cs # HF Inference API (DNS-blocked in prod)
+│   │   └── NomicEmbeddingProvider.cs # Nomic Atlas API, production embeddings
+│   └── tests/                        # xUnit, 80+ tests
+├── frontend/                         # React + Tailwind (Vite)
 ├── eval/
-│   ├── README.md                             # How to run the full eval pipeline
-│   ├── datasets/
-│   │   ├── golden_dataset.json               # 100 labeled queries, 12 categories
-│   │   ├── e2e_golden_dataset.json           # 60 e2e test cases, 10 intent categories
-│   │   ├── e2e_results.json                  # Latest e2e harness run
-│   │   ├── e2e_judge_results.json            # Latest LLM judge scores
-│   │   └── month3-eval-report.md             # Consolidated Month 3 eval report
-│   ├── experiments/
-│   │   ├── 2026-06-01_baseline.json
-│   │   ├── 2026-06-07_spell_check.json
-│   │   └── 2026-06-03_semantic_negation.json
-│   └── harnesses/
-│       ├── retrieve.py                       # Local retrieval step
-│       ├── score_simple.py                   # Colab scoring step
-│       ├── compare_experiments.py            # Experiment diff tool
-│       ├── eval_e2e.py                       # E2E harness
-│       └── llm_judge.py                      # LLM judge scorer
+│   ├── datasets/                     # golden datasets, experiment results
+│   └── harnesses/                    # retrieve.py, score_simple.py, eval_e2e.py, llm_judge.py
 ├── docs/
-│   └── adrs/
-│       ├── 001-orchestration-framework.md
-│       ├── 002-vector-database.md
-│       ├── 003-llm-provider.md
-│       ├── 004-diet-agent-architecture.md
-│       ├── 005-orchestrator-design.md
-│       ├── 006-planner-agent-architecture.md
-│       ├── 007-session-memory-design.md
-│       ├── 008-guardrails-architecture.md
-│       ├── 009-evaluation-pipeline.md
-│       ├── 010-observability-architecture.md
-│       └── 011-evaluation-strategy.md
-├── docker-compose.yml
-└── chefagent_embeddings.ipynb
+│   └── adrs/                         # Architecture Decision Records
+└── docker-compose.yml                # Local: Qdrant + Redis
 ```
 
 ---
 
 ## Architecture Decision Records
 
-- [ADR-001: Orchestration Framework](docs/adrs/001-orchestration-framework.md)
-- [ADR-002: Vector Database](docs/adrs/002-vector-database.md)
-- [ADR-003: LLM Provider](docs/adrs/003-llm-provider.md)
-- [ADR-004: Diet Agent Architecture](docs/adrs/004-diet-agent-architecture.md)
-- [ADR-005: Orchestrator Design](docs/adrs/005-orchestrator-design.md)
-- [ADR-006: Planner Agent Architecture](docs/adrs/006-planner-agent-architecture.md)
-- [ADR-007: Session Memory Design](docs/adrs/007-session-memory-design.md)
-- [ADR-008: Guardrails Architecture](docs/adrs/008-guardrails-architecture.md)
-- [ADR-009: Evaluation Pipeline](docs/adrs/009-evaluation-pipeline.md)
-- [ADR-010: Observability Architecture](docs/adrs/010-observability-architecture.md)
-- [ADR-011: Evaluation Strategy](docs/adrs/011-evaluation-strategy.md)
+| ADR | Decision |
+|---|---|
+| [ADR-001](docs/adrs/001-semantic-kernel.md) | Semantic Kernel over raw HTTP clients |
+| [ADR-002](docs/adrs/002-qdrant.md) | Qdrant as vector database |
+| [ADR-003](docs/adrs/003-ollama.md) | Ollama for local LLM + embeddings |
+| [ADR-004](docs/adrs/004-diet-rules-over-llm.md) | Rules-first dietary validation |
+| [ADR-005](docs/adrs/005-intent-router.md) | Rules-based intent classification |
+| [ADR-006](docs/adrs/006-redis-session.md) | Redis for session memory |
+| [ADR-007](docs/adrs/007-circuit-breaker.md) | Circuit breaker for LLM resilience |
+| [ADR-008](docs/adrs/008-ci-pipeline.md) | GitHub Actions CI |
+| [ADR-009](docs/adrs/009-evaluation-pipeline.md) | RAGAS-style evaluation pipeline |
+| [ADR-010](docs/adrs/010-langfuse-observability.md) | Langfuse for observability |
+| [ADR-011](docs/adrs/011-evaluation-strategy.md) | Three-layer evaluation strategy |
+| [ADR-012](docs/adrs/012-cloud-deployment.md) | Cloud deployment strategy |
 
 ---
 
@@ -375,10 +220,26 @@ ChefAgent/
 |---|---|---|
 | Month 1 (Weeks 1–4) | Recipe Agent, Diet Agent, Orchestrator, React UI | ✅ Complete |
 | Month 2 (Weeks 5–8) | Planner Agent, Session Memory, Guardrails | ✅ Complete |
-| Month 3 (Weeks 9–11) | Eval pipeline, Langfuse observability, semantic fixes | ✅ Complete |
-| Month 3 (Week 12) | Cloud deploy | 🔄 Next |
-| Month 4 | MCP server, LinkedIn posts | 🔜 Planned |
+| Month 3 (Weeks 9–12) | Eval pipeline, Observability, Cloud deployment | ✅ Complete — v1.0.0 |
+| Month 4 | MCP server (`mcp-dotnet-diagnostics`), LinkedIn posts | 🔜 In progress |
 | Month 5 | Portfolio site, resume, outreach | 🔜 Planned |
+
+---
+
+## Known Limitations
+
+| Item | Detail |
+|---|---|
+| `GeneralQuestion` statelessness | Loses context across turns — "how to make it" loses its reference |
+| IntentRouter vocabulary gaps | Question-form `ValidateDiet`, informal `CreateMealPlan` phrasing |
+| Nut-free retrieval depth | Filter reduces candidate pool too aggressively for some queries |
+| Upstash cold start | ~3,000ms first Redis call per session — pre-warm on API startup would fix it |
+
+---
+
+## Related
+
+- **mcp-dotnet-diagnostics** — companion project: MCP server exposing .NET runtime diagnostics to AI assistants. [GitHub](https://github.com/aayushmdesai/mcp-dotnet-diagnostics) · [NuGet](https://www.nuget.org/packages/mcp-dotnet-diagnostics)
 
 ---
 

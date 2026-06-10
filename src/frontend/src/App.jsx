@@ -9,11 +9,14 @@ function getApiUrl() {
     return 'http://localhost:5100/chat';
   }
 
-  const url = `${window.location.protocol}//${hostname.replace('-5173', '-5100')}/chat`;
-  console.log('API URL:', url);  // ← add this
-  return url;
-}
+  // Codespaces port forwarding
+  if (hostname.includes('github.dev') || hostname.includes('githubpreview.dev')) {
+    return `${window.location.protocol}//${hostname.replace('-5173', '-5100')}/chat`;
+  }
 
+  // Production — Vercel frontend → Railway API
+  return 'https://chefagent-production.up.railway.app/chat';
+}
 const API_URL = getApiUrl();
 // Generate a stable session ID for this browser session
 function getSessionId() {
