@@ -47,11 +47,9 @@ def main():
         PointStruct,
     )
 
-    parsed = urlparse(args.qdrant_url)
+    # to load 50k records
     client = QdrantClient(
-        host=parsed.hostname,
-        port=parsed.port or 6333,
-        https=parsed.scheme == "https",
+        url=args.qdrant_url,
         api_key=args.api_key,
         check_compatibility=False,
         prefer_grpc=False
