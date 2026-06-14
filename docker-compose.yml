@@ -24,10 +24,12 @@ services:
       - HuggingFace__ApiKey=${HUGGINGFACE_API_KEY}
       - HuggingFace__Model=nomic-ai/nomic-embed-text-v1
       - HuggingFace__BaseUrl=https://api-inference.huggingface.co/models
-      - EmbeddingProvider=nomic
+      - EmbeddingProvider=voyage
       - Nomic__ApiKey=${NOMIC_API_KEY}
       - Nomic__Model=${NOMIC_MODEL}
       - Nomic__BaseUrl=${NOMIC_BASE_URL}
+      - Voyage__ApiKey=${VOYAGE_API_KEY}
+      - Voyage__Model=${VOYAGE_MODEL}
     depends_on:
       redis:
         condition: service_healthy

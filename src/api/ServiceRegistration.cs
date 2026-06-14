@@ -144,6 +144,17 @@ public static class ServiceRegistration
                 return new NomicEmbeddingProvider(httpClient, apiKey, model, baseUrl);
             }
 
+            if (embeddingProvider == "voyage")
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Cloud");
+                var apiKey =
+                    config["Voyage:ApiKey"]
+                    ?? throw new InvalidOperationException(
+                        "Voyage:ApiKey required when EmbeddingProvider=voyage"
+                    );
+                var model = config["Voyage:Model"] ?? "voyage-4-lite";
+                return new VoyageEmbeddingProvider(httpClient, apiKey, model);
+            }
             var ollamaClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
             var embeddingModel = config["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
             return new OllamaEmbeddingProvider(ollamaClient, ollamaUrl, embeddingModel);
