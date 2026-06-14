@@ -6,7 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace ChefAgent.Shared;
+namespace ChefAgent.Shared.Observability;
 
 /// <summary>
 /// The ONLY class in ChefAgent that knows Langfuse exists.

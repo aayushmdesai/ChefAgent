@@ -21,7 +21,9 @@ using ChefAgent.Agents.Orchestrator;
 using ChefAgent.Agents.PlannerAgent;
 using ChefAgent.Agents.Recipe;
 using ChefAgent.Shared;
+using ChefAgent.Shared.Guardrails;
 using ChefAgent.Shared.Models;
+using ChefAgent.Shared.Observability;
 
 public static class Endpoints
 {

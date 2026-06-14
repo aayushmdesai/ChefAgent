@@ -1,7 +1,9 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using ChefAgent.Shared;
+using ChefAgent.Shared.Guardrails;
 using ChefAgent.Shared.Models;
+using ChefAgent.Shared.Observability;
 using Microsoft.Extensions.Logging;
 
 namespace ChefAgent.Agents.Recipe;

@@ -1,4 +1,4 @@
-namespace ChefAgent.Shared;
+namespace ChefAgent.Shared.Observability;
 
 /// <summary>
 /// Binds to the "Langfuse" section in appsettings.json / environment variables.

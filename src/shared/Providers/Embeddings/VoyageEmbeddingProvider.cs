@@ -1,4 +1,4 @@
-namespace ChefAgent.Shared;
+namespace ChefAgent.Shared.Providers.Embeddings;
 
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;

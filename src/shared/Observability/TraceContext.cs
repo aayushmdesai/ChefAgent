@@ -1,4 +1,4 @@
-namespace ChefAgent.Shared;
+namespace ChefAgent.Shared.Observability;
 
 /// <summary>
 /// Carries trace identity through the call chain.

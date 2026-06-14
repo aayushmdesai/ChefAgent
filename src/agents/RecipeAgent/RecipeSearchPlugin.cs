@@ -1,7 +1,10 @@
 using System.ComponentModel;
 using System.Net.Http.Json;
 using ChefAgent.Shared;
+using ChefAgent.Shared.Guardrails;
 using ChefAgent.Shared.Models;
+using ChefAgent.Shared.Observability;
+using ChefAgent.Shared.Providers.Embeddings;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Qdrant.Client;

@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace ChefAgent.Shared;
+namespace ChefAgent.Shared.Observability;
 
 /// <summary>
 /// In-memory metrics collector. Records per-request latency and intent counts.

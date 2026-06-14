@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ChefAgent.Shared.Guardrails;
 using ChefAgent.Shared.Models;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;

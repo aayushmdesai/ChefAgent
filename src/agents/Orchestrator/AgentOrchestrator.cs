@@ -6,7 +6,10 @@ using ChefAgent.Agents.Diet;
 using ChefAgent.Agents.PlannerAgent;
 using ChefAgent.Agents.Recipe;
 using ChefAgent.Shared;
+using ChefAgent.Shared.Guardrails;
 using ChefAgent.Shared.Models;
+using ChefAgent.Shared.Observability;
+using ChefAgent.Shared.Providers.Llm;
 using Microsoft.Extensions.Logging;
 
 /// <summary>

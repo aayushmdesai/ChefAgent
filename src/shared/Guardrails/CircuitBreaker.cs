@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace ChefAgent.Shared;
+namespace ChefAgent.Shared.Guardrails;
 
 public enum CircuitState
 {

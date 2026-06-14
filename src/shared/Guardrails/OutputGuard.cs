@@ -2,7 +2,7 @@ using System.Text.Json;
 using ChefAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 
-namespace ChefAgent.Shared;
+namespace ChefAgent.Shared.Guardrails;
 
 public class OutputGuard
 {

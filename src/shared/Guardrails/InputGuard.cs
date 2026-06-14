@@ -1,4 +1,4 @@
-namespace ChefAgent.Shared;
+namespace ChefAgent.Shared.Guardrails;
 
 public record InputValidationResult
 {

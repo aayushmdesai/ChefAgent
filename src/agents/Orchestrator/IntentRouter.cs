@@ -2,7 +2,9 @@ namespace ChefAgent.Agents.Orchestrator;
 
 using System.Text.RegularExpressions;
 using ChefAgent.Shared;
+using ChefAgent.Shared.Guardrails;
 using ChefAgent.Shared.Models;
+using ChefAgent.Shared.Observability;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 

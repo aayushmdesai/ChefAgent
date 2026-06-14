@@ -1,4 +1,4 @@
-namespace ChefAgent.Shared;
+namespace ChefAgent.Shared.Providers.Embeddings;
 
 /// <summary>
 /// Abstraction over any text embedding provider (Ollama, HuggingFace, etc.)

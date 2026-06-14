@@ -1,4 +1,4 @@
-namespace ChefAgent.Shared;
+namespace ChefAgent.Shared.Providers.Llm;
 
 /// <summary>
 /// Abstraction over any LLM chat provider (Ollama, Groq, etc.)

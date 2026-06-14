@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 
-namespace ChefAgent.Shared;
+namespace ChefAgent.Shared.Guardrails;
 
 public record GuardrailEvent
 {
