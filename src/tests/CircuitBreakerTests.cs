@@ -1,4 +1,5 @@
 using ChefAgent.Shared;
+using ChefAgent.Shared.Guardrails;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;

@@ -1,4 +1,5 @@
 using ChefAgent.Shared;
+using ChefAgent.Shared.Guardrails;
 using Xunit;
 
 namespace ChefAgent.Tests;
