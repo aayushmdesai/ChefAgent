@@ -28,19 +28,30 @@ public class VoyageEmbeddingProvider : IEmbeddingProvider
 
     public async Task<float[]> EmbedAsync(string text, CancellationToken ct = default)
     {
-        var request = new
+        var request = new { model = _model, input = new[] { text } };
+
+        const int maxRetries = 5;
+        for (int attempt = 0; attempt < maxRetries; attempt++)
         {
-            model = _model,
-            input = new[] { text }, // no prefix convention for Voyage
-        };
+            var response = await _httpClient.PostAsJsonAsync(BaseUrl, request, ct);
 
-        var response = await _httpClient.PostAsJsonAsync(BaseUrl, request, ct);
-        response.EnsureSuccessStatusCode();
+            if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                // respect Retry-After header if present, else back off
+                var retryAfter =
+                    response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(20 * (attempt + 1));
+                await Task.Delay(retryAfter, ct);
+                continue;
+            }
 
-        var result = await response.Content.ReadFromJsonAsync<VoyageResponse>(
-            cancellationToken: ct
-        );
-        return result!.Data[0].Embedding;
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<VoyageResponse>(
+                cancellationToken: ct
+            );
+            return result!.Data[0].Embedding;
+        }
+
+        throw new InvalidOperationException($"Voyage API returned 429 after {maxRetries} retries.");
     }
 
     private record EmbeddingObject([property: JsonPropertyName("embedding")] float[] Embedding);
