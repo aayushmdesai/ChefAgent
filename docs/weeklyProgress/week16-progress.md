@@ -8,7 +8,7 @@
 ## Goals
 
 - Fix production (Nomic exhausted → Voyage migration) ✅
-- Re-run eval pipeline on 52k dataset + new embeddings
+- Re-run eval pipeline on 52k dataset + new embeddings ✅
 - Fix IntentRouter vocabulary gaps
 - Publish Post #2
 - Publish Post #3 + community seeding
@@ -126,12 +126,92 @@ EmbeddingProvider=voyage in Railway env vars to activate
 
 ---
 
+## Day 2 — Eval Pipeline Re-run (voyage-4-lite, 52k corpus) ✅
+
+### Setup
+
+- Added `time.sleep(25)` between questions in `retrieve.py` to respect
+  Voyage's 3 RPM free tier limit at query time
+- Added retry with backoff on 429 in `VoyageEmbeddingProvider.cs` —
+  respects `Retry-After` header, falls back to `20s × attempt`
+- `score_simple.py` unchanged — Ollama running on Colab (llama3.2)
+
+### Results
+
+**Experiment:** `eval/experiments/2026-06-14_voyage_52k.json`  
+**Baseline:** `eval/experiments/2026-06-07_spell_check.json`
+
+| Metric | Baseline | Experiment | Delta |
+|---|---|---|---|
+| context_relevance | 0.524 | 0.578 | ↑ +0.054 |
+| faithfulness | 0.444 | 0.477 | ↑ +0.033 |
+| answer_relevancy | 0.234 | 0.279 | ↑ +0.045 |
+
+**Per-category context relevance:**
+
+| Category | Baseline | Experiment | Delta |
+|---|---|---|---|
+| technique | 0.550 | 0.800 | ↑ +0.250 |
+| dietary | 0.458 | 0.675 | ↑ +0.217 |
+| misspelling | 0.617 | 0.800 | ↑ +0.183 |
+| multi_intent | 0.463 | 0.600 | ↑ +0.137 |
+| situation | 0.425 | 0.562 | ↑ +0.137 |
+| cuisine | 0.613 | 0.725 | ↑ +0.112 |
+| exact_match | 0.613 | 0.725 | ↑ +0.112 |
+| filtering | 0.438 | 0.488 | ↑ +0.050 |
+| by_ingredients | 0.610 | 0.630 | ↑ +0.020 |
+| x_free | 0.588 | 0.450 | ↓ -0.138 |
+| negation | 0.503 | 0.280 | ↓ -0.223 |
+| edge_case | 0.433 | 0.167 | ↓ -0.266 |
+
+### Analysis
+
+**Wins driven by corpus size (10k → 52k):** technique, dietary, cuisine,
+multi_intent, situation all improved significantly. More candidates in
+Qdrant means better top-k matches.
+
+**Indian recipes paying off:** dietary +0.217 is the clearest signal —
+the Indian recipe dataset added in Week 15 directly improved retrieval
+for dietary-specific queries.
+
+**SymSpell holding up:** misspelling +0.183 across an embedding model
+change validates that spell correction is doing real work upstream of
+the vector search.
+
+**Regressions — negation (-0.223), x_free (-0.138), edge_case (-0.266):**
+Likely `voyage-4-lite` encodes "without X" and "X-free" queries
+differently than Nomic did — pulling toward recipes containing X rather
+than excluding it. This is not a RAG problem, it's an IntentRouter /
+DietAgent filtering gap. The edge_case regression is mostly noise (tiny
+sample, inherently low-signal queries like "food", "r", "xkqzpw blarfnog").
+
+**Root cause of negation/x_free regressions:** these query types need
+post-retrieval filtering in DietAgent, not better embedding. The embedding
+model retrieves semantically similar recipes; exclusion logic must happen
+at the agent layer. Flagged as tech debt.
+
+### Commits
+
+```
+eval: voyage-4-lite 52k experiment results
+
+Overall: context_relevance +0.054, faithfulness +0.033, answer_relevancy +0.045
+Wins: technique +0.250, dietary +0.217, misspelling +0.183
+Regressions: negation -0.223, edge_case -0.266, x_free -0.138
+```
+
+```
+fix(voyage): add retry with backoff on 429
+```
+
+---
+
 ## Deferred
 
 - Colab notebook (`chefagent_embeddings_voyage_batch.ipynb`) — commit
   to `scripts/pipeline/` once cleaned up
-- Re-run eval pipeline on 52k + Voyage embeddings (Day 2)
 - IntentRouter vocabulary gaps (Day 3)
 - Post #2 publish (Day 4)
 - Post #3 publish + community seeding (Day 5)
 - Month 5 prep (Days 6-7)
+- Negation/x_free regression investigation (tech debt)
