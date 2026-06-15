@@ -85,6 +85,8 @@ Prints per-category delta table with ↑/↓/→ arrows.
 | `2026-06-01_baseline.json` | Baseline — no improvements |
 | `2026-06-07_spell_check.json` | After SymSpell + food domain dictionary |
 | `2026-06-03_semantic_negation.json` | After X-free semantic expansion |
+| `2026-06-14_voyage_52k.json` | Voyage-4-lite embeddings, 52k corpus — context_relevance +0.054 vs spell_check baseline |
+| `2026-06-14_e2e_intentrouter_fixes.json` | E2E sweep after IntentRouter fixes — 41/60 passed, 87% on evaluated cases |
 
 ---
 
@@ -137,6 +139,8 @@ Output: `eval/datasets/e2e_judge_results.json`
 - LLM judge uses `llama3.2` to judge `llama3.2` output — same model, same blind spots. Scores are directionally useful for comparing categories, not absolute quality claims.
 - `implicit_dietary` safety scores are null — the judge doesn't have visibility into the LLM-extracted profile. Requires storing the extracted profile in `e2e_results.json`.
 - `get_meal_plan` helpfulness is artificially low — the judge sees only the response message string, not the `mealPlan` object content.
+- Voyage AI free tier (3 RPM) causes timeouts during eval runs — 13/60 cases timed out in Week 16 sweep. True pass rate on evaluated cases: 41/47 = 87%.
+- Meal plan setup messages (180s timeout) can cascade — if setup times out, dependent modify/get cases will fail with "no plan in Redis".
 
 ---
 
@@ -166,7 +170,8 @@ eval/
 ├── experiments/
 │   ├── 2026-06-01_baseline.json
 │   ├── 2026-06-07_spell_check.json
-│   └── 2026-06-03_semantic_negation.json
+│   ├── 2026-06-03_semantic_negation.json
+│   └── 2026-06-14_voyage_52k.json
 └── harnesses/
     ├── retrieve.py                      # Local retrieval step
     ├── score_simple.py                  # Colab scoring step

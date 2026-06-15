@@ -33,7 +33,7 @@ import time
 from datetime import datetime
 from tabulate import tabulate
 
-API_BASE = "http://localhost:5100"
+API_BASE = "https://chefagent-production.up.railway.app"
 CHAT_ENDPOINT = f"{API_BASE}/chat"
 DATASET_PATH = "eval/datasets/e2e_golden_dataset.json"
 
@@ -70,7 +70,24 @@ def call_chat(message: str, session_id: str, dietary_profile: dict | None, timeo
     data["_latency_ms"] = elapsed_ms
     return data
 
+MEAL_PLAN_CATEGORIES = {"create_meal_plan", "modify_meal_plan", "get_meal_plan"}
 
+def run_setup_messages(setup_messages: list, session_id: str) -> None:
+    """
+    Sends setup messages in order without evaluating them.
+    These prime session state (e.g. create a plan before testing modify).
+    """
+    for msg in setup_messages:
+        try:
+            call_chat(
+                message=msg["message"],
+                session_id=session_id,
+                dietary_profile=msg.get("dietary_profile"),
+                timeout=180,  # meal plan setup slow due to Voyage rate limits
+            )
+            time.sleep(2)  # avoid 429 cascade between setup messages
+        except Exception as e:
+            print(f"    ⚠️  Setup message failed: {msg['message'][:50]}... — {e}")
 def run_setup_messages(setup_messages: list, session_id: str) -> None:
     """
     Sends setup messages in order without evaluating them.
@@ -84,7 +101,7 @@ def run_setup_messages(setup_messages: list, session_id: str) -> None:
                 dietary_profile=msg.get("dietary_profile"),
                 timeout=60,  # plans can be slow
             )
-            time.sleep(0.5)  # small gap between sequence messages
+            time.sleep(1)  # small gap between sequence messages
         except Exception as e:
             print(
                 f"    ⚠️  Setup message failed: {msg['message'][:50]}... — {e}")
@@ -188,7 +205,7 @@ def run_case(case: dict, session_id: str) -> dict:
             message=case["message"],
             session_id=session_id,
             dietary_profile=case.get("dietary_profile"),
-            timeout=60,
+            timeout=180 if case["category"] in MEAL_PLAN_CATEGORIES else 60,
         )
         evaluation = evaluate_response(case, response)
         return {
@@ -351,7 +368,7 @@ def main():
         result = run_case(case, session_id)
         results.append(result)
         print_case_result(result)
-        time.sleep(0.3)  # avoid hammering the API
+        time.sleep(1)  # avoid hammering the API
 
     print_summary(results)
 
