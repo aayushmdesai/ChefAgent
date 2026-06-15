@@ -240,6 +240,7 @@ public class IntentRouter
         "what's on monday",
         "what's on tuesday",
         "what's on wednesday",
+        "remind me what i am having",
     ];
 
     // ── Contraction Normalization ─────────────────────────────────────────────
