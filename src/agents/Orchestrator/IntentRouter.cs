@@ -77,6 +77,8 @@ public class IntentRouter
         "is x safe",
         "is x gluten-free",
         "is x dairy-free",
+        "can i eat this",
+        "can i eat it",
     ];
 
     // Implicit constraint signals — heuristic to detect when LLM extraction is needed.
