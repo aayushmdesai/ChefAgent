@@ -57,6 +57,28 @@ public class IntentRouter
         "okay for me",
         "will this work for",
         "is this okay",
+        "is this vegan",
+        "is this vegetarian",
+        "is this halal",
+        "is this kosher",
+        "is this gluten-free",
+        "is this dairy-free",
+        "is this safe",
+        "is it vegan",
+        "is it vegetarian",
+        "is it halal",
+        "is it kosher",
+        "is it gluten-free",
+        "is it dairy-free",
+        "can vegans eat",
+        "can vegetarians eat",
+        "can i eat this",
+        "is x vegan",
+        "is x halal",
+        "is x kosher",
+        "is x safe",
+        "is x gluten-free",
+        "is x dairy-free",
     ];
 
     // Implicit constraint signals — heuristic to detect when LLM extraction is needed.
@@ -147,6 +169,10 @@ public class IntentRouter
         "new plan for the week",
         "help me plan my week",
         "help me plan meals",
+        "plan dinners for the week",
+        "plan lunches for the week",
+        "plan breakfasts for the week",
+        "plan meals for the week",
     ];
 
     private static readonly HashSet<string> ModifyMealPlanSignals =
@@ -201,6 +227,10 @@ public class IntentRouter
         "view my plan",
         "my plan",
         "my weekly plan",
+        "what did you plan",
+        "what have you planned",
+        "what's planned for",
+        "what is planned for",
     ];
 
     // ── Contraction Normalization ─────────────────────────────────────────────
@@ -406,7 +436,11 @@ public class IntentRouter
 
     private static UserIntent ClassifyIntent(string lower)
     {
-        if (ValidateDietSignals.Any(s => lower.Contains(s)))
+        if (
+            ValidateDietSignals.Any(s => lower.Contains(s))
+            || DietQuestionRegex.IsMatch(lower)
+            || CanEatRegex.IsMatch(lower)
+        )
             return UserIntent.ValidateDiet;
 
         if (GetMealPlanSignals.Any(s => lower.Contains(s)))
@@ -756,6 +790,18 @@ public class IntentRouter
         }
         return null;
     }
+
+    // Question-form diet validation — "is X vegan/halal/kosher/gluten-free/dairy-free?"
+    private static readonly Regex DietQuestionRegex = new(
+        @"\bis\s+\w[\w\s]{0,30}(vegan|vegetarian|halal|kosher|gluten.free|dairy.free|nut.free|safe)\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase
+    );
+
+    // "can vegans/vegetarians eat X?"
+    private static readonly Regex CanEatRegex = new(
+        @"\bcan\s+(vegans?|vegetarians?|i|a\s+\w+\s+allergy\s+person)\s+eat\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase
+    );
 
     private static DietaryProfile? MergeProfiles(
         DietaryProfile? existing,
