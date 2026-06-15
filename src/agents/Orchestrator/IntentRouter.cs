@@ -45,7 +45,6 @@ public class IntentRouter
 
     private static readonly HashSet<string> ValidateDietSignals =
     [
-        "can i eat",
         "is this safe",
         "safe for me",
         "safe for",
@@ -72,7 +71,6 @@ public class IntentRouter
         "is it dairy-free",
         "can vegans eat",
         "can vegetarians eat",
-        "can i eat this",
         "is x vegan",
         "is x halal",
         "is x kosher",
@@ -231,6 +229,15 @@ public class IntentRouter
         "what have you planned",
         "what's planned for",
         "what is planned for",
+        "remind me what i'm having",
+        "what am i having",
+        "what's on thursday",
+        "what's on friday",
+        "what's on saturday",
+        "what's on sunday",
+        "what's on monday",
+        "what's on tuesday",
+        "what's on wednesday",
     ];
 
     // ── Contraction Normalization ─────────────────────────────────────────────
@@ -494,6 +501,8 @@ public class IntentRouter
             restrictions.Add("halal");
         if (lower.Contains("kosher"))
             restrictions.Add("kosher");
+        if (lower.Contains("paleo"))
+            restrictions.Add("paleo");
 
         if (allergies.Count == 0 && restrictions.Count == 0)
             return null;
@@ -799,7 +808,7 @@ public class IntentRouter
 
     // "can vegans/vegetarians eat X?"
     private static readonly Regex CanEatRegex = new(
-        @"\bcan\s+(vegans?|vegetarians?|i|a\s+\w+\s+allergy\s+person)\s+eat\b",
+        @"\bcan\s+(vegans?|vegetarians?|a\s+\w+\s+allergy\s+person)\s+eat\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase
     );
 
