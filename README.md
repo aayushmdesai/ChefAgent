@@ -28,7 +28,7 @@ curl -X POST https://chefagent-production.up.railway.app/chat \
 
 | Milestone | Status | Notes |
 |---|---|---|
-| **RAG Pipeline** | ✅ Week 1 complete | 10K recipes, Qdrant vector search, Nomic embeddings |
+| **RAG Pipeline** | ✅ Week 1 complete | 52K recipes, Qdrant vector search, Voyage embeddings |
 | **Multi-stage Retrieval** | ✅ Week 2 complete | Negation parsing, spell correction, query expansion |
 | **Diet Agent** | ✅ Week 3 complete | 420+ phrase rules, 12 dietary categories, LLM fallback |
 | **Orchestrator + UI** | ✅ Week 4 complete | IntentRouter, /chat endpoint, React frontend |
@@ -39,6 +39,9 @@ curl -X POST https://chefagent-production.up.railway.app/chat \
 | **Observability** | ✅ Week 10 complete | Langfuse tracing, 14 span types, embedding cache (1813ms → 12ms) |
 | **E2E eval + Negation fix** | ✅ Week 11 complete | 60-case harness, LLM judge, semantic X-free expansion |
 | **Cloud Deployment** | ✅ Week 12 complete | Railway API + Vercel UI, 21x LLM speedup (Groq), zero agent code changed |
+| **MCP Server** | ✅ Weeks 13-14 complete | mcp-dotnet-diagnostics, NuGet published, Glama listed |
+| **LinkedIn + Dataset** | ✅ Week 15 complete | 3 posts written, dataset expanded 10k → 52k recipes |
+| **Production fix + Eval** | ✅ Week 16 complete | Voyage AI migration, IntentRouter fixes, 87% e2e pass rate |
 
 ---
 
@@ -67,7 +70,7 @@ POST /chat  (ASP.NET Core Minimal API)
                 recipes + dietary notes + meal plan + confidence flag
 ```
 
-**Provider abstraction:** `ILlmProvider` and `IEmbeddingProvider` interfaces decouple agents from specific LLM/embedding backends. Cloud migration (Ollama → Groq + Nomic) required zero agent code changes.
+**Provider abstraction:** `ILlmProvider` and `IEmbeddingProvider` interfaces decouple agents from specific LLM/embedding backends. Three provider swaps (HuggingFace → Nomic → Voyage AI for embeddings, Ollama → Groq for LLM) required zero agent code changes.
 
 ---
 
@@ -77,7 +80,7 @@ POST /chat  (ASP.NET Core Minimal API)
 |---|---|
 | **Orchestration** | Semantic Kernel (C#) |
 | **LLM** | Groq — Llama 3.3 70B (cloud) / Ollama llama3.2 (local fallback) |
-| **Embeddings** | Nomic Atlas API — nomic-embed-text-v1 (cloud) / Ollama (local fallback) |
+| **Embeddings** | Voyage AI — voyage-4-lite, 1024d (cloud) / Ollama (local fallback) |
 | **Vector DB** | Qdrant Cloud (1GB free) / Qdrant Docker (local) |
 | **Session state** | Upstash Redis (cloud) / Redis Docker (local) |
 | **Spell correction** | SymSpell + food domain dictionary |
@@ -93,7 +96,7 @@ POST /chat  (ASP.NET Core Minimal API)
 
 | Operation | Local | Cloud | Notes |
 |---|---|---|---|
-| SearchRecipe | ~100ms | ~499ms cold / ~65ms warm | Nomic embed + Qdrant Cloud |
+| SearchRecipe | ~100ms | ~499ms cold / ~65ms warm | Voyage embed + Qdrant Cloud |
 | SearchRecipe (cache hit) | ~12ms | ~65ms | Embedding cache, skip embed |
 | GetMealPlan | ~15ms | ~15ms | Redis only |
 | CreateMealPlan | ~640ms | ~1,118ms | 7 Qdrant searches |
@@ -113,8 +116,8 @@ Requires Docker and .NET 8 SDK.
 git clone https://github.com/aayushmdesai/ChefAgent.git
 cd ChefAgent
 docker compose up -d          # Qdrant + Redis
-ollama pull nomic-embed-text  # embeddings
-ollama pull llama3.2          # LLM
+ollama pull nomic-embed-text  # local embeddings fallback
+ollama pull llama3.2          # local LLM fallback
 dotnet run --project src/api
 ```
 
@@ -129,7 +132,7 @@ The API runs on `http://localhost:5000`. The React frontend is in `frontend/`.
 # Required Railway Variables:
 # Qdrant__Endpoint, Qdrant__ApiKey, Qdrant__CollectionName
 # LlmProvider=groq, Groq__ApiKey, Groq__Model
-# EmbeddingProvider=nomic, Nomic__ApiKey, Nomic__Model, Nomic__BaseUrl
+# EmbeddingProvider=voyage, Voyage__ApiKey, Voyage__Model=voyage-4-lite
 # Redis__ConnectionString (Upstash)
 # Langfuse__Enabled, Langfuse__BaseUrl, Langfuse__PublicKey, Langfuse__SecretKey
 # ASPNETCORE_ENVIRONMENT=Production
@@ -147,7 +150,15 @@ Three eval layers, each catching different failure modes:
 | Pipeline correctness | Does the full system route and respond correctly? | E2E harness, 60 cases |
 | Response quality | Is the answer actually helpful? | LLM-as-judge |
 
-**Results (v1.0.0):** 86% e2e pass rate (after cascading failure exclusion). Remaining failures trace to intent classifier vocabulary gaps — question-form `ValidateDiet`, informal `CreateMealPlan` phrasing.
+**Results (v1.0.0, Week 16):**
+
+| Experiment | Context Relevance | Notes |
+|---|---|---|
+| Baseline (nomic, 10k) | 0.470 | No preprocessing |
+| + Spell check (nomic, 10k) | 0.524 | SymSpell + food dict |
+| Voyage 52k (voyage-4-lite) | 0.578 | 5× corpus + model swap |
+
+E2E pass rate: **87% on evaluated cases** (41/47, excluding Voyage 3 RPM timeouts).
 
 Run the eval pipeline:
 ```bash
@@ -156,6 +167,7 @@ python harnesses/retrieve.py          # local retrieval step
 # upload retrieved_contexts.json to Colab, run score_simple.py
 python harnesses/eval_e2e.py          # full pipeline e2e
 python harnesses/llm_judge.py         # subjective quality scoring
+python harnesses/compare_experiments.py eval/experiments/A.json eval/experiments/B.json
 ```
 
 ---
@@ -172,22 +184,23 @@ ChefAgent/
 │   │   ├── DietAgent/                # DietValidationPlugin, DietaryRules
 │   │   └── PlannerAgent/             # MealPlanGenerator, slot modification
 │   ├── shared/
-│   │   ├── Guards/                   # InputGuard, OutputGuard
-│   │   ├── Resilience/               # CircuitBreaker, RateLimiter
-│   │   ├── Tracing/                  # Langfuse client, MetricsCollector
-│   │   ├── SessionStore.cs           # Redis abstraction
-│   │   ├── ILlmProvider.cs           # Chat provider interface + ChatMessage record
-│   │   ├── IEmbeddingProvider.cs     # Embedding provider interface
-│   │   ├── OllamaLlmProvider.cs      # Ollama chat implementation
-│   │   ├── GroqProvider.cs           # Groq OpenAI-compatible, 429 retry backoff
-│   │   ├── OllamaEmbeddingProvider.cs # Ollama embed, search_query: prefix
-│   │   ├── HuggingFaceEmbeddingProvider.cs # HF Inference API (DNS-blocked in prod)
-│   │   └── NomicEmbeddingProvider.cs # Nomic Atlas API, production embeddings
+│   │   ├── Providers/
+│   │   │   ├── Embeddings/           # IEmbeddingProvider, Ollama, HuggingFace, Nomic, Voyage
+│   │   │   └── Llm/                  # ILlmProvider, OllamaLlmProvider, GroqProvider
+│   │   ├── Guardrails/               # InputGuard, OutputGuard, CircuitBreaker, GuardrailAuditLog
+│   │   ├── Observability/            # LangfuseOptions, MetricsCollector, TraceContext, Tracing
+│   │   ├── DietaryRules.cs
+│   │   ├── RateLimiter.cs
+│   │   ├── SessionStore.cs
+│   │   └── Models.cs
 │   └── tests/                        # xUnit, 80+ tests
 ├── frontend/                         # React + Tailwind (Vite)
 ├── eval/
 │   ├── datasets/                     # golden datasets, experiment results
-│   └── harnesses/                    # retrieve.py, score_simple.py, eval_e2e.py, llm_judge.py
+│   ├── experiments/                  # timestamped experiment JSON files
+│   └── harnesses/                    # retrieve.py, score_simple.py, eval_e2e.py, llm_judge.py, compare_experiments.py
+├── scripts/
+│   └── pipeline/                     # prepare_recipes.py, generate_embeddings_voyage.py, load_qdrant.py
 ├── docs/
 │   └── adrs/                         # Architecture Decision Records
 └── docker-compose.yml                # Local: Qdrant + Redis
@@ -211,6 +224,7 @@ ChefAgent/
 | [ADR-010](docs/adrs/010-langfuse-observability.md) | Langfuse for observability |
 | [ADR-011](docs/adrs/011-evaluation-strategy.md) | Three-layer evaluation strategy |
 | [ADR-012](docs/adrs/012-cloud-deployment.md) | Cloud deployment strategy |
+| [ADR-013](docs/adrs/013-voyage-embedding-migration.md) | Voyage AI embedding migration |
 
 ---
 
@@ -221,7 +235,7 @@ ChefAgent/
 | Month 1 (Weeks 1–4) | Recipe Agent, Diet Agent, Orchestrator, React UI | ✅ Complete |
 | Month 2 (Weeks 5–8) | Planner Agent, Session Memory, Guardrails | ✅ Complete |
 | Month 3 (Weeks 9–12) | Eval pipeline, Observability, Cloud deployment | ✅ Complete — v1.0.0 |
-| Month 4 | MCP server (`mcp-dotnet-diagnostics`), LinkedIn posts | 🔜 In progress |
+| Month 4 (Weeks 13–16) | MCP server, LinkedIn posts, Voyage migration, IntentRouter fixes | ✅ Complete |
 | Month 5 | Portfolio site, resume, outreach | 🔜 Planned |
 
 ---
@@ -231,9 +245,10 @@ ChefAgent/
 | Item | Detail |
 |---|---|
 | `GeneralQuestion` statelessness | Loses context across turns — "how to make it" loses its reference |
-| IntentRouter vocabulary gaps | Question-form `ValidateDiet`, informal `CreateMealPlan` phrasing |
 | Nut-free retrieval depth | Filter reduces candidate pool too aggressively for some queries |
 | Upstash cold start | ~3,000ms first Redis call per session — pre-warm on API startup would fix it |
+| Voyage 3 RPM free tier | Meal plan generation (21 embedding calls) saturates rate limit — retry logic handles it |
+| negation/x_free RAGAS regression | voyage-4-lite encodes exclusion queries differently than Nomic — post-retrieval filtering correct but candidates weaker |
 
 ---
 
