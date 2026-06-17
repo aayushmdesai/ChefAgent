@@ -420,13 +420,30 @@ Three issues diagnosed and documented:
 
 ## Days 6-7 — Month 5 Prep
 
-### Post Engagement (to be filled at end of week)
+### Post Engagement (final, pulled end of Week 17)
 
-| Post | Impressions | Reactions | Comments | Saves |
-|------|-------------|-----------|----------|-------|
-| #1 (Multi-agent architecture) | 429 | 14 | 0 | 2 |
-| #2 (RAG eval deep dive) | | | | |
-| #3 (MCP server diagnostics) | | | | |
+| Post | Date | Impressions | Members Reached | Reactions | Comments | Saves | Link Clicks |
+|------|------|-------------|------------------|-----------|----------|-------|-------------|
+| #1 (Multi-agent architecture) | 6/10 | 636 | 402 | 16 | 0 | 2 | 2 |
+| #2 (RAG eval deep dive) | 6/12 | 455 | 255 | 10 | 1 | 0 | 3 |
+| #3 (MCP server diagnostics) | 6/16 | 534 | 314 | 12 | 0 | 1 | 0 |
+
+**Notes:**
+- Post #1's original same-day placeholder numbers (429 impressions / 14 reactions)
+  were early-read figures before the post finished circulating — final pulled
+  numbers are meaningfully higher across the board (636 impressions, 16 reactions).
+  Worth remembering that day-of LinkedIn numbers are not final; wait 3-5 days
+  before recording them as the official figure.
+- Post #1 has the strongest reach of the three, likely the novelty of the
+  multi-agent architecture topic plus it being the first post in the series.
+- Post #2 had the lowest impressions/reach but is the only post with a comment —
+  small sample, but worth noting that technical deep-dive content (RAG eval
+  specifics) may engage fewer people more deeply rather than more people lightly.
+- Post #3 had zero link engagement (no GitHub link in that post, unlike #1 and #2
+  which linked to `github.com/aayushmdesai/ChefAgent`) — explains the 0 in that
+  column; not a performance signal, a content difference.
+- All three posts skew toward Software Engineer job titles (29-35%) and
+  Entry/Senior seniority — aligns with the intended technical audience.
 
 ### Month 5 Plan — Portfolio + Resume + Outreach
 
