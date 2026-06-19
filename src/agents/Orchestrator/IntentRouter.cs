@@ -355,7 +355,9 @@ public class IntentRouter
             {
                 intent = UserIntent.GeneralQuestion;
                 _logger.LogInformation(
-                    "[IntentRouter] Context continuation — overriding SearchRecipe → GeneralQuestion (last turn was GeneralQuestion)"
+                    "[IntentRouter] History count={Count} LastAssistantIntent={Intent}",
+                    history?.Count ?? -1,
+                    history?.LastOrDefault(e => e.Role == "assistant")?.Intent?.ToString() ?? "null"
                 );
             }
             // ── LLM entity extraction fallback ───────────────────────
