@@ -28,7 +28,8 @@ public record ChatRequest(
     string Message,
     string? SessionId = null, // reserved for Month 2 Redis session memory
     DietaryProfile? DietaryProfile = null, // optional — merged with any profile extracted from message
-    bool UseLlmClassification = false // false = rules only (fast, no timeouts)
+    bool UseLlmClassification = false, // false = rules only (fast, no timeouts)
+    bool Rerank = false
 // true  = LLM classification (smart, slow on 8GB CPU)
 // Month 2: train classifier on labeled dataset
 );
