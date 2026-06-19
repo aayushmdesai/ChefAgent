@@ -70,7 +70,7 @@ public class RecipeSearchPlugin
             int? maxIngredients = null,
         [Description("Filter: max number of steps (null = no filter)")] int? maxSteps = null,
         bool rerank = false,
-        bool expand = false,
+        bool expand = true,
         CancellationToken cancellationToken = default,
         TraceContext? parentCtx = null
     )
