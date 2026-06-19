@@ -340,6 +340,24 @@ public class IntentRouter
             var intent = ClassifyIntent(normalized);
             var extractedProfile = ExtractProfile(normalized);
 
+            // ── Context continuation — follow-up questions ────────────────────────────
+            // If rules defaulted to SearchRecipe AND the last turn was GeneralQuestion
+            // AND the message is short (likely a follow-up, not a new search),
+            // override to GeneralQuestion so history context is used.
+            if (
+                intent == UserIntent.SearchRecipe
+                && history is not null
+                && history.Count > 0
+                && history.LastOrDefault(e => e.Role == "assistant")?.Intent
+                    == UserIntent.GeneralQuestion
+                && lower.Split(' ').Length <= 8
+            )
+            {
+                intent = UserIntent.GeneralQuestion;
+                _logger.LogInformation(
+                    "[IntentRouter] Context continuation — overriding SearchRecipe → GeneralQuestion (last turn was GeneralQuestion)"
+                );
+            }
             // ── LLM entity extraction fallback ───────────────────────
             // Only fires when:
             //   1. Rules extracted nothing
