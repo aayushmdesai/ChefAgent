@@ -6,11 +6,14 @@
 //
 // Dependency graph:
 //   QdrantClient          ← infrastructure
-//   HttpClient "Ollama"   ← infrastructure
-//   RecipeSearchPlugin    ← depends on QdrantClient + HttpClient
-//   DietValidationPlugin  ← depends on HttpClient
-//   IntentRouter          ← depends on HttpClient (reserved for Month 2 LLM)
-//   AgentOrchestrator     ← depends on RecipeSearchPlugin + DietValidationPlugin + HttpClient
+//   ILlmProvider          ← config-driven: Groq (prod) or Ollama (local)
+//   IEmbeddingProvider    ← config-driven: Voyage (prod) or Ollama (local)
+//   RecipeSearchPlugin    ← depends on QdrantClient + IEmbeddingProvider
+//   QueryPreprocessor     ← depends on ILlmProvider
+//   RecipeReranker        ← depends on ILlmProvider
+//   DietValidationPlugin  ← depends on ILlmProvider
+//   IntentRouter          ← depends on ILlmProvider
+//   AgentOrchestrator     ← depends on all agents + ILlmProvider
 // ============================================================
 
 namespace ChefAgent.Api;
@@ -200,38 +203,29 @@ public static class ServiceRegistration
         services.AddSingleton(sp =>
         {
             var qdrant = sp.GetRequiredService<QdrantClient>();
-            var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
             var logger = sp.GetRequiredService<ILogger<RecipeSearchPlugin>>();
             var outputGuard = sp.GetRequiredService<OutputGuard>();
             var circuitBreaker = sp.GetRequiredKeyedService<CircuitBreaker>("ollama");
             var tracing = sp.GetRequiredService<Tracing>();
-            var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
-            var embeddingModel = config["Ollama:EmbeddingModel"] ?? "nomic-embed-text";
             var embeddingProvider = sp.GetRequiredService<IEmbeddingProvider>();
-            var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
             var collection = config["Qdrant:CollectionName"] ?? "recipes";
 
             return new RecipeSearchPlugin(
                 qdrant,
-                httpClient,
                 collection,
                 logger,
                 outputGuard,
                 tracing,
                 embeddingProvider,
                 new RecipeReranker(
-                    httpClient,
-                    ollamaUrl,
-                    chatModel,
+                    sp.GetRequiredService<ILlmProvider>(),
                     outputGuard,
                     circuitBreaker,
                     sp.GetRequiredService<Tracing>(),
                     sp.GetRequiredService<ILogger<RecipeReranker>>()
                 ),
                 new QueryPreprocessor(
-                    httpClient,
-                    ollamaUrl,
-                    chatModel,
+                    sp.GetRequiredService<ILlmProvider>(),
                     sp.GetRequiredService<ILogger<QueryPreprocessor>>()
                 )
             );
@@ -315,17 +309,11 @@ public static class ServiceRegistration
                 )
         );
         services.AddSingleton<OutputGuard>();
-        // IntentRouter — rules-based classifier, Month 2 will add LLM path
+        // IntentRouter — rules-based classifier with ILlmProvider fallback for entity extraction
         services.AddSingleton(sp =>
         {
-            var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Ollama");
-            var ollamaUrl = config["Ollama:Endpoint"] ?? "http://localhost:11434";
-            var chatModel = config["Ollama:ChatModel"] ?? "llama3.2";
-
             return new IntentRouter(
-                httpClient,
-                ollamaUrl,
-                chatModel,
+                sp.GetRequiredService<ILlmProvider>(),
                 sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
                 sp.GetRequiredService<SessionStore>(),
                 sp.GetRequiredService<Tracing>(),

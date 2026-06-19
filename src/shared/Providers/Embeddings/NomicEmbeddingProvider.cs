@@ -5,7 +5,6 @@ using System.Text.Json.Serialization;
 
 /// <summary>
 /// IEmbeddingProvider backed by Nomic Atlas API.
-/// Uses nomic-embed-text-v1 — identical model to local Ollama.
 /// Zero vector space mismatch: stored vectors and query vectors use the same model.
 /// Endpoint: https://api-atlas.nomic.ai/v1/embedding/text
 /// </summary>

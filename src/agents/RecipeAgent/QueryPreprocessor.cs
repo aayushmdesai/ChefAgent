@@ -1,8 +1,8 @@
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using ChefAgent.Agents.Diet;
-using ChefAgent.Shared;
 using ChefAgent.Shared.Models;
+using ChefAgent.Shared.Providers.Llm;
 using Microsoft.Extensions.Logging;
 
 namespace ChefAgent.Agents.Recipe;
@@ -15,9 +15,7 @@ namespace ChefAgent.Agents.Recipe;
 /// </summary>
 public class QueryPreprocessor
 {
-    private readonly HttpClient _httpClient;
-    private readonly string _ollamaUrl;
-    private readonly string _chatModel;
+    private readonly ILlmProvider _llmProvider;
     private readonly ILogger<QueryPreprocessor> _logger;
 
     private static readonly Regex NegationPattern = new(
@@ -165,16 +163,9 @@ public class QueryPreprocessor
         "special",
     ];
 
-    public QueryPreprocessor(
-        HttpClient httpClient,
-        string ollamaUrl,
-        string chatModel,
-        ILogger<QueryPreprocessor> logger
-    )
+    public QueryPreprocessor(ILlmProvider llmProvider, ILogger<QueryPreprocessor> logger)
     {
-        _httpClient = httpClient;
-        _ollamaUrl = ollamaUrl;
-        _chatModel = chatModel;
+        _llmProvider = llmProvider;
         _logger = logger;
     }
 
@@ -311,9 +302,6 @@ public class QueryPreprocessor
         return AbstractSignals.Any(signal => lower.Contains(signal));
     }
 
-    // TODO(Month4-cleanup): Wire ILlmProvider here.
-    // ExpandQueryAsync fires rarely (opt-in, abstract queries only).
-    // Direct Ollama call retained for now.
     /// <summary>
     /// Expands a vague query into concrete food search terms via LLM.
     /// "something warm and comforting" → "soup, stew, chili, casserole, pot roast"
@@ -335,18 +323,7 @@ public class QueryPreprocessor
             Return ONLY the expanded search terms, nothing else. No explanation.
             """;
 
-        var request = new
-        {
-            model = _chatModel,
-            messages = new[] { new { role = "user", content = prompt } },
-            stream = false,
-        };
-
-        var response = await _httpClient.PostAsJsonAsync($"{_ollamaUrl}/api/chat", request, ct);
-        response.EnsureSuccessStatusCode();
-
-        var result = await response.Content.ReadFromJsonAsync<OllamaChatResponse>(ct);
-        var expanded = result?.Message?.Content?.Trim() ?? query;
+        var expanded = (await _llmProvider.ChatAsync([new ChatMessage("user", prompt)], ct)).Trim();
 
         // Strip quotes if the LLM wraps it
         expanded = expanded.Trim('"', '\'');
@@ -404,11 +381,6 @@ public class QueryPreprocessor
 
         return filtered;
     }
-
-    // DTOs
-    private record OllamaChatResponse(OllamaChatMessage Message);
-
-    private record OllamaChatMessage(string Role, string Content);
 }
 
 public record PreprocessedQuery(

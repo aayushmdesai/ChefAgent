@@ -5,6 +5,7 @@ using ChefAgent.Shared;
 using ChefAgent.Shared.Guardrails;
 using ChefAgent.Shared.Models;
 using ChefAgent.Shared.Observability;
+using ChefAgent.Shared.Providers.Llm;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,9 +35,7 @@ using Microsoft.Extensions.Logging;
 public class IntentRouter
 {
     private readonly ILogger<IntentRouter> _logger;
-    private readonly HttpClient _httpClient;
-    private readonly string _ollamaUrl;
-    private readonly string _chatModel;
+    private readonly ILlmProvider _llmProvider;
     private readonly CircuitBreaker _circuitBreaker;
     private readonly SessionStore _sessionStore;
     private readonly Tracing _tracing;
@@ -302,18 +301,14 @@ public class IntentRouter
     }
 
     public IntentRouter(
-        HttpClient httpClient,
-        string ollamaUrl,
-        string chatModel,
+        ILlmProvider llmProvider,
         [FromKeyedServices("ollama")] CircuitBreaker circuitBreaker,
         SessionStore sessionStore,
         Tracing tracing,
         ILogger<IntentRouter> logger
     )
     {
-        _httpClient = httpClient;
-        _ollamaUrl = ollamaUrl;
-        _chatModel = chatModel;
+        _llmProvider = llmProvider;
         _circuitBreaker = circuitBreaker;
         _sessionStore = sessionStore;
         _tracing = tracing;
@@ -658,38 +653,15 @@ public class IntentRouter
                     + $"vegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, "
                     + $"gluten-free, dairy-free, nut-free, egg-free, soy-free\n\n"
                     + $"If nothing new was expressed, return:\n{emptyFormat}";
-                var payload = new
-                {
-                    model = _chatModel,
-                    stream = false,
-                    messages = new[] { new { role = "user", content = prompt } },
-                };
-
-                var json = System.Text.Json.JsonSerializer.Serialize(payload);
-                var content = new System.Net.Http.StringContent(
-                    json,
-                    System.Text.Encoding.UTF8,
-                    "application/json"
-                );
-
                 // 90s timeout — LLM extraction is opt-in, caller already opted in
                 using var cts = new System.Threading.CancellationTokenSource(
                     TimeSpan.FromSeconds(90)
                 );
-                var response = await _httpClient.PostAsync(
-                    $"{_ollamaUrl}/api/chat",
-                    content,
+                var raw = await _llmProvider.ChatAsync(
+                    [new ChatMessage("user", prompt)],
                     cts.Token
                 );
-                response.EnsureSuccessStatusCode();
                 _circuitBreaker.RecordSuccess();
-
-                var body = await response.Content.ReadAsStringAsync();
-                using var doc = System.Text.Json.JsonDocument.Parse(body);
-                var raw =
-                    doc.RootElement.GetProperty("message").GetProperty("content").GetString()
-                    ?? string.Empty;
-
                 _logger.LogInformation("[IntentRouter] LLM raw response: {Raw}", raw);
                 // Strip markdown fences if present
                 raw = raw.Trim();

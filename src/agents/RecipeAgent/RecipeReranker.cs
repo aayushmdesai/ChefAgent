@@ -1,9 +1,8 @@
 using System.Net.Http.Json;
-using System.Text.Json;
-using ChefAgent.Shared;
 using ChefAgent.Shared.Guardrails;
 using ChefAgent.Shared.Models;
 using ChefAgent.Shared.Observability;
+using ChefAgent.Shared.Providers.Llm;
 using Microsoft.Extensions.Logging;
 
 namespace ChefAgent.Agents.Recipe;
@@ -14,27 +13,21 @@ namespace ChefAgent.Agents.Recipe;
 /// </summary>
 public class RecipeReranker
 {
-    private readonly HttpClient _httpClient;
-    private readonly string _ollamaUrl;
-    private readonly string _chatModel;
+    private readonly ILlmProvider _llmProvider;
     private readonly OutputGuard _outputGuard;
     private readonly CircuitBreaker _circuitBreaker;
     private readonly Tracing _tracing;
     private readonly ILogger<RecipeReranker> _logger;
 
     public RecipeReranker(
-        HttpClient httpClient,
-        string ollamaUrl,
-        string chatModel,
+        ILlmProvider llmProvider,
         OutputGuard outputGuard,
         CircuitBreaker circuitBreaker,
         Tracing tracing,
         ILogger<RecipeReranker> logger
     )
     {
-        _httpClient = httpClient;
-        _ollamaUrl = ollamaUrl;
-        _chatModel = chatModel;
+        _llmProvider = llmProvider;
         _outputGuard = outputGuard;
         _circuitBreaker = circuitBreaker;
         _tracing = tracing;
@@ -80,7 +73,7 @@ public class RecipeReranker
                 }
 
                 var rankings = await _outputGuard.CallWithRetryAsync(
-                    llmCall: () => CallOllamaAsync(prompt, ct),
+                    llmCall: () => CallLlmAsync(prompt, ct),
                     validator: raw => _outputGuard.ValidateRerankOutput(raw, candidates.Count),
                     context: "Reranker"
                 );
@@ -166,26 +159,8 @@ public class RecipeReranker
         return sb.ToString();
     }
 
-    // TODO(Month4-cleanup): Wire ILlmProvider here.
-    // RerankAsync is opt-in (rerank=true flag), off by default.
-    // Direct Ollama call retained for now.
-    private async Task<string?> CallOllamaAsync(string prompt, CancellationToken ct)
+    private async Task<string?> CallLlmAsync(string prompt, CancellationToken ct)
     {
-        var request = new
-        {
-            model = _chatModel,
-            messages = new[] { new { role = "user", content = prompt } },
-            stream = false,
-        };
-
-        var response = await _httpClient.PostAsJsonAsync($"{_ollamaUrl}/api/chat", request, ct);
-        response.EnsureSuccessStatusCode();
-
-        var result = await response.Content.ReadFromJsonAsync<OllamaChatResponse>(ct);
-        return result?.Message?.Content ?? "";
+        return await _llmProvider.ChatAsync([new ChatMessage("user", prompt)], ct);
     }
-
-    private record OllamaChatResponse(OllamaChatMessage Message);
-
-    private record OllamaChatMessage(string Role, string Content);
 }

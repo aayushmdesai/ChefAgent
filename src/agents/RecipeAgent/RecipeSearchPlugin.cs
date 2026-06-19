@@ -1,6 +1,4 @@
 using System.ComponentModel;
-using System.Net.Http.Json;
-using ChefAgent.Shared;
 using ChefAgent.Shared.Guardrails;
 using ChefAgent.Shared.Models;
 using ChefAgent.Shared.Observability;
@@ -19,7 +17,6 @@ namespace ChefAgent.Agents.Recipe;
 public class RecipeSearchPlugin
 {
     private readonly QdrantClient _qdrantClient;
-    private readonly HttpClient _httpClient;
     private readonly string _collectionName;
     private readonly ILogger<RecipeSearchPlugin> _logger;
     private readonly IEmbeddingProvider _embeddingProvider;
@@ -43,7 +40,6 @@ public class RecipeSearchPlugin
 
     public RecipeSearchPlugin(
         QdrantClient qdrantClient,
-        HttpClient httpClient,
         string collectionName,
         ILogger<RecipeSearchPlugin> logger,
         OutputGuard outputGuard,
@@ -54,7 +50,6 @@ public class RecipeSearchPlugin
     )
     {
         _qdrantClient = qdrantClient;
-        _httpClient = httpClient;
         _collectionName = collectionName;
         _logger = logger;
         _reranker = reranker;

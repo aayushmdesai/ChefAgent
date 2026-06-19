@@ -5,10 +5,12 @@
 ## Summary
 
 Rebuilt the resume to lead with AI agent work while keeping the .NET/healthcare
-background as credibility, not the headline — then built and deployed a full
-4-page portfolio site from scratch. Both shipped live this week, ahead of the
-original Days 6–7 polish schedule; most of that polish landed during Days 4–5
-instead.
+background as credibility, not the headline — then built and deployed a portfolio
+site from scratch, starting as a 4-page React Router SPA and evolving into a
+single scrollable page with anchor navigation, an Experience section with honest
+narrative framing, a redesigned Hero, hamburger mobile nav, Open Graph meta tags,
+custom favicon, and copy-to-clipboard on code blocks. All shipped live at
+aayushmdesai.vercel.app.
 
 ---
 
@@ -48,9 +50,9 @@ gets touched again.
 
 ## Portfolio Site
 
-**Status: Live at `aayushmdesai.vercel.app`, all 4 pages built and deployed.**
+**Status: Live at `aayushmdesai.vercel.app`, fully restructured as a single-page scrollable site.**
 
-Stack: React + Vite + Tailwind v4, React Router, deployed on Vercel from GitHub.
+Stack: React + Vite + Tailwind v4, no React Router (anchor-based navigation), deployed on Vercel from GitHub.
 
 ### Day 3 — Scaffold
 - Vite + Tailwind v4 (plugin-based config, no separate `tailwind.config.js`)
@@ -67,80 +69,101 @@ Stack: React + Vite + Tailwind v4, React Router, deployed on Vercel from GitHub.
     descriptions. Fixed an early aspect-ratio bug where the viewBox didn't
     match the actual node geometry, causing visible distortion/off-center
     rendering.
-  - **Request lifecycle**: animated, auto-playing step-through with a progress
-    rail; later upgraded to **link directly to the architecture diagram** —
-    stepping through the request flow highlights the matching agent node(s)
-    above it in real time.
+  - **Request lifecycle**: animated, auto-playing vertical timeline (dots +
+    connector line) placed side-by-side with the architecture diagram.
+    Stepping through highlights the matching agent node(s) in real time;
+    hovering a node pauses the animation.
   - **Product screenshot**: real screenshot of the ChefAgent chat UI, captioned
-    to tie back to the "rules for the common case" key decision (the screenshot
-    shows `SearchRecipe` / `rules-default` tags confirming no LLM call was needed).
+    to tie back to the "rules for the common case" key decision.
   - **Guardrails & observability section**: 5-layer guardrail grid + Langfuse
-    tracing explanation (added after a review pass identified the original
-    page was missing any mention of guardrails despite it being a stated
-    achievement).
+    tracing explanation.
   - **Eval results table**: shows the real progression including the semantic
-    negation tradeoff (context relevance dipped, answer relevancy rose +0.112)
-    and the Voyage AI migration's negation regression — both disclosed
-    honestly as a deliberate tradeoff and documented tech debt, not hidden.
+    negation tradeoff and Voyage AI migration regression — both disclosed
+    honestly, not hidden.
 
-### Day 5 — MCP Server page + About page
-- **MCP Server page**: hero, "what MCP is" explainer, demo GIF (Week 14 health
-  check recording), full 7-tool table with "reach for it when" column, "how it
-  works" section explaining the tool-description chaining technique, 3 key
-  decisions (C# over TypeScript, target-by-PID, the .NET 10 EventPipe payload
-  discovery), install instructions, and a directory-badge row linking to
-  mcpservers.org, Glama, awesome-mcp-servers, and CodeGuilds.
-- **About page**: short bio, current role focus, resume link, GitHub/LinkedIn.
-  Iterated twice on layout — first pass was too cramped (small photo, narrow
-  text column, lots of dead space) after comparing against two inspiration
-  sites; rebuilt with a bigger heading, bigger circular photo (224px), and
-  full-width use of the existing layout container.
+### Day 5 — MCP Server page + Connect section
+- **MCP Server page**: hero, "what MCP is" explainer, demo GIF, full 7-tool
+  table, "how it works" section, 3 key decisions, install instructions,
+  copy-to-clipboard on code blocks, directory badges (mcpservers.org, Glama,
+  awesome-mcp-servers, CodeGuilds).
+- **About page**: initially built as separate, later merged into the
+  single-page layout as a "Connect" closing section.
 
-### Bonus: Home page polish (pulled forward from Days 6–7)
-Reviewed two portfolio sites for inspiration (Parinith Reddy's, Dipin Yadav's)
-and adopted three elements, explicitly rejecting a fourth:
-- **Icon-based social links** (GitHub/LinkedIn/Mail) replacing plain text —
-  required installing `react-icons` after discovering `lucide-react` doesn't
-  ship brand/logo icons (a real gap in that library, not a version issue)
-- **Categorized tech stack grid** — 4 categories mirroring the resume's skill
-  groupings exactly (AI & Agent Systems / Languages & Frameworks / Cloud &
-  Infrastructure / Backend Engineering)
-- **"Let's Connect" closing section** — heading, positioning line, 3 labeled
-  contact buttons
-- **Rejected**: light/dark mode toggle — assessed as low-signal frontend
-  polish disconnected from the backend/AI-infra story being told. Explicitly
-  deferred, not forgotten — revisit only if time remains after everything else.
+### Days 6–7 — Single-page restructure + polish
+
+**Major architectural decision:** converted from 4-page React Router SPA to a
+single scrollable page with anchor-based navigation and `IntersectionObserver`
+active-section highlighting — inspired by reviewing Parinith Reddy's and Dipin
+Yadav's portfolios side-by-side. React Router removed entirely.
+
+**New section order:** Home → Experience → ChefAgent → MCP Server → Connect
+
+**File structure:** `src/sections/` (Hero, ChefAgentSection, McpSection,
+ExperienceSection, ConnectSection) + `src/components/` (Nav, Layout, Footer)
+
+**New: ExperienceSection** — built from scratch via targeted Q&A to get accurate
+ownership claims. 3 expanded narrative items (IQ-Prompt Integration, EHR
+scheduling sync, Patient Intake Portal) with honest problem → approach → outcome
+framing. Remaining 6 Carenet items behind "Show all experience" toggle.
+
+**Hero redesign:**
+- Photo left, bio right (Dipin-style layout)
+- "Open to opportunities" green pulsing badge
+- "Dallas, TX · Open to relocation" location line
+- 3 scrollable cards with section labels: Experience first, then Personal Projects
+- Tech stack expanded to 5 categories, full-width stacked bordered cards
+- Skills updated: Data & Persistence and Backend & Observability added as
+  separate categories; LINQ, SQL Server, MySQL, Serilog, Hangfire, xUnit,
+  Upstash, Qdrant Cloud added
+
+**Nav:**
+- Sticky with `IntersectionObserver` active highlighting
+  (`rootMargin: '-10% 0px -85% 0px'` — tuned for long sections like MCP)
+- Smooth scroll with runtime nav-height offset
+- "AD" logo replacing full name
+- Hamburger menu on mobile (animated ≡ → × transition, dropdown with all links)
+
+**Other polish:**
+- `index.html`: tab title, meta description, Open Graph tags, Twitter card,
+  `og:image` for LinkedIn/Slack link previews
+- Favicon: custom dark circle SVG with "AD" initials
+- Copy-to-clipboard on MCP install command and JSON config
+- All external links open in new tab
+- `overflow-x-hidden` on Layout for mobile
+- README with homepage screenshot added to repo
 
 ---
 
-## Engagement (final numbers, all 3 posts)
+## Engagement (as of Week 17)
 
 | Post | Date | Impressions | Members Reached | Reactions | Comments | Saves | Link Clicks |
 |------|------|-------------|------------------|-----------|----------|-------|-------------|
 | #1 (ChefAgent architecture) | 6/10 | 636 | 402 | 16 | 0 | 2 | 2 |
 | #2 (RAG eval deep dive) | 6/12 | 455 | 255 | 10 | 1 | 0 | 3 |
 | #3 (MCP server diagnostics) | 6/16 | 534 | 314 | 12 | 0 | 1 | 0 |
+| #4 (Portfolio site launch) | 6/18 | scheduled | — | — | — | — | — |
 
-Post #1's previously recorded same-day numbers (429 impressions / 14 reactions,
-captured in the Week 16 doc) were early reads before the post finished
-circulating — final numbers came in higher across the board. Post #1 has the
-strongest overall reach of the three. Post #3 shows 0 link clicks because that
-post didn't include a GitHub link (unlike #1 and #2), not because of weaker
-engagement — its impressions and reactions are comparable to #1.
+Post #4 is a portfolio announcement — genuine, grounded tone ("nothing fancy,
+just the real work documented honestly"). Attached a screen recording of the
+site in motion rather than a static screenshot. Numbers to be pulled next week.
 
 ---
 
 ## Tech debt / open items
 
-- **Profile photo**: placeholder swapped for real photo mid-week; final crop
-  confirmed circular, 224px, good framing
-- **Mobile testing**: not yet done — the ChefAgent architecture diagram and
-  the new Home page tech-stack grid are the highest-risk components at
-  narrow widths and should be checked first
-- **Distribution**: portfolio URL not yet added to resume header, LinkedIn
-  Featured/About sections, or a GitHub profile README
-- **Full proofread pass**: not yet done across all 4 pages
+- **Full proofread pass**: not yet done — do before outreach phase
 - **Dark mode toggle**: deliberately deferred, lowest priority
+- **MCP tools table mobile**: 3-column table is hard to read on narrow screens;
+  left as-is by choice
+
+## Distribution — completed
+
+- ✅ Portfolio URL added to resume header (Dallas, TX · aayushmdesai.vercel.app on line 1)
+- ✅ LinkedIn Featured section — portfolio link with photo thumbnail and description
+- ✅ LinkedIn About section — updated with ChefAgent/MCP specifics, portfolio URL, honest framing
+- ✅ LinkedIn Contact info — website field updated
+- ✅ Resume PDF uploaded to portfolio site (serves as the "View résumé" download)
+- ✅ Post #4 scheduled — portfolio announcement
 
 ---
 
@@ -169,3 +192,21 @@ page redesign only happened because two inspiration sites were reviewed
 side-by-side against the current build — the gap (small photo, narrow text,
 wasted space) was invisible until placed next to a reference that used the
 same width intentionally.
+
+**Single-page vs multi-page is a real tradeoff, not a style preference.**
+Started with 4 separate routes, switched to single-page after seeing how
+inspection sites like Dipin's felt more fluid and less like clicking through
+documentation. The tradeoff: deep-link URLs like `/chefagent` are gone, but
+the scrollable arc (identity → work → projects → connect) tells a better story
+than isolated pages with no flow between them.
+
+**`IntersectionObserver` rootMargin needs tuning per content length.** The
+default aggressive margin (`-20% 0px -55% 0px`) worked for short sections but
+caused the active nav link to jump ahead on long sections like MCP. Widening
+to `-10% 0px -85% 0px` kept long sections active while you read them.
+
+**Ownership framing in experience narratives matters.** The first draft of the
+ExperienceSection overclaimed on IQ-Prompt (said "designed" when it was
+"implemented against an architecture"). Corrected via Q&A before writing —
+a reminder that honest framing is more credible than inflated claims, and a
+hiring manager who digs in will catch the difference.
