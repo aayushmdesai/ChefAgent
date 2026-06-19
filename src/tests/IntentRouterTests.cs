@@ -3,9 +3,9 @@ using ChefAgent.Shared;
 using ChefAgent.Shared.Guardrails;
 using ChefAgent.Shared.Models;
 using ChefAgent.Shared.Observability;
+using ChefAgent.Shared.Providers.Llm;
 using Microsoft.Extensions.Logging;
 using Moq;
-using StackExchange.Redis;
 using Xunit;
 
 namespace ChefAgent.Tests;
@@ -37,10 +37,15 @@ public class IntentRouterTests
             new HttpClient()
         );
 
+        var llmProvider = new Mock<ILlmProvider>();
+        llmProvider
+            .Setup(p =>
+                p.ChatAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<CancellationToken>())
+            )
+            .ReturnsAsync("{}");
+
         return new IntentRouter(
-            new HttpClient(),
-            "http://localhost:11434",
-            "llama3.2",
+            llmProvider.Object,
             circuitBreaker,
             sessionStore,
             tracing,
