@@ -950,7 +950,22 @@ public class AgentOrchestrator
             }
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            var answer = await AskLlmAsync(classified.SearchQuery);
+            List<ConversationEntry> history = [];
+            if (classified.SessionId is not null)
+            {
+                try
+                {
+                    history = await _sessionStore.GetHistoryAsync(classified.SessionId, limit: 6);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "[Orchestrator] History load failed for GeneralQuestion — proceeding without context"
+                    );
+                }
+            }
+            var answer = await AskLlmAsync(classified.SearchQuery, history);
             sw.Stop();
 
             _circuitBreaker.RecordSuccess();
@@ -1067,16 +1082,28 @@ public class AgentOrchestrator
 
     // ── LLM Direct (GeneralQuestion) ───────────────────────────────────────
 
-    private async Task<string> AskLlmAsync(string question, CancellationToken ct = default)
+    private async Task<string> AskLlmAsync(
+        string question,
+        List<ConversationEntry>? history = null,
+        CancellationToken ct = default
+    )
     {
-        var messages = new[]
+        var messages = new List<ChatMessage>
         {
             new ChatMessage(
                 "system",
                 "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences."
             ),
-            new ChatMessage("user", question),
         };
+
+        // Inject last 3 turns of history for context
+        if (history is not null)
+        {
+            foreach (var entry in history.TakeLast(6))
+                messages.Add(new ChatMessage(entry.Role, entry.Content));
+        }
+
+        messages.Add(new ChatMessage("user", question));
 
         return await _llmProvider.ChatAsync(messages, ct);
     }
