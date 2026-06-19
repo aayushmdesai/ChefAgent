@@ -7,7 +7,7 @@
 ## Goals
 
 - Complete ILlmProvider wiring through all remaining call sites ✅
-- Re-ranker on Groq + eval measurement ⏳
+- Re-ranker on Groq + eval measurement ✅ (finding: expansion matters more)
 - GeneralQuestion conversation context ⏳
 - Upstash cold-start pre-warm ⏳
 - Portfolio site proofread + update ⏳
@@ -52,10 +52,6 @@ components had a silent asterisk: if you swapped `LlmProvider=groq` in env vars,
 Ollama. Now `ServiceRegistration.cs` is the single source of truth for provider
 selection — one env var change affects every LLM call in the system.
 
-The re-ranker in particular should benefit immediately: it was designed in Month 2
-but left on CPU Ollama where it was too slow for interactive use (30+ seconds).
-Now it goes through Groq. Day 2 will measure the actual latency.
-
 ### Key learnings
 
 The `TODO(Month4-cleanup)` comment in `RecipeReranker.cs` was the exact right pattern
@@ -69,11 +65,100 @@ greps rather than narrow ones — they catch dead code the targeted search misse
 
 ---
 
-## Days 2–7 — In progress
+## Day 2 — Re-ranker investigation + query expansion fix ✅
+
+### What we investigated
+
+The plan for Day 2 was to test the re-ranker through Groq and decide whether to
+make it default. That investigation revealed two things: the re-ranker was never
+actually firing, and the more impactful fix was elsewhere.
+
+**Re-ranker was never wired through the chat endpoint.**
+`ChatRequest` has no `Rerank` field. `RecipeSearchPlugin.SearchRecipesAsync` has
+`rerank: false` as a default. The orchestrator never passes it. So every curl with
+`"rerank": true` in the body was silently ignored by the deserializer — the flag
+existed only on `RecipeSearchRequest` (the `/recipes/search` endpoint), not on
+`/chat`.
+
+Hardcoded `rerank: true` temporarily at the orchestrator call site, pushed to
+Railway, and tested. Results: inconsistent latency (1.2s vs 9.8s across two
+queries), ordering barely changed from vector similarity. The temporary commit
+was reverted.
+
+**The real finding: `expand: false` was the default, and it was never overridden.**
+`QueryPreprocessor.ExpandQueryAsync` had been built in Month 2 but never used in
+production — the `expand` flag defaulted to `false` in `RecipeSearchPlugin` and
+the orchestrator never set it. Abstract queries were hitting the vector index
+literally, returning keyword matches instead of semantically appropriate results.
+
+### The fix
+
+One line change in `RecipeSearchPlugin.cs`:
+
+```csharp
+// Before:
+bool expand = false,
+
+// After:
+bool expand = true,
+```
+
+`IsAbstract()` is rules-based and cheap — it checks for signal words (`something`,
+`impressive`, `cozy`, `quick`, `fancy`, etc.) before deciding whether to call the
+LLM. Concrete queries skip expansion entirely with zero latency cost.
+
+### Before vs after
+
+**"something impressive for a dinner party"**
+
+| | Results |
+|---|---|
+| Before | Party Punch, Champagne Punch, Pink Party Wedding Punch, Cathy's Champagne Punch, Pretty Party Punch |
+| After | Beef Tenderloin Stuffed with Lobster, Meat Soufflé, Steak with Lobster Tail, Beef Wellington, Paella |
+
+**"something cozy for a cold night"**
+
+After: Beef Pot Pie, Gourmet Stew, Shepherd's Pie, Shepard's Pie, Meal-In-A-Dish
+
+### Latency profile
+
+| Query type | Example | Latency |
+|---|---|---|
+| Concrete (no expansion) | "chicken tikka masala" | 0.7s |
+| Abstract, Railway warm | "something cozy for a cold night" | ~4s |
+| Abstract, Railway cold | "something impressive for a dinner party" | ~9s |
+
+The 4-9s range on abstract queries is Groq expansion (~2-3s) + Railway/Upstash
+overhead. Cold start adds ~5s on top of warm latency — same Upstash issue as
+always, addressed in Day 4.
+
+### Re-ranker decision
+
+Deferred — not default-on yet. The expansion fix addresses retrieval quality
+directly; re-ordering bad candidates doesn't help. Once retrieval is consistently
+good, re-ranking becomes the next lever. The wiring work (Day 1) means it would
+now go through Groq if enabled — the infrastructure is ready, the decision is
+just not yet justified by the data.
+
+### Key learnings
+
+**Retrieval quality > reordering quality.** The re-ranker can only reorder what
+retrieval found. If vector similarity returns 5 punch recipes for "dinner party",
+the re-ranker reorders 5 punch recipes. Getting the right candidates matters more
+than the order of wrong ones.
+
+**Flag defaults are silent bugs.** `expand: false` in `SearchRecipesAsync` was
+correct under Month 2 CPU constraints (LLM expansion on CPU took 30+ seconds).
+When Groq replaced Ollama in Month 3, the constraint disappeared but the default
+didn't change. Worth auditing other opt-in flags when the hardware constraint
+that motivated them no longer applies.
+
+---
+
+## Days 3–7 — In progress
 
 | Day | Focus | Status |
 |-----|-------|--------|
-| Day 2 | Re-ranker on Groq + eval | ⏳ |
 | Day 3 | GeneralQuestion conversation context | ⏳ |
 | Day 4 | Upstash cold-start pre-warm | ⏳ |
 | Day 5 | Portfolio site proofread + update | ⏳ |
