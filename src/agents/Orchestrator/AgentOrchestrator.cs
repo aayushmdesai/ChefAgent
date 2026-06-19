@@ -424,7 +424,6 @@ public class AgentOrchestrator
             recipes = await _recipeAgent.SearchRecipesAsync(
                 classified.SearchQuery,
                 maxResults: 5,
-                rerank: true,
                 parentCtx: parentCtx
             );
             _tracing.EndSpan(recipeCtx, output: new { resultCount = recipes.Count });
