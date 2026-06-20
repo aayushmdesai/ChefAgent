@@ -67,6 +67,7 @@ public static class Endpoints
                         {
                             "huggingface" => "HuggingFace",
                             "nomic" => "Nomic",
+                            "voyage" => "Voyage",
                             _ => "Ollama",
                         },
                         memory = "Redis",
