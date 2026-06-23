@@ -10,8 +10,8 @@
 - Re-ranker on Groq + eval measurement ✅ (finding: expansion matters more)
 - GeneralQuestion conversation context ✅
 - Upstash cold-start pre-warm ✅
-- Portfolio site proofread + update ⏳
-- Company research + outreach message templates ⏳
+- Portfolio site proofread + update ✅
+- Company research + outreach message templates ✅
 
 ---
 
@@ -308,9 +308,85 @@ Redis format for StackExchange.Redis, not the `rediss://` URL format.
 
 ---
 
-## Days 5–7 — In progress
+## Day 5 — Portfolio site proofread + update ✅
+
+### Approach
+
+Ran two full audit passes on the live site source, fixing issues in priority order across three sessions. Total fixes: 20+ items across critical, nice-to-have, and mobile categories.
+
+### Critical fixes
+
+**Eval table math reconciled.** The answer-relevancy column had inconsistent delta references — `+0.112` in the semantic negation row was measured against baseline, while every other delta was vs-previous-stage. Fixed to `+0.091` (vs previous). Column now sums: `0.213 + 0.021 + 0.091 − 0.046 = 0.279 ✓`. Added "over baseline" to the prose so the rhetorical +0.112 figure stays without confusing the table.
+
+**Answer-relevancy regression shown honestly.** Last row `0.279` was displayed green with `(+0.045)` — a regression shown as a gain by re-baselining. Fixed to orange `(−0.046)`.
+
+**Context relevance delta fixed.** Last row showed `+0.054` (copied from spell correction row). Actual delta `0.578 − 0.482 = +0.096`. Fixed.
+
+**Connect section heading restored.** Previous edit dropped the `Let's Connect` heading and positioning sentence, leaving four floating buttons with no context. Restored.
+
+**Inflated verbs removed from experience.** "Architected" → "Built" in quickBullets. "Technical lead" dropped — contradicted the honest IQ-Prompt ownership framing in the expanded cards. "1K–10K/day" figure dropped (under one event/second reads small).
+
+**Dashed peer-to-peer lines removed** from architecture diagram — implied agent-to-agent communication that doesn't exist in the orchestrator-routed design.
+
+**87% pass rate added** to eval section on site — was on resume but missing from portfolio.
+
+### Nice-to-have fixes
+
+- Favicon path: `public/favicon.svg` → `/favicon.svg`
+- Hero subhead: grounded to "Backend engineer — 5 years in .NET/Azure healthcare systems. Building AI agents on the side…" — matches the meta description
+- Meta/OG/Twitter descriptions: same honest framing
+- Qdrant duplicate removed from skills (Qdrant + Qdrant Cloud → just Qdrant Cloud)
+- Tech stack card order: Languages & Frameworks first, AI & Agent Systems second
+- Scroll-spy Connect fallback: `nearBottom` scroll listener activates Connect when within 100px of page bottom
+- Lifecycle replay button: shows after manual step selection
+- Aria labels on all Connect links, `aria-expanded` on hamburger
+- Résumé button added to Connect section
+- Diagram keyboard accessible: `tabIndex={0}`, `role="button"`, `onKeyDown`, SVG `<title>` and `aria-label`
+- Mobile menu: Escape key + outside-click close
+- MCP tools table: stacked card layout under `sm` breakpoint instead of cramped horizontal scroll
+- Architecture diagram `onClick` for mobile tap support
+- Experience card outcomes: IQ-Prompt ("shipped to production, actively used") and Patient Intake ("patients now upload documents and complete payments before appointments")
+- "Drove consolidation" vague clause → concrete: "centralized job visibility and Redis state management across teams"
+
+### Resume sync
+
+Reordered resume sections: Experience now leads over Projects (correct for a 5-year engineer). Fixed three bullets to match portfolio site: "SME and technical lead" → "SME", "Architected" → "Built", "reducing cross-team integration overhead" → concrete outcome.
+
+### Key learnings
+
+**Fix the meta description and the visible copy.** Updated `index.html` description to honest framing but left the hero subhead unchanged across two rounds — nobody reads the meta, everyone reads the hero. The visible copy is what matters.
+
+**Arithmetic is the credibility test.** An eval table whose deltas don't sum is a stronger negative signal than no eval table at all — the exact engineer you're trying to impress will add the column. Two-character fixes (`+0.112` → `+0.091`) have outsized impact.
+
+**Two audit passes caught what one missed.** The first pass caught structural issues (heading missing, regression hidden). The second pass caught subtler ones (column still doesn't sum, hero subhead still unchanged). Worth doing at least two passes on anything that claims to be honest and verifiable.
+
+---
+
+## Days 6–7 — Outreach ✅
+
+Active job search running in parallel throughout Week 18. Outreach ongoing — targeting AI agent infrastructure, backend + AI, and platform engineering roles across AI-first companies, big tech AI teams, and enterprise AI orgs.
+
+Primary angles:
+- **ChefAgent** → orchestration and RAG roles (multi-agent architecture, provider-agnostic design, eval-driven development)
+- **mcp-dotnet-diagnostics** → infrastructure and platform roles (MCP protocol, open-source tooling, .NET runtime internals)
+- **.NET/Azure background** → backend + AI roles at shops that need someone who bridges both worlds
+
+---
+
+## Week 18 Summary
 
 | Day | Focus | Status |
 |-----|-------|--------|
-| Day 5 | Portfolio site proofread + update | ⏳ |
-| Day 6-7 | Company research + outreach prep | ⏳ |
+| Day 1 | ILlmProvider wiring cleanup | ✅ |
+| Day 2 | Re-ranker investigation + query expansion fix | ✅ |
+| Day 3 | GeneralQuestion conversation context | ✅ |
+| Day 4 | Redis pre-warm + connection fix | ✅ |
+| Day 5 | Portfolio proofread + resume sync | ✅ |
+| Day 6-7 | Outreach | ✅ |
+
+Every code change this week shipped a real improvement and a portfolio talking point:
+- ILlmProvider cleanup completes the provider-agnostic story — no asterisks
+- Query expansion fix: “something impressive for a dinner party” → Beef Wellington instead of punch recipes
+- Multi-turn context: follow-up questions now work correctly on the live demo
+- Redis pre-warm: first-request latency no longer trips the circuit breaker
+- Portfolio: 20+ fixes across two audit passes — eval math reconciled, honest framing throughout
