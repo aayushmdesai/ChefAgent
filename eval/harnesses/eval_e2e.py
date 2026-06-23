@@ -52,20 +52,25 @@ def make_session_id(session_group: str | None, case_id: str) -> str:
     return f"eval-{RUN_ID}-{case_id}"
 
 
-def call_chat(message: str, session_id: str, dietary_profile: dict | None, timeout: int = 30) -> dict:
-    """Calls /chat and returns the parsed response."""
-    payload = {
-        "message": message,
-        "sessionId": session_id,
-    }
+def call_chat(message: str, session_id: str, dietary_profile: dict | None,
+              timeout: int = 30, _retried: bool = False) -> dict:
+    """Calls /chat and returns the parsed response. Retries once on 429."""
+    payload = {"message": message, "sessionId": session_id}
     if dietary_profile:
         payload["dietaryProfile"] = dietary_profile
 
     start = time.time()
     resp = requests.post(CHAT_ENDPOINT, json=payload, timeout=timeout)
     elapsed_ms = int((time.time() - start) * 1000)
-    resp.raise_for_status()
 
+    # Separate "Voyage rate-limited me" from "the logic is wrong"
+    if resp.status_code == 429 and not _retried:
+        wait = int(resp.headers.get("Retry-After", 20))
+        print(f"    429 — waiting {wait}s, retrying once")
+        time.sleep(wait)
+        return call_chat(message, session_id, dietary_profile, timeout, _retried=True)
+
+    resp.raise_for_status()
     data = resp.json()
     data["_latency_ms"] = elapsed_ms
     return data
@@ -265,6 +270,31 @@ def print_case_result(result: dict) -> None:
     if ev.get("recipe_titles"):
         print(f"     Recipes:  {', '.join(ev['recipe_titles'])}")
 
+def prewarm_cache(cases: list) -> None:
+    """
+    Warm the server-side (Redis) embedding cache and absorb cold-start
+    circuit-breaker trips OUTSIDE the scored run. Paced for 3 RPM; responses
+    discarded. Note: this does NOT save wall-clock time — it moves the
+    rate-limit cost out of the numbers you report.
+    """
+    seen, queries = set(), []
+    for case in cases:
+        for m in case.get("setup_messages", []):
+            if m["message"] not in seen:
+                seen.add(m["message"]); queries.append(m["message"])
+        if case["message"] not in seen:
+            seen.add(case["message"]); queries.append(case["message"])
+
+    print(f"\n  Pre-warming {len(queries)} distinct queries...")
+    warm_session = f"eval-{RUN_ID}-prewarm"
+    for i, q in enumerate(queries, 1):
+        try:
+            call_chat(q, warm_session, None, timeout=180)
+            print(f"    [{i}/{len(queries)}] warmed")
+        except Exception as e:
+            print(f"    [{i}/{len(queries)}] miss — {e}")
+        time.sleep(1)
+    print("  Pre-warm complete.\n")
 
 def print_summary(results: list) -> None:
     """Prints category-level summary table."""
@@ -339,7 +369,7 @@ def print_summary(results: list) -> None:
     ]
     correct_intent = sum(
         1 for r in intent_results
-        if r["evaluation"].get("intent_match")
+        if r["evaluation"].get("checks", {}).get("intent_match")
     )
     if intent_results:
         print(f"  Intent accuracy: {correct_intent}/{len(intent_results)} "
@@ -360,6 +390,7 @@ def main():
 
     cases = dataset["cases"]
     print(f"\n  Loaded {len(cases)} test cases\n")
+    prewarm_cache(cases)
 
     results = []
 

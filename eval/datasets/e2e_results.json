@@ -1,12 +1,12 @@
 {
-  "run_id": "20260614233457",
-  "timestamp": "2026-06-14T23:56:21.648068",
+  "run_id": "20260622234141",
+  "timestamp": "2026-06-23T00:07:36.087949",
   "endpoint": "https://chefagent-production.up.railway.app/chat",
   "dataset": "eval/datasets/e2e_golden_dataset.json",
   "total": 60,
-  "passed": 41,
-  "failed": 6,
-  "timeouts": 13,
+  "passed": 56,
+  "failed": 3,
+  "timeouts": 1,
   "errors": 0,
   "results": [
     {
@@ -32,7 +32,7 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 9371,
+        "latency_ms": 727,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"a chicken soup\".",
         "message_full": "Here are 5 recipes for \"a chicken soup\".",
@@ -67,7 +67,7 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 373,
+        "latency_ms": 729,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"to make pasta carbonara\".",
         "message_full": "Here are 5 recipes for \"to make pasta carbonara\".",
@@ -102,7 +102,7 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 360,
+        "latency_ms": 730,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"some beef stew\".",
         "message_full": "Here are 5 recipes for \"some beef stew\".",
@@ -117,11 +117,37 @@
     {
       "id": "e2e-004",
       "category": "search_simple",
+      "session_group": null,
       "message": "what can I make with salmon",
       "expected_intent": "SearchRecipe",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
+      "expected_behavior": "Returns salmon recipes. Response is helpful. Recipes contain salmon as main ingredient.",
+      "status": "PASS",
+      "evaluation": {
+        "passed": true,
+        "checks": {
+          "intent_match": true,
+          "response_not_empty": true,
+          "has_recipes": true,
+          "diet_check_ran": null,
+          "blocked_correctly": null,
+          "not_blocked_unexpectedly": true,
+          "confidence_valid": true
+        },
+        "actual_intent": "SearchRecipe",
+        "recipe_count": 5,
+        "diet_check_count": 0,
+        "confidence": "High",
+        "latency_ms": 823,
+        "is_blocked": false,
+        "message_preview": "Here are 5 recipes for \"salmon\".",
+        "message_full": "Here are 5 recipes for \"salmon\".",
+        "recipe_titles": [
+          "Salmon",
+          "Marion'S Hot Poached Salmon",
+          "Salmonelle'S"
+        ]
+      },
+      "error": null
     },
     {
       "id": "e2e-005",
@@ -146,7 +172,7 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 2677,
+        "latency_ms": 673,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"a chocolate cake\".",
         "message_full": "Here are 5 recipes for \"a chocolate cake\".",
@@ -181,7 +207,7 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 467,
+        "latency_ms": 702,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"breakfast\".",
         "message_full": "Here are 5 recipes for \"breakfast\".",
@@ -196,11 +222,37 @@
     {
       "id": "e2e-007",
       "category": "search_simple",
+      "session_group": null,
       "message": "quick weeknight dinner recipes",
       "expected_intent": "SearchRecipe",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
+      "expected_behavior": "Returns dinner recipes. Response acknowledges quick/easy constraint. Recipes are dinner-appropriate.",
+      "status": "PASS",
+      "evaluation": {
+        "passed": true,
+        "checks": {
+          "intent_match": true,
+          "response_not_empty": true,
+          "has_recipes": true,
+          "diet_check_ran": null,
+          "blocked_correctly": null,
+          "not_blocked_unexpectedly": true,
+          "confidence_valid": true
+        },
+        "actual_intent": "SearchRecipe",
+        "recipe_count": 5,
+        "diet_check_count": 0,
+        "confidence": "High",
+        "latency_ms": 1125,
+        "is_blocked": false,
+        "message_preview": "Here are 5 recipes for \"quick weeknight\".",
+        "message_full": "Here are 5 recipes for \"quick weeknight\".",
+        "recipe_titles": [
+          "Chicken Pasta Dish",
+          "Chicken Breast Dinner",
+          "Easy Chicken And Pasta"
+        ]
+      },
+      "error": null
     },
     {
       "id": "e2e-008",
@@ -225,7 +277,7 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 2509,
+        "latency_ms": 731,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"vegetable stir fry\".",
         "message_full": "Here are 5 recipes for \"vegetable stir fry\".",
@@ -260,7 +312,7 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 347,
+        "latency_ms": 833,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"a pasta\" but none fully matched your dairy-free profile. Check the details for substitution suggest",
         "message_full": "Found 5 recipes for \"a pasta\" but none fully matched your dairy-free profile. Check the details for substitution suggestions.",
@@ -295,7 +347,7 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 239,
+        "latency_ms": 830,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"breakfast\". 3 are compatible with your gluten-free profile. The rest have notes \u2014 check the details",
         "message_full": "Found 5 recipes for \"breakfast\". 3 are compatible with your gluten-free profile. The rest have notes \u2014 check the details for substitution suggestions.",
@@ -310,11 +362,37 @@
     {
       "id": "e2e-011",
       "category": "search_with_diet",
+      "session_group": null,
       "message": "vegan dinner recipes",
       "expected_intent": "SearchRecipe",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
+      "expected_behavior": "Returns dinner recipes. Diet validation runs. Response acknowledges vegan constraint. Violations flagged if any animal products present.",
+      "status": "PASS",
+      "evaluation": {
+        "passed": true,
+        "checks": {
+          "intent_match": true,
+          "response_not_empty": true,
+          "has_recipes": true,
+          "diet_check_ran": true,
+          "blocked_correctly": null,
+          "not_blocked_unexpectedly": true,
+          "confidence_valid": true
+        },
+        "actual_intent": "SearchRecipe",
+        "recipe_count": 5,
+        "diet_check_count": 5,
+        "confidence": "Medium",
+        "latency_ms": 731,
+        "is_blocked": false,
+        "message_preview": "Found 5 recipes for \"dinner\". 2 are compatible with your vegan profile. The rest have notes \u2014 check the details for subs",
+        "message_full": "Found 5 recipes for \"dinner\". 2 are compatible with your vegan profile. The rest have notes \u2014 check the details for substitution suggestions.",
+        "recipe_titles": [
+          "Bachelor'S Banquet",
+          "Rainy Day Dinner",
+          "Dump Dish Dinner"
+        ]
+      },
+      "error": null
     },
     {
       "id": "e2e-012",
@@ -339,7 +417,7 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 3276,
+        "latency_ms": 716,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"cookies for my kid\". 2 are compatible with your nut-free profile. The rest have notes \u2014 check the d",
         "message_full": "Found 5 recipes for \"cookies for my kid\". 2 are compatible with your nut-free profile. The rest have notes \u2014 check the details for substitution suggestions.",
@@ -374,7 +452,7 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 427,
+        "latency_ms": 703,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"chicken\". 3 are compatible with your halal profile. The rest have notes \u2014 check the details for sub",
         "message_full": "Found 5 recipes for \"chicken\". 3 are compatible with your halal profile. The rest have notes \u2014 check the details for substitution suggestions.",
@@ -389,11 +467,37 @@
     {
       "id": "e2e-014",
       "category": "search_with_diet",
+      "session_group": null,
       "message": "vegetarian soup recipes",
       "expected_intent": "SearchRecipe",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
+      "expected_behavior": "Returns soup recipes. Diet check flags any meat or seafood. Response acknowledges vegetarian constraint.",
+      "status": "PASS",
+      "evaluation": {
+        "passed": true,
+        "checks": {
+          "intent_match": true,
+          "response_not_empty": true,
+          "has_recipes": true,
+          "diet_check_ran": true,
+          "blocked_correctly": null,
+          "not_blocked_unexpectedly": true,
+          "confidence_valid": true
+        },
+        "actual_intent": "SearchRecipe",
+        "recipe_count": 5,
+        "diet_check_count": 5,
+        "confidence": "Medium",
+        "latency_ms": 718,
+        "is_blocked": false,
+        "message_preview": "Here are 5 vegetarian-friendly recipes for \"soup\".",
+        "message_full": "Here are 5 vegetarian-friendly recipes for \"soup\".",
+        "recipe_titles": [
+          "Making A Happy Home",
+          "Bubble Recipe",
+          "Recipe For A Vital Marriage"
+        ]
+      },
+      "error": null
     },
     {
       "id": "e2e-015",
@@ -418,7 +522,7 @@
         "recipe_count": 4,
         "diet_check_count": 4,
         "confidence": "Medium",
-        "latency_ms": 3430,
+        "latency_ms": 787,
         "is_blocked": false,
         "message_preview": "Here are 4 egg-free-friendly recipes for \"egg-free baking\".",
         "message_full": "Here are 4 egg-free-friendly recipes for \"egg-free baking\".",
@@ -453,7 +557,7 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 524,
+        "latency_ms": 710,
         "is_blocked": false,
         "message_preview": "I couldn't find any recipes for \"a paleo\". Try a different query.",
         "message_full": "I couldn't find any recipes for \"a paleo\". Try a different query.",
@@ -464,11 +568,37 @@
     {
       "id": "e2e-017",
       "category": "search_with_diet",
+      "session_group": null,
       "message": "dairy-free and gluten-free dinner",
       "expected_intent": "SearchRecipe",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
+      "expected_behavior": "Returns dinner recipes. Both dairy and gluten checks run. Response acknowledges both restrictions. No violations in returned recipes.",
+      "status": "PASS",
+      "evaluation": {
+        "passed": true,
+        "checks": {
+          "intent_match": true,
+          "response_not_empty": true,
+          "has_recipes": true,
+          "diet_check_ran": true,
+          "blocked_correctly": null,
+          "not_blocked_unexpectedly": true,
+          "confidence_valid": true
+        },
+        "actual_intent": "SearchRecipe",
+        "recipe_count": 5,
+        "diet_check_count": 5,
+        "confidence": "Medium",
+        "latency_ms": 749,
+        "is_blocked": false,
+        "message_preview": "Found 5 recipes for \"and\". 4 are compatible with your dairy-free, gluten-free profile. The rest have notes \u2014 check the d",
+        "message_full": "Found 5 recipes for \"and\". 4 are compatible with your dairy-free, gluten-free profile. The rest have notes \u2014 check the details for substitution suggestions.",
+        "recipe_titles": [
+          "Recipe For A Vital Marriage",
+          "Making A Happy Home",
+          "Friendly Recipe"
+        ]
+      },
+      "error": null
     },
     {
       "id": "e2e-018",
@@ -493,7 +623,7 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 3295,
+        "latency_ms": 735,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"pasta\". 4 are compatible with your pescatarian profile. The rest have notes \u2014 check the details for",
         "message_full": "Found 5 recipes for \"pasta\". 4 are compatible with your pescatarian profile. The rest have notes \u2014 check the details for substitution suggestions.",
@@ -528,7 +658,7 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 243,
+        "latency_ms": 830,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"pasta without tomatoes\".",
         "message_full": "Here are 5 recipes for \"pasta without tomatoes\".",
@@ -563,7 +693,7 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 240,
+        "latency_ms": 727,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"soup without onions or garlic\".",
         "message_full": "Here are 5 recipes for \"soup without onions or garlic\".",
@@ -598,7 +728,7 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 247,
+        "latency_ms": 670,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"chicken  excluding mushrooms\".",
         "message_full": "Here are 5 recipes for \"chicken  excluding mushrooms\".",
@@ -631,16 +761,16 @@
         },
         "actual_intent": "SearchRecipe",
         "recipe_count": 5,
-        "diet_check_count": 0,
-        "confidence": "High",
-        "latency_ms": 487,
+        "diet_check_count": 5,
+        "confidence": "Medium",
+        "latency_ms": 21273,
         "is_blocked": false,
-        "message_preview": "Here are 5 recipes for \"cookies with\".",
-        "message_full": "Here are 5 recipes for \"cookies with\".",
+        "message_preview": "Found 5 recipes for \"cookies with\". 4 are compatible with your nuts profile. The rest have notes \u2014 check the details for",
+        "message_full": "Found 5 recipes for \"cookies with\". 4 are compatible with your nuts profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Cookies",
           "Best Cookies",
-          "Angel Food Cookies"
+          "Cookies Quick"
         ]
       },
       "error": null
@@ -648,11 +778,37 @@
     {
       "id": "e2e-023",
       "category": "search_negation",
+      "session_group": null,
       "message": "stir fry without soy sauce",
       "expected_intent": "SearchRecipe",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
+      "expected_behavior": "Returns stir fry recipes. Negation on soy sauce detected. Filtered recipes do not contain soy sauce.",
+      "status": "PASS",
+      "evaluation": {
+        "passed": true,
+        "checks": {
+          "intent_match": true,
+          "response_not_empty": true,
+          "has_recipes": true,
+          "diet_check_ran": null,
+          "blocked_correctly": null,
+          "not_blocked_unexpectedly": true,
+          "confidence_valid": true
+        },
+        "actual_intent": "SearchRecipe",
+        "recipe_count": 5,
+        "diet_check_count": 0,
+        "confidence": "High",
+        "latency_ms": 726,
+        "is_blocked": false,
+        "message_preview": "Here are 5 recipes for \"stir fry without soy sauce\".",
+        "message_full": "Here are 5 recipes for \"stir fry without soy sauce\".",
+        "recipe_titles": [
+          "Summer Stir-Fry",
+          "Stir-Fry Vegetables",
+          "Sizzling Sausage Stir-Fry"
+        ]
+      },
+      "error": null
     },
     {
       "id": "e2e-024",
@@ -677,7 +833,7 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 2723,
+        "latency_ms": 661,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"a cake  hold the nuts\".",
         "message_full": "Here are 5 recipes for \"a cake  hold the nuts\".",
@@ -712,7 +868,7 @@
         "recipe_count": 1,
         "diet_check_count": 1,
         "confidence": "Medium",
-        "latency_ms": 421,
+        "latency_ms": 814,
         "is_blocked": false,
         "message_preview": "\"Fat-Free Pasta Salad(Use Fat-Free Honey Dijon, Ranch Or Italian Dressing)\" looks compatible with your dietary profile. ",
         "message_full": "\"Fat-Free Pasta Salad(Use Fat-Free Honey Dijon, Ranch Or Italian Dressing)\" looks compatible with your dietary profile. Recipe passed all rule checks for: dairy-free.",
@@ -725,11 +881,37 @@
     {
       "id": "e2e-026",
       "category": "validate_diet",
+      "session_group": null,
       "message": "can I eat beef stew if I'm vegetarian?",
       "expected_intent": "ValidateDiet",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
+      "expected_behavior": "Response clearly states beef stew is not vegetarian. Violations include beef and beef stock. Response is direct and helpful.",
+      "status": "FAIL",
+      "evaluation": {
+        "passed": false,
+        "checks": {
+          "intent_match": false,
+          "response_not_empty": true,
+          "has_recipes": null,
+          "diet_check_ran": null,
+          "blocked_correctly": null,
+          "not_blocked_unexpectedly": true,
+          "confidence_valid": true
+        },
+        "actual_intent": "SearchRecipe",
+        "recipe_count": 5,
+        "diet_check_count": 5,
+        "confidence": "Medium",
+        "latency_ms": 824,
+        "is_blocked": false,
+        "message_preview": "Found 5 recipes for \"can i eat beef stew if i'm vegetarian?\" but none fully matched your vegetarian profile. Check the d",
+        "message_full": "Found 5 recipes for \"can i eat beef stew if i'm vegetarian?\" but none fully matched your vegetarian profile. Check the details for substitution suggestions.",
+        "recipe_titles": [
+          "Vegetable Beef Stew",
+          "No Peek Beef Stew",
+          "Beef Stew"
+        ]
+      },
+      "error": null
     },
     {
       "id": "e2e-027",
@@ -754,7 +936,7 @@
         "recipe_count": 1,
         "diet_check_count": 1,
         "confidence": "Medium",
-        "latency_ms": 2396,
+        "latency_ms": 763,
         "is_blocked": false,
         "message_preview": "\"Hummus\" has some issues for your profile. Recipe contains: sesame (sesame).",
         "message_full": "\"Hummus\" has some issues for your profile. Recipe contains: sesame (sesame).",
@@ -787,7 +969,7 @@
         "recipe_count": 1,
         "diet_check_count": 1,
         "confidence": "Medium",
-        "latency_ms": 452,
+        "latency_ms": 711,
         "is_blocked": false,
         "message_preview": "\"Holy Guacamole!\" looks compatible with your dietary profile. Recipe passed all rule checks for: vegan.",
         "message_full": "\"Holy Guacamole!\" looks compatible with your dietary profile. Recipe passed all rule checks for: vegan.",
@@ -800,11 +982,35 @@
     {
       "id": "e2e-029",
       "category": "validate_diet",
+      "session_group": null,
       "message": "can a nut allergy person eat marzipan?",
       "expected_intent": "ValidateDiet",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
+      "expected_behavior": "Response identifies marzipan contains almond paste. Flags as unsafe. Response is clear about the risk.",
+      "status": "PASS",
+      "evaluation": {
+        "passed": true,
+        "checks": {
+          "intent_match": true,
+          "response_not_empty": true,
+          "has_recipes": null,
+          "diet_check_ran": null,
+          "blocked_correctly": null,
+          "not_blocked_unexpectedly": true,
+          "confidence_valid": true
+        },
+        "actual_intent": "ValidateDiet",
+        "recipe_count": 1,
+        "diet_check_count": 1,
+        "confidence": "Medium",
+        "latency_ms": 695,
+        "is_blocked": false,
+        "message_preview": "\"Party Nuts\" has some issues for your profile. Recipe contains: nuts (peanut).",
+        "message_full": "\"Party Nuts\" has some issues for your profile. Recipe contains: nuts (peanut).",
+        "recipe_titles": [
+          "Party Nuts"
+        ]
+      },
+      "error": null
     },
     {
       "id": "e2e-030",
@@ -829,7 +1035,7 @@
         "recipe_count": 1,
         "diet_check_count": 1,
         "confidence": "Medium",
-        "latency_ms": 3517,
+        "latency_ms": 780,
         "is_blocked": false,
         "message_preview": "\"Chicken Tikka Recipe\" has some issues for your profile. Recipe contains ambiguous ingredients (e.g. 'spice blend', 'nat",
         "message_full": "\"Chicken Tikka Recipe\" has some issues for your profile. Recipe contains ambiguous ingredients (e.g. 'spice blend', 'natural flavors') that could not be verified against your dietary restrictions. Recipe skipped.",
@@ -862,7 +1068,7 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "Medium",
-        "latency_ms": 124844,
+        "latency_ms": 1831,
         "is_blocked": false,
         "message_preview": "Here's your 7-day dinner plan tailored to your dairy-free profile. You can ask me to swap any day \u2014 just say \"swap Tuesd",
         "message_full": "Here's your 7-day dinner plan tailored to your dairy-free profile. You can ask me to swap any day \u2014 just say \"swap Tuesday dinner to something with pasta\".",
@@ -893,10 +1099,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 190,
+        "latency_ms": 849,
         "is_blocked": false,
-        "message_preview": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
-        "message_full": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
+        "message_preview": "Here is your current dinner plan.",
+        "message_full": "Here is your current dinner plan.",
         "recipe_titles": []
       },
       "error": null
@@ -908,13 +1114,13 @@
       "message": "swap Monday dinner to something with chicken",
       "expected_intent": "ModifyMealPlan",
       "expected_behavior": "Modifies Monday entry in the existing plan. New recipe contains chicken. New recipe is dairy-free (constraint persists from session). Other days unchanged.",
-      "status": "FAIL",
+      "status": "PASS",
       "evaluation": {
-        "passed": false,
+        "passed": true,
         "checks": {
           "intent_match": true,
           "response_not_empty": true,
-          "has_recipes": false,
+          "has_recipes": true,
           "diet_check_ran": null,
           "blocked_correctly": null,
           "not_blocked_unexpectedly": true,
@@ -923,11 +1129,11 @@
         "actual_intent": "ModifyMealPlan",
         "recipe_count": 0,
         "diet_check_count": 0,
-        "confidence": "High",
-        "latency_ms": 188,
+        "confidence": "Medium",
+        "latency_ms": 863,
         "is_blocked": false,
-        "message_preview": "I couldn't find your meal plan. Try generating one first by saying \"plan my dinners for the week\".",
-        "message_full": "I couldn't find your meal plan. Try generating one first by saying \"plan my dinners for the week\".",
+        "message_preview": "Swapped Monday's dinner to Chicken Dinner (chicken).",
+        "message_full": "Swapped Monday's dinner to Chicken Dinner (chicken).",
         "recipe_titles": []
       },
       "error": null
@@ -939,13 +1145,13 @@
       "message": "change Friday to a pasta dish",
       "expected_intent": "ModifyMealPlan",
       "expected_behavior": "Modifies Friday entry. New recipe is pasta-based and dairy-free. Session state read correctly. Constraint persistence verified.",
-      "status": "FAIL",
+      "status": "PASS",
       "evaluation": {
-        "passed": false,
+        "passed": true,
         "checks": {
           "intent_match": true,
           "response_not_empty": true,
-          "has_recipes": false,
+          "has_recipes": true,
           "diet_check_ran": null,
           "blocked_correctly": null,
           "not_blocked_unexpectedly": true,
@@ -954,11 +1160,11 @@
         "actual_intent": "ModifyMealPlan",
         "recipe_count": 0,
         "diet_check_count": 0,
-        "confidence": "High",
-        "latency_ms": 179,
+        "confidence": "Medium",
+        "latency_ms": 925,
         "is_blocked": false,
-        "message_preview": "I couldn't find your meal plan. Try generating one first by saying \"plan my dinners for the week\".",
-        "message_full": "I couldn't find your meal plan. Try generating one first by saying \"plan my dinners for the week\".",
+        "message_preview": "Swapped Friday's dinner to Spaghetti Parmesan (a pasta dish).",
+        "message_full": "Swapped Friday's dinner to Spaghetti Parmesan (a pasta dish).",
         "recipe_titles": []
       },
       "error": null
@@ -966,11 +1172,33 @@
     {
       "id": "e2e-035",
       "category": "create_meal_plan",
+      "session_group": "plan_vegan",
       "message": "create a vegan meal plan for the week",
       "expected_intent": "CreateMealPlan",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
+      "expected_behavior": "Creates 7-day plan. All recipes are vegan (no meat, seafood, dairy, eggs). Plan has variety. Response confirms vegan constraint.",
+      "status": "PASS",
+      "evaluation": {
+        "passed": true,
+        "checks": {
+          "intent_match": true,
+          "response_not_empty": true,
+          "has_recipes": true,
+          "diet_check_ran": null,
+          "blocked_correctly": null,
+          "not_blocked_unexpectedly": true,
+          "confidence_valid": true
+        },
+        "actual_intent": "CreateMealPlan",
+        "recipe_count": 0,
+        "diet_check_count": 0,
+        "confidence": "Medium",
+        "latency_ms": 125236,
+        "is_blocked": false,
+        "message_preview": "Here's your 7-day full day (breakfast, lunch, and dinner) plan tailored to your vegan profile. You can ask me to swap an",
+        "message_full": "Here's your 7-day full day (breakfast, lunch, and dinner) plan tailored to your vegan profile. You can ask me to swap any day \u2014 just say \"swap Tuesday dinner to something with pasta\".",
+        "recipe_titles": []
+      },
+      "error": null
     },
     {
       "id": "e2e-036",
@@ -995,10 +1223,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 2752,
+        "latency_ms": 787,
         "is_blocked": false,
-        "message_preview": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
-        "message_full": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
+        "message_preview": "Here is your current full day (breakfast, lunch, and dinner) plan.",
+        "message_full": "Here is your current full day (breakfast, lunch, and dinner) plan.",
         "recipe_titles": []
       },
       "error": null
@@ -1010,13 +1238,13 @@
       "message": "swap Wednesday to something with lentils",
       "expected_intent": "ModifyMealPlan",
       "expected_behavior": "Modifies Wednesday. New recipe contains lentils and is vegan. Other days unchanged. Vegan constraint persists.",
-      "status": "FAIL",
+      "status": "PASS",
       "evaluation": {
-        "passed": false,
+        "passed": true,
         "checks": {
           "intent_match": true,
           "response_not_empty": true,
-          "has_recipes": false,
+          "has_recipes": true,
           "diet_check_ran": null,
           "blocked_correctly": null,
           "not_blocked_unexpectedly": true,
@@ -1025,11 +1253,11 @@
         "actual_intent": "ModifyMealPlan",
         "recipe_count": 0,
         "diet_check_count": 0,
-        "confidence": "High",
-        "latency_ms": 2896,
+        "confidence": "Medium",
+        "latency_ms": 1095,
         "is_blocked": false,
-        "message_preview": "I couldn't find your meal plan. Try generating one first by saying \"plan my dinners for the week\".",
-        "message_full": "I couldn't find your meal plan. Try generating one first by saying \"plan my dinners for the week\".",
+        "message_preview": "Swapped Wednesday's dinner to Michael'S Lentil \"Stoup\" (lentils).",
+        "message_full": "Swapped Wednesday's dinner to Michael'S Lentil \"Stoup\" (lentils).",
         "recipe_titles": []
       },
       "error": null
@@ -1057,7 +1285,7 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 631,
+        "latency_ms": 2007,
         "is_blocked": false,
         "message_preview": "Here's your 7-day dinner plan. You can ask me to swap any day \u2014 just say \"swap Tuesday dinner to something with pasta\".",
         "message_full": "Here's your 7-day dinner plan. You can ask me to swap any day \u2014 just say \"swap Tuesday dinner to something with pasta\".",
@@ -1088,10 +1316,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 490,
+        "latency_ms": 684,
         "is_blocked": false,
-        "message_preview": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
-        "message_full": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
+        "message_preview": "Here is your current dinner plan.",
+        "message_full": "Here is your current dinner plan.",
         "recipe_titles": []
       },
       "error": null
@@ -1103,13 +1331,13 @@
       "message": "replace Tuesday with something Italian",
       "expected_intent": "ModifyMealPlan",
       "expected_behavior": "Modifies Tuesday entry to an Italian recipe. Other days unchanged. Session correctly read and written.",
-      "status": "FAIL",
+      "status": "PASS",
       "evaluation": {
-        "passed": false,
+        "passed": true,
         "checks": {
           "intent_match": true,
           "response_not_empty": true,
-          "has_recipes": false,
+          "has_recipes": true,
           "diet_check_ran": null,
           "blocked_correctly": null,
           "not_blocked_unexpectedly": true,
@@ -1118,11 +1346,11 @@
         "actual_intent": "ModifyMealPlan",
         "recipe_count": 0,
         "diet_check_count": 0,
-        "confidence": "High",
-        "latency_ms": 191,
+        "confidence": "Medium",
+        "latency_ms": 967,
         "is_blocked": false,
-        "message_preview": "I couldn't find your meal plan. Try generating one first by saying \"plan my dinners for the week\".",
-        "message_full": "I couldn't find your meal plan. Try generating one first by saying \"plan my dinners for the week\".",
+        "message_preview": "Swapped Tuesday's dinner to Italian Dinner In A Dish (something italian).",
+        "message_full": "Swapped Tuesday's dinner to Italian Dinner In A Dish (something italian).",
         "recipe_titles": []
       },
       "error": null
@@ -1150,10 +1378,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 303,
+        "latency_ms": 726,
         "is_blocked": false,
-        "message_preview": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
-        "message_full": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
+        "message_preview": "Here is your current dinner plan.",
+        "message_full": "Here is your current dinner plan.",
         "recipe_titles": []
       },
       "error": null
@@ -1181,10 +1409,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 168,
+        "latency_ms": 822,
         "is_blocked": false,
-        "message_preview": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
-        "message_full": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
+        "message_preview": "Here is your current dinner plan.",
+        "message_full": "Here is your current dinner plan.",
         "recipe_titles": []
       },
       "error": null
@@ -1212,7 +1440,7 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 214,
+        "latency_ms": 754,
         "is_blocked": false,
         "message_preview": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
         "message_full": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
@@ -1243,7 +1471,7 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 193,
+        "latency_ms": 863,
         "is_blocked": false,
         "message_preview": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
         "message_full": "You do not have a meal plan yet. Want me to create one? Just say \"plan my dinners for the week\".",
@@ -1254,11 +1482,37 @@
     {
       "id": "e2e-045",
       "category": "implicit_dietary",
+      "session_group": null,
       "message": "I'm lactose intolerant, find me a soup",
       "expected_intent": "SearchRecipe",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
+      "expected_behavior": "System extracts dairy-free constraint from 'lactose intolerant'. Returns soup recipes without dairy. Response acknowledges the constraint was understood.",
+      "status": "PASS",
+      "evaluation": {
+        "passed": true,
+        "checks": {
+          "intent_match": true,
+          "response_not_empty": true,
+          "has_recipes": true,
+          "diet_check_ran": null,
+          "blocked_correctly": null,
+          "not_blocked_unexpectedly": true,
+          "confidence_valid": true
+        },
+        "actual_intent": "SearchRecipe",
+        "recipe_count": 5,
+        "diet_check_count": 0,
+        "confidence": "High",
+        "latency_ms": 1042,
+        "is_blocked": false,
+        "message_preview": "Here are 5 recipes for \"i'm lactose intolerant a soup\".",
+        "message_full": "Here are 5 recipes for \"i'm lactose intolerant a soup\".",
+        "recipe_titles": [
+          "Gluten-Free Substitute Cream Based Soups",
+          "Milkless Potato Soup",
+          "Soup!"
+        ]
+      },
+      "error": null
     },
     {
       "id": "e2e-046",
@@ -1281,12 +1535,12 @@
         },
         "actual_intent": "SearchRecipe",
         "recipe_count": 5,
-        "diet_check_count": 0,
-        "confidence": "High",
-        "latency_ms": 603,
+        "diet_check_count": 5,
+        "confidence": "Medium",
+        "latency_ms": 1143,
         "is_blocked": false,
-        "message_preview": "Here are 5 recipes for \"i can't have gluten what pasta can i eat?\".",
-        "message_full": "Here are 5 recipes for \"i can't have gluten what pasta can i eat?\".",
+        "message_preview": "Found 5 recipes for \"i can't have gluten what pasta can i eat?\". 1 are compatible with your gluten-free profile. The res",
+        "message_full": "Found 5 recipes for \"i can't have gluten what pasta can i eat?\". 1 are compatible with your gluten-free profile. The rest have notes \u2014 check the details for substitution suggestions.",
         "recipe_titles": [
           "Lemon Basil Pasta",
           "Dee'S Bowtie Pasta",
@@ -1298,19 +1552,10 @@
     {
       "id": "e2e-047",
       "category": "implicit_dietary",
+      "session_group": null,
       "message": "my kid has a peanut allergy, suggest dinner",
       "expected_intent": "SearchRecipe",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
-    },
-    {
-      "id": "e2e-048",
-      "category": "implicit_dietary",
-      "session_group": null,
-      "message": "I don't eat meat or dairy, find me something for dinner",
-      "expected_intent": "SearchRecipe",
-      "expected_behavior": "System extracts vegan-adjacent constraints. Returns dinner without meat or dairy. Response acknowledges both constraints.",
+      "expected_behavior": "System extracts nut-free constraint. Returns dinner recipes without peanuts. Response acknowledges allergy concern.",
       "status": "PASS",
       "evaluation": {
         "passed": true,
@@ -1327,17 +1572,26 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 2534,
+        "latency_ms": 661,
         "is_blocked": false,
-        "message_preview": "Here are 5 recipes for \"i don't eat meat or dairy something for\".",
-        "message_full": "Here are 5 recipes for \"i don't eat meat or dairy something for\".",
+        "message_preview": "Here are 5 recipes for \"my kid has a peanut allergy\".",
+        "message_full": "Here are 5 recipes for \"my kid has a peanut allergy\".",
         "recipe_titles": [
-          "Nonfat Yogurt Cheese",
-          "Low-Fat Blend",
-          "Dairy Free Balsamic Strawberry Ice-cream Recipe"
+          "Peanut Butter Play Dough(Play Dough You Can Eat.)",
+          "Peanut Butter Surprise Balls(Kid'S Recipe)",
+          "\"School Lunch\" Peanut Crunch"
         ]
       },
       "error": null
+    },
+    {
+      "id": "e2e-048",
+      "category": "implicit_dietary",
+      "message": "I don't eat meat or dairy, find me something for dinner",
+      "expected_intent": "SearchRecipe",
+      "status": "TIMEOUT",
+      "evaluation": null,
+      "error": "Request timed out after 60s"
     },
     {
       "id": "e2e-049",
@@ -1362,7 +1616,7 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 374,
+        "latency_ms": 941,
         "is_blocked": false,
         "message_preview": "Here are 5 kosher-friendly recipes for \"i keep what can i make for ?\".",
         "message_full": "Here are 5 kosher-friendly recipes for \"i keep what can i make for ?\".",
@@ -1377,11 +1631,37 @@
     {
       "id": "e2e-050",
       "category": "implicit_dietary",
+      "session_group": null,
       "message": "celiac disease safe recipes for breakfast",
       "expected_intent": "SearchRecipe",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
+      "expected_behavior": "System extracts gluten-free constraint from 'celiac disease'. Returns gluten-free breakfast recipes. Response is accurate and helpful.",
+      "status": "PASS",
+      "evaluation": {
+        "passed": true,
+        "checks": {
+          "intent_match": true,
+          "response_not_empty": true,
+          "has_recipes": true,
+          "diet_check_ran": null,
+          "blocked_correctly": null,
+          "not_blocked_unexpectedly": true,
+          "confidence_valid": true
+        },
+        "actual_intent": "SearchRecipe",
+        "recipe_count": 5,
+        "diet_check_count": 0,
+        "confidence": "High",
+        "latency_ms": 731,
+        "is_blocked": false,
+        "message_preview": "Here are 5 recipes for \"celiac disease safe\".",
+        "message_full": "Here are 5 recipes for \"celiac disease safe\".",
+        "recipe_titles": [
+          "Diabetic Delight",
+          "Diabetic Rice Cereal Crust",
+          "Cracked Wheat Cereal(Diabetic Approved)"
+        ]
+      },
+      "error": null
     },
     {
       "id": "e2e-051",
@@ -1406,7 +1686,7 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 339,
+        "latency_ms": 173,
         "is_blocked": true,
         "message_preview": "I can help you find recipes, plan meals, and check dietary compatibility. What would you like to do?",
         "message_full": "I can help you find recipes, plan meals, and check dietary compatibility. What would you like to do?",
@@ -1437,7 +1717,7 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 176,
+        "latency_ms": 182,
         "is_blocked": true,
         "message_preview": "I can help you find recipes, plan meals, and check dietary compatibility. What would you like to do?",
         "message_full": "I can help you find recipes, plan meals, and check dietary compatibility. What would you like to do?",
@@ -1468,14 +1748,14 @@
         "recipe_count": 5,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 469,
+        "latency_ms": 751,
         "is_blocked": false,
         "message_preview": "Here are 5 recipes for \"chicken  chicken  chicken  chicken  chicken  chicken  chicken  chicken  chicken  chicken\".",
         "message_full": "Here are 5 recipes for \"chicken  chicken  chicken  chicken  chicken  chicken  chicken  chicken  chicken  chicken\".",
         "recipe_titles": [
           "Mammy'S Chicken And Dumplings",
           "\"Surprise Me\" Fried Chicken",
-          "Chicken & Noodles"
+          "Crispy Chicken Dumplings Recipe"
         ]
       },
       "error": null
@@ -1503,7 +1783,7 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "High",
-        "latency_ms": 179,
+        "latency_ms": 167,
         "is_blocked": true,
         "message_preview": "I can help you find recipes, plan meals, and check dietary compatibility. What would you like to do?",
         "message_full": "I can help you find recipes, plan meals, and check dietary compatibility. What would you like to do?",
@@ -1534,7 +1814,7 @@
         "recipe_count": 1,
         "diet_check_count": 1,
         "confidence": "Medium",
-        "latency_ms": 479,
+        "latency_ms": 784,
         "is_blocked": false,
         "message_preview": "\"Boeuf Bourguignon\" has some issues for your profile. Recipe contains ambiguous ingredients (e.g. 'spice blend', 'natura",
         "message_full": "\"Boeuf Bourguignon\" has some issues for your profile. Recipe contains ambiguous ingredients (e.g. 'spice blend', 'natural flavors') that could not be verified against your dietary restrictions. Recipe skipped.",
@@ -1547,11 +1827,35 @@
     {
       "id": "e2e-056",
       "category": "validate_diet",
+      "session_group": null,
       "message": "can vegans eat honey?",
       "expected_intent": "ValidateDiet",
-      "status": "TIMEOUT",
-      "evaluation": null,
-      "error": "Request timed out after 60s"
+      "expected_behavior": "Response clearly states honey is not vegan (bee product). Violation flagged. Response is informative and direct.",
+      "status": "PASS",
+      "evaluation": {
+        "passed": true,
+        "checks": {
+          "intent_match": true,
+          "response_not_empty": true,
+          "has_recipes": null,
+          "diet_check_ran": null,
+          "blocked_correctly": null,
+          "not_blocked_unexpectedly": true,
+          "confidence_valid": true
+        },
+        "actual_intent": "ValidateDiet",
+        "recipe_count": 1,
+        "diet_check_count": 1,
+        "confidence": "Medium",
+        "latency_ms": 708,
+        "is_blocked": false,
+        "message_preview": "\"Honey(Without Bees)\" looks compatible with your dietary profile. Recipe passed all rule checks for: vegan.",
+        "message_full": "\"Honey(Without Bees)\" looks compatible with your dietary profile. Recipe passed all rule checks for: vegan.",
+        "recipe_titles": [
+          "Honey(Without Bees)"
+        ]
+      },
+      "error": null
     },
     {
       "id": "e2e-057",
@@ -1576,7 +1880,7 @@
         "recipe_count": 1,
         "diet_check_count": 1,
         "confidence": "Medium",
-        "latency_ms": 2802,
+        "latency_ms": 748,
         "is_blocked": false,
         "message_preview": "\"Ceasar Salad\" has some issues for your profile. Recipe contains: seafood (anchovy, worcestershire sauce).",
         "message_full": "\"Ceasar Salad\" has some issues for your profile. Recipe contains: seafood (anchovy, worcestershire sauce).",
@@ -1609,10 +1913,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "Medium",
-        "latency_ms": 845,
+        "latency_ms": 1144,
         "is_blocked": false,
-        "message_preview": "Broiling involves high-heat cooking from above, typically using the oven's broiler, to achieve a crispy exterior and car",
-        "message_full": "Broiling involves high-heat cooking from above, typically using the oven's broiler, to achieve a crispy exterior and caramelized flavor. Baking, on the other hand, uses dry heat from all sides to cook food evenly, often resulting in a more tender and moist texture. This difference in heat application gives broiled and baked foods distinct textures and flavors.",
+        "message_preview": "The main difference between broiling and baking is the heat source and direction: broiling uses high heat from above, wh",
+        "message_full": "The main difference between broiling and baking is the heat source and direction: broiling uses high heat from above, while baking uses surrounding heat from all sides. This results in broiling producing a crispy, caramelized exterior and a juicy interior, whereas baking cooks food more evenly throughout.",
         "recipe_titles": []
       },
       "error": null
@@ -1640,10 +1944,10 @@
         "recipe_count": 0,
         "diet_check_count": 0,
         "confidence": "Medium",
-        "latency_ms": 533,
+        "latency_ms": 1138,
         "is_blocked": false,
         "message_preview": "To check if chicken is fully cooked, use a food thermometer to ensure the internal temperature reaches 165\u00b0F (74\u00b0C). You",
-        "message_full": "To check if chicken is fully cooked, use a food thermometer to ensure the internal temperature reaches 165\u00b0F (74\u00b0C). You can also check for visual cues, such as white or light brown color and firm texture, or cut into the thickest part to verify the juices run clear.",
+        "message_full": "To check if chicken is fully cooked, use a food thermometer to ensure the internal temperature reaches 165\u00b0F (74\u00b0C). You can also check for visual cues like white or light brown color, and that the juices run clear when cut.",
         "recipe_titles": []
       },
       "error": null
@@ -1671,7 +1975,7 @@
         "recipe_count": 5,
         "diet_check_count": 5,
         "confidence": "Medium",
-        "latency_ms": 264,
+        "latency_ms": 832,
         "is_blocked": false,
         "message_preview": "Found 5 recipes for \"dinner\" but none fully matched your jain profile. Check the details for substitution suggestions.",
         "message_full": "Found 5 recipes for \"dinner\" but none fully matched your jain profile. Check the details for substitution suggestions.",

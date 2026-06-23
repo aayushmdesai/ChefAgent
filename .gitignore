@@ -19,6 +19,8 @@ __pycache__/
 dist/
 venv/
 .venv/
+venv-eval/
+.venv-eval/
 *.egg
 
 # Node
