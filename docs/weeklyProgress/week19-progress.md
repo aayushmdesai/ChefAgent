@@ -204,7 +204,68 @@ for later.
 
 ---
 
-## Next
-- [ ] Portfolio: add Context Precision per-category table under "RAGAS (Claude judge)" heading + footnotes
-- [ ] Verify live links (resume PDF + LinkedIn still on old `aayushmdesai14` handle — repos/portfolio already correct)
-- [ ] Pivot to outreach (Day 5)
+## Day 4 — Portfolio + resume reconciliation (DONE)
+
+Rewrote the ChefAgent eval section and reconciled every stale number so the site, resume, and
+frozen eval data all agree.
+
+- **Portfolio (`ChefAgentSection.jsx`)**: split into two tables to respect the methodology break —
+  a new RAGAS (Claude judge) Context Precision per-category table, and the older preprocessing
+  progression kept under its own "earlier, local-model judge" heading, clearly labeled as not
+  comparable. Faithfulness/answer-relevancy footnoted as measuring response format, not retrieval.
+  e2e headline updated 87% → **56/60 (93%)** with all four misses named.
+- **Orchestrator diagram desc**: intent accuracy 94% → **96% (57/59)**, matching the e2e run.
+- **Resume (`resume.tex`)**: pass rate 87% → **93% (56/60)**; dropped the stale 0.470→0.578
+  context-relevance decimals (old llama3.2 metric) in favor of a qualitative retrieval-improvement
+  line, so the resume no longer contradicts the Claude-judged numbers on the site.
+
+**Link verification — CLOSED across all owned surfaces.** Confirmed no dead `aayushmdesai14`
+handle in: both READMEs, portfolio source (Hero, Connect, ChefAgent, Mcp sections), and resume
+`.tex` (all `\href` links). All use the correct `aayushmdesai` handle. The `aayushmdesai14@gmail.com`
+email is correct as-is (email, unrelated to the GitHub rename).
+
+### Carried forward (not blocking)
+- **21x latency claim** (~14,000ms → ~651ms) appears on both portfolio and resume. Internally
+  consistent (same number both places), but not re-measured this week — make sure it's defensible
+  in an interview, or soften.
+- **Experience bullets** (incidents −40%, slot search −40%, API latency −25%) are work-history
+  numbers, not re-measured. Stand behind each under questioning.
+- **LinkedIn**: the one surface not directly inspected — confirm featured links use `aayushmdesai`
+  and the headline/about don't still cite 87%.
+- **`build_answer` synthesis** + faithfulness re-run: deferred (see Day 3 open option).
+- **Word-drop preprocessing bug** ("impressive dinner" → "impressive  for guests"): logged.
+
+### Commits
+- ChefAgent repo: eval harness fixes, `score_ragas.py`, final experiment JSON, progress doc.
+- portfolio-site repo: ChefAgent eval section rewrite. Resume recompiled to PDF.
+
+---
+
+## Day 5+ — Outreach (ACTIVE — running parallel)
+- [x] Built tiered, H-1B-flagged target list (100 companies) → `healthcare-it-target-list.md`
+- [x] Applied to many roles + cold-reached hiring managers and recruiters across the list (ongoing)
+- [ ] Verify sponsorship per posting (h1bdata.info / myvisajobs) as you go — 🟡/🔴 first
+- [ ] Keep both tracks live: 🟢 incumbents (lead .NET/healthcare) + ★★ agent startups (lead ChefAgent)
+- [ ] Respond same-day to any replies
+- [ ] Interview prep: five talking points (architecture walkthrough, hardest bug, "what's the other 13%", three provider swaps, design-a-multi-agent-system)
+
+**LinkedIn post — deferred.** Candidate topic chosen for the next post: the `/recipes/search`
+vs `/chat` eval-endpoint bug ("a passing eval against the wrong endpoint is worse than a failing
+one"). Draft not written yet; revisit when ready to post.
+
+---
+
+## Week 19 — Close-out summary
+
+**Build/eval work is done and frozen. Outreach is now the ongoing track.**
+
+What shipped this week:
+- **E2E sweep re-run** with pre-warm + 429 retry → **56/60 (93%)**, up from the stale 87%; intent accuracy **96% (57/59)**. Four misses named and triaged (guardrail flood, router boundary, paleo data gap, infra timeout).
+- **Real RAGAS eval** (Claude judge + Voyage embeddings) replacing the old llama3.2 vibe-scorer. Context Precision **0.55** (excl. edge cases), with an honest per-category story: strong where strength was built, weak exactly where the Voyage embedding limitation was already documented. Faithfulness/answer-relevancy footnoted as format-bound, not retrieval signal.
+- **`retrieve.py` retargeted to `/chat`** — the fix that made the eval measure the real (expanded) system instead of the raw vector endpoint. Made resumable; ran on a Python 3.11 venv to dodge the 3.14/dill incompatibility.
+- **Portfolio + resume reconciled** — eval section rewritten with the methodology split, every stale number fixed (87%→93%, intent 94%→96%, dropped the old context-relevance decimals), all GitHub links confirmed on the correct `aayushmdesai` handle. Both repos committed.
+- **Outreach foundation** — 100-company tiered target list with profile-fit (★) and H-1B heuristic (🟢🟡🔴) flags.
+
+Carried forward (non-blocking): 21x latency claim should be defensible-or-softened; experience-bullet numbers stand-behind-able; LinkedIn eyeball for old handle / stale 87%; deferred `build_answer` synthesis + faithfulness re-run; word-drop preprocessing bug.
+
+The improvement story for interviews lives in the **e2e 56/60** (same harness, real before/after). RAGAS is the standalone rigorous-quality bar. Both are honest and survive scrutiny — which was the whole point of the week.
