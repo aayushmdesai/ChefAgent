@@ -13,6 +13,7 @@
 //   RecipeReranker        ← depends on ILlmProvider
 //   DietValidationPlugin  ← depends on ILlmProvider
 //   IntentRouter          ← depends on ILlmProvider
+//   AgentRegistry         ← depends on all agents
 //   AgentOrchestrator     ← depends on all agents + ILlmProvider
 // ============================================================
 
@@ -46,6 +47,7 @@ public static class ServiceRegistration
         services.AddDietAgent(config);
         services.AddOrchestrator(config);
         services.AddMealPlannerAgent(config);
+        services.AddAgentRegistry();
         services.AddApiServices();
         return services;
     }
@@ -267,6 +269,20 @@ public static class ServiceRegistration
             sp.GetRequiredService<SessionStore>()
         ));
 
+        return services;
+    }
+
+    // ── Agent Registry ──────────────────────────────────────────
+    private static IServiceCollection AddAgentRegistry(this IServiceCollection services)
+    {
+        services.AddSingleton(sp =>
+        {
+            var registry = new AgentRegistry(sp.GetRequiredService<ILogger<AgentRegistry>>());
+            registry.Register(sp.GetRequiredService<RecipeSearchPlugin>());
+            registry.Register(sp.GetRequiredService<DietValidationPlugin>());
+            registry.Register(sp.GetRequiredService<MealPlannerPlugin>());
+            return registry;
+        });
         return services;
     }
 
