@@ -18,12 +18,21 @@ public class AgentRegistryTests
             Capabilities = capabilities;
         }
 
-        public Task<AgentResult> HandleAsync(AgentContext context, CancellationToken ct = default) =>
-            Task.FromResult(new AgentResult { Success = true });
+        public Task<AgentResult> HandleAsync(
+            AgentContext context,
+            CancellationToken ct = default
+        ) => Task.FromResult(new AgentResult { Success = true });
     }
 
-    private static AgentRegistry MakeRegistry() =>
-        new(new Mock<ILogger<AgentRegistry>>().Object);
+    private static AgentRegistry MakeRegistry() => new(new Mock<ILogger<AgentRegistry>>().Object);
+
+    private static AgentRegistry MakeRegistry(params string[] capabilities)
+    {
+        var registry = new AgentRegistry(new Mock<ILogger<AgentRegistry>>().Object);
+        foreach (var cap in capabilities)
+            registry.Register(new FakeAgent($"Agent_{cap}", cap));
+        return registry;
+    }
 
     [Fact]
     public void EmptyRegistry_FindByCapability_ReturnsNull()
@@ -85,5 +94,26 @@ public class AgentRegistryTests
 
         // Real-world case: GetMealPlan has no agent.
         Assert.Null(registry.FindByCapability(AgentCapabilities.GetMealPlan));
+    }
+
+    [Fact]
+    public void RealWorldShape_SearchThenFanOutDietValidation()
+    {
+        var registry = MakeRegistry(AgentCapabilities.SearchRecipe, AgentCapabilities.ValidateDiet);
+
+        var pipeline = PipelineBuilder
+            .For("SearchRecipe", registry)
+            .Then(AgentCapabilities.SearchRecipe)
+            .ThenForEach(
+                AgentCapabilities.ValidateDiet,
+                fanOutFrom: AgentCapabilities.SearchRecipe, // iterate the recipe list Step 1 produced
+                runIf: ctx => ctx.Classified.MergedProfile is not null,
+                continueOnFailure: true // a failed validation still returns the recipe
+            )
+            .Build();
+
+        var dietStep = pipeline.Steps[1];
+        Assert.Equal(AgentCapabilities.SearchRecipe, dietStep.FanOutFrom);
+        Assert.True(dietStep.ContinueOnFailure);
     }
 }

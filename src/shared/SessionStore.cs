@@ -238,4 +238,10 @@ public class SessionStore
     private static string HistoryKey(string sessionId) => $"session:{sessionId}:history";
 
     private static string ExtractionKey(string sessionId) => $"session:{sessionId}:extraction";
+
+    private static string ShoppingListKey(string sessionId) => $"session:{sessionId}:shopping_list";
+
+    private static string FridgeKey(string sessionId) => $"session:{sessionId}:fridge";
+
+    private static string NutritionKey(string sessionId) => $"session:{sessionId}:nutrition";
 }
