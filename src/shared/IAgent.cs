@@ -1,3 +1,6 @@
+using ChefAgent.Shared.Models;
+using ChefAgent.Shared.Observability;
+
 namespace ChefAgent.Shared;
 
 public interface IAgent
@@ -7,15 +10,11 @@ public interface IAgent
     Task<AgentResult> HandleAsync(AgentContext context, CancellationToken ct = default);
 }
 
+// src/shared/IAgent.cs — AgentContext revised
 public record AgentContext
 {
-    public required string SessionId { get; init; }
-    public required string UserQuery { get; init; }
-    public required string Intent { get; init; }
-
-    // Chaining support (Day 4-5): outputs from prior agents in a pipeline
-    // land here, keyed by capability name. e.g. after RecipeAgent runs,
-    // DietAgent reads context.SharedData["SearchRecipe"] for the candidate list.
+    public required ClassifiedIntent Classified { get; init; }
+    public required TraceContext TraceCtx { get; init; }
     public Dictionary<string, object> SharedData { get; init; } = new();
 }
 

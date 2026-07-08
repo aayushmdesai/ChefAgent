@@ -29,7 +29,7 @@ using Microsoft.Extensions.Logging;
 ///   - Known violations → rules-based substitution knowledge base (instant)
 ///   - Complex/ambiguous cases → LLM suggests context-aware substitutions
 /// </summary>
-public class DietValidationPlugin
+public class DietValidationPlugin : IAgent
 {
     private readonly ILlmProvider _llmProvider;
     private readonly CircuitBreaker _circuitBreaker;
@@ -191,6 +191,9 @@ public class DietValidationPlugin
         _tracing = tracing;
         _logger = logger;
     }
+
+    public string Name => "DietAgent";
+    public IReadOnlyList<string> Capabilities { get; } = [AgentCapabilities.ValidateDiet];
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -373,6 +376,46 @@ public class DietValidationPlugin
                 llmResult.IsCompatible
             );
             return llmResult;
+        }
+    }
+
+    public async Task<AgentResult> HandleAsync(AgentContext context, CancellationToken ct = default)
+    {
+        if (context.Classified.MergedProfile is null)
+            return new AgentResult
+            {
+                Success = false,
+                ErrorMessage = "No dietary profile to validate against.",
+            };
+
+        if (
+            !context.SharedData.TryGetValue("TargetRecipe", out var recipeObj)
+            || recipeObj is not RecipeDocument recipe
+        )
+            return new AgentResult
+            {
+                Success = false,
+                ErrorMessage = "No recipe provided for diet validation.",
+            };
+
+        try
+        {
+            var validation = await ValidateRecipeAsync(
+                recipe,
+                context.Classified.MergedProfile,
+                context.TraceCtx
+            );
+
+            return new AgentResult
+            {
+                Success = true,
+                Data = validation,
+                OutputsForNextAgent = new() { [AgentCapabilities.ValidateDiet] = validation },
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AgentResult { Success = false, ErrorMessage = ex.Message };
         }
     }
 

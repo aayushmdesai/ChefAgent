@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using ChefAgent.Shared;
 using ChefAgent.Shared.Guardrails;
 using ChefAgent.Shared.Models;
 using ChefAgent.Shared.Observability;
@@ -14,7 +15,7 @@ namespace ChefAgent.Agents.Recipe;
 /// Semantic Kernel plugin that performs vector search over the recipe corpus in Qdrant.
 /// Embeds the query via LLM, then searches Qdrant for similar recipes.
 /// </summary>
-public class RecipeSearchPlugin
+public class RecipeSearchPlugin : IAgent
 {
     private readonly QdrantClient _qdrantClient;
     private readonly string _collectionName;
@@ -37,6 +38,45 @@ public class RecipeSearchPlugin
         float[]
     > _embeddingCache = new(StringComparer.OrdinalIgnoreCase);
     private const int EmbeddingCacheMaxSize = 1000;
+    public string Name => "RecipeAgent";
+
+    public IReadOnlyList<string> Capabilities { get; } =
+    [AgentCapabilities.SearchRecipe, AgentCapabilities.SearchByIngredients];
+
+    public async Task<AgentResult> HandleAsync(AgentContext context, CancellationToken ct = default)
+    {
+        var maxResults = context.SharedData.TryGetValue("maxResults", out var mr) ? (int)mr : 5;
+
+        try
+        {
+            var recipes = await SearchRecipesAsync(
+                context.Classified.SearchQuery,
+                maxResults,
+                maxIngredients: null,
+                maxSteps: null,
+                rerank: false,
+                expand: true,
+                cancellationToken: ct,
+                parentCtx: context.TraceCtx
+            );
+
+            return new AgentResult
+            {
+                Success = true,
+                Data = recipes,
+                OutputsForNextAgent = new() { [AgentCapabilities.SearchRecipe] = recipes },
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "RecipeAgent.HandleAsync failed for query '{Query}'",
+                context.Classified.SearchQuery
+            );
+            return new AgentResult { Success = false, ErrorMessage = ex.Message };
+        }
+    }
 
     public RecipeSearchPlugin(
         QdrantClient qdrantClient,

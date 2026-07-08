@@ -164,3 +164,26 @@ public record ConversationEntry
     public string? PlanId { get; init; }
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
 }
+
+/// <summary>
+/// Result of intent classification — intent + all extracted entities.
+/// ClassifiedBy values: "rules" | "rules-default" | "llm" (Month 2)
+/// "rules-default" means SearchRecipe was assumed, not explicitly matched.
+/// Collect these cases as training data for future LLM classifier.
+/// </summary>
+public record ClassifiedIntent
+{
+    public required UserIntent Intent { get; init; }
+    public required string SearchQuery { get; init; }
+    public string OriginalMessage { get; init; } = string.Empty;
+    public DietaryProfile? ExtractedProfile { get; init; }
+    public DietaryProfile? MergedProfile { get; init; }
+    public string? SessionId { get; set; }
+    public string? TargetDay { get; set; }
+    public string TargetSlot { get; set; } = "dinner";
+    public string? ModifyConstraint { get; set; }
+    public List<string> MealSlots { get; init; } = ["dinner"];
+    public List<UserIntent> DeferredIntents { get; init; } = [];
+    public string? DeferredMessage { get; init; }
+    public required string ClassifiedBy { get; init; }
+}

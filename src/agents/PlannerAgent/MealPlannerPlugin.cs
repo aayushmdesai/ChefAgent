@@ -7,7 +7,7 @@ using ChefAgent.Shared.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 
-public class MealPlannerPlugin
+public class MealPlannerPlugin : IAgent
 {
     private readonly RecipeSearchPlugin _recipeSearch;
     private readonly DietValidationPlugin _dietValidation;
@@ -139,6 +139,53 @@ public class MealPlannerPlugin
         _dietValidation = dietValidation;
         _logger = logger;
         _sessionStore = sessionStore;
+    }
+
+    public string Name => "PlannerAgent";
+    public IReadOnlyList<string> Capabilities { get; } =
+    [AgentCapabilities.CreateMealPlan, AgentCapabilities.ModifyMealPlan];
+
+    // Note: GetMealPlan is NOT here — that intent reads straight from SessionStore,
+    // no agent involved. Registry needs to handle capabilities with zero registered agents.
+
+    public async Task<AgentResult> HandleAsync(AgentContext context, CancellationToken ct = default)
+    {
+        try
+        {
+            if (context.Classified.Intent == UserIntent.CreateMealPlan)
+            {
+                var constraints = new PlanConstraints { MealSlots = context.Classified.MealSlots };
+                var plan = await GeneratePlanAsync(context.Classified.MergedProfile, constraints);
+                return new AgentResult { Success = true, Data = plan };
+            }
+
+            if (context.Classified.Intent == UserIntent.ModifyMealPlan)
+            {
+                var (plan, message) = await ModifyPlanAsync(
+                    context.Classified.SessionId!,
+                    context.Classified.TargetDay!,
+                    context.Classified.TargetSlot,
+                    context.Classified.ModifyConstraint
+                );
+
+                return new AgentResult
+                {
+                    Success = true,
+                    Data = plan,
+                    OutputsForNextAgent = new() { ["message"] = message },
+                };
+            }
+
+            return new AgentResult
+            {
+                Success = false,
+                ErrorMessage = $"PlannerAgent cannot handle intent {context.Classified.Intent}",
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AgentResult { Success = false, ErrorMessage = ex.Message };
+        }
     }
 
     [KernelFunction("generate_meal_plan")]
