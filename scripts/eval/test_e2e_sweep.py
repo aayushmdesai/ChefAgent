@@ -16,10 +16,16 @@ Generates eval/datasets/e2e_sweep_results.md
 import requests
 import time
 import sys
+import uuid
 from datetime import datetime
 
 BASE_URL = "http://localhost:5100"
 RESULTS = []
+RUN_ID = uuid.uuid4().hex[:8]
+
+def scoped(base: str) -> str:
+    """Scope a session ID to this run so no state leaks across sweeps."""
+    return f"{base}-{RUN_ID}"
 
 # Latency thresholds (informational — flag if exceeded, don't fail)
 # Generous because Codespaces CPU inference is slow
@@ -33,8 +39,10 @@ LATENCY_FLAGS = {
 }
 
 
-def send_chat(message: str, session_id: str, profile: dict = None) -> dict:
-    """Send a /chat request."""
+def send_chat(message: str, session_id: str, profile: dict = None, pace: bool = True) -> dict:
+    """Send a /chat request. Paced by default to stay under Voyage's free-tier RPM."""
+    if pace:
+        time.sleep(1.5)
     payload = {"message": message, "sessionId": session_id}
     if profile:
         payload["profile"] = profile
@@ -51,7 +59,6 @@ def send_chat(message: str, session_id: str, profile: dict = None) -> dict:
     except Exception as e:
         return {"status": None, "body": None,
                 "latency_s": round(time.time() - start, 2), "error": str(e)}
-
 
 def assert_case(category: str, tc: int, query: str, result: dict,
                 expected_intent: str = None,
@@ -152,7 +159,7 @@ def is_neutral_redirect(body):
 
 def category_recipe_search():
     print("\n━━ CATEGORY 1: RECIPE SEARCH (10) ━━")
-    sid = "e2e-search"
+    sid = scoped("e2e-search")
 
     assert_case("search", 1, "find me pasta recipes",
                 send_chat("find me pasta recipes", sid),
@@ -204,7 +211,7 @@ def category_recipe_search():
 
 def category_dietary():
     print("\n━━ CATEGORY 2: DIETARY VALIDATION (8) ━━")
-    sid = "e2e-diet"
+    sid = scoped("e2e-diet")
 
     assert_case("diet", 11, "is pasta with cheese safe for a nut allergy?",
                 send_chat("is pasta with cheese safe for a nut allergy?", sid),
@@ -245,7 +252,7 @@ def category_dietary():
 
 def category_meal_planning():
     print("\n━━ CATEGORY 3: MEAL PLANNING (8) ━━")
-    sid = "e2e-plan"
+    sid = scoped("e2e-plan")
 
     assert_case("plan", 19, "plan my dinners for the week",
                 send_chat("plan my dinners for the week", sid),
@@ -287,7 +294,7 @@ def category_meal_planning():
 
 def category_conversation():
     print("\n━━ CATEGORY 4: CONVERSATION CONTEXT (8) ━━")
-    sid = "e2e-context"
+    sid = scoped("e2e-context")
 
     # Establish context: search first
     assert_case("search", 27, "find me chicken recipes (context setup)",
@@ -360,7 +367,7 @@ def category_guardrails():
                 latency_type="guard", note="should be blocked/redirected")
 
     # Repeated query — send 3 times
-    sid_repeat = "e2e-guard-repeat"
+    sid_repeat = scoped("e2e-guard-repeat")
     send_chat("find me pizza recipes", sid_repeat)
     send_chat("find me pizza recipes", sid_repeat)
     assert_case("guard", 40, "repeated query (3rd time)",
@@ -368,21 +375,21 @@ def category_guardrails():
                 latency_type="search", note="repeat detection",
                 content_check=message_contains("already", "different"))
 
-    # Rate limit — burst (this is a soft test, depends on timing)
-    sid_burst = "e2e-guard-burst"
-    burst_429 = 0
-    for i in range(35):
-        r = send_chat(f"recipe query {i}", sid_burst)
-        if r["status"] == 429:
-            burst_429 += 1
-    assert_case("guard", 41, f"rate limit burst (35 requests, {burst_429} got 429)",
-                {"status": 200 if burst_429 > 0 else 200,
-                 "body": {"message": f"{burst_429} requests throttled (429)",
-                          "detectedIntent": "N/A"},
-                 "latency_s": 0, "error": None},
-                latency_type="guard",
-                note=f"expected some 429s, got {burst_429}",
-                content_check=lambda b: burst_429 > 0)
+    # # Rate limit — burst (this is a soft test, depends on timing)
+    # sid_burst = "e2e-guard-burst"
+    # burst_429 = 0
+    # for i in range(35):
+    #     r = send_chat(f"recipe query {i}", sid_burst)
+    #     if r["status"] == 429:
+    #         burst_429 += 1
+    # assert_case("guard", 41, f"rate limit burst (35 requests, {burst_429} got 429)",
+    #             {"status": 200 if burst_429 > 0 else 200,
+    #              "body": {"message": f"{burst_429} requests throttled (429)",
+    #                       "detectedIntent": "N/A"},
+    #              "latency_s": 0, "error": None},
+    #             latency_type="guard",
+    #             note=f"expected some 429s, got {burst_429}",
+    #             content_check=lambda b: burst_429 > 0)
 
     # Confidence level check — rules-only should be High
     assert_case("guard", 42, "confidence: rules-only search → High",
@@ -398,17 +405,17 @@ def category_edge_cases():
 
     # Empty profile + allergy query
     assert_case("diet", 43, "allergy query with empty profile",
-                send_chat("is this safe for my allergy?", "e2e-edge-1"),
+                send_chat("is this safe for my allergy?", scoped("e2e-edge-1")),
                 latency_type="diet", note="empty profile + allergy")
 
     # Unknown intent
     assert_case("general", 44, "what's the weather today?",
-                send_chat("what's the weather today?", "e2e-edge-2"),
+                send_chat("what's the weather today?", scoped("e2e-edge-2")),
                 latency_type="general", note="off-domain / general")
 
     # Very short query
     assert_case("search", 45, "pasta (very short)",
-                send_chat("pasta", "e2e-edge-3"),
+                send_chat("pasta", scoped("e2e-edge-3")),
                 "SearchRecipe", has_recipes, latency_type="search",
                 note="minimal query")
 
@@ -416,7 +423,7 @@ def category_edge_cases():
     long_q = "I want a recipe that has chicken and rice and vegetables and is healthy and " * 5
     long_q = long_q[:480]
     assert_case("search", 46, "very long query (~480 chars)",
-                send_chat(long_q, "e2e-edge-4"),
+                send_chat(long_q, scoped("e2e-edge-4")),
                 latency_type="search", note="near max length")
 
     # Special characters
@@ -427,19 +434,39 @@ def category_edge_cases():
 
     # Mixed case
     assert_case("search", 48, "FiNd Me PaStA ReCiPeS",
-                send_chat("FiNd Me PaStA ReCiPeS", "e2e-edge-6"),
+                send_chat("FiNd Me PaStA ReCiPeS", scoped("e2e-edge-6")),
                 "SearchRecipe", has_recipes, latency_type="search",
                 note="mixed case")
 
     # Numbers / quantities
     assert_case("search", 49, "recipe for 4 people under 30 minutes",
-                send_chat("recipe for 4 people under 30 minutes", "e2e-edge-7"),
+                send_chat("recipe for 4 people under 30 minutes", scoped("e2e-edge-7")),
                 "SearchRecipe", latency_type="search", note="numeric constraints")
 
     # Greeting / small talk
     assert_case("general", 50, "hello",
-                send_chat("hello", "e2e-edge-8"),
+                send_chat("hello", scoped("e2e-edge-8")),
                 latency_type="guard", note="greeting (known: classified as search)")
+
+def test_rate_limit_burst():
+    """TC41 — deliberate unpaced burst to trigger the app's rate limiter.
+    Run separately, after the paced sweep, so it doesn't consume Voyage's
+    rate-limit budget for the rest of the run."""
+    print("\n━━ TC41: RATE LIMIT BURST (unpaced, run last) ━━")
+    sid_burst = scoped("e2e-guard-burst")
+    burst_429 = 0
+    for i in range(35):
+        r = send_chat(f"recipe query {i}", sid_burst, pace=False)
+        if r["status"] == 429:
+            burst_429 += 1
+    assert_case("guard", 41, f"rate limit burst (35 requests, {burst_429} got 429)",
+                {"status": 200 if burst_429 > 0 else 200,
+                 "body": {"message": f"{burst_429} requests throttled (429)",
+                          "detectedIntent": "N/A"},
+                 "latency_s": 0, "error": None},
+                latency_type="guard",
+                note=f"expected some 429s, got {burst_429}",
+                content_check=lambda b: burst_429 > 0)
 
 
 # ─── REPORT ───────────────────────────────────────────────────────────
@@ -564,6 +591,7 @@ def main():
     category_conversation()
     category_guardrails()
     category_edge_cases()
+    test_rate_limit_burst()  
 
     total = len(RESULTS)
     passed = sum(1 for r in RESULTS if r["passed"])

@@ -184,7 +184,25 @@ public static class ServiceRegistration
     )
     {
         var connectionString = config["Redis:ConnectionString"] ?? "localhost:6379";
-        var options = ConfigurationOptions.Parse(connectionString);
+        ConfigurationOptions options;
+
+        if (connectionString.StartsWith("redis://") || connectionString.StartsWith("rediss://"))
+        {
+            var uri = new Uri(connectionString);
+            var userInfo = uri.UserInfo.Split(':', 2);
+            options = new ConfigurationOptions
+            {
+                EndPoints = { { uri.Host, uri.Port } },
+                Password = userInfo.Length > 1 ? userInfo[1] : null,
+                User = userInfo.Length > 0 && userInfo[0] != "default" ? userInfo[0] : null,
+                Ssl = connectionString.StartsWith("rediss://"),
+            };
+        }
+        else
+        {
+            options = ConfigurationOptions.Parse(connectionString);
+        }
+
         options.ConnectTimeout = config.GetValue<int>("Redis:ConnectTimeoutMs", 2000);
         options.SyncTimeout = config.GetValue<int>("Redis:SyncTimeoutMs", 2000);
         options.AsyncTimeout = config.GetValue<int>("Redis:AsyncTimeoutMs", 2000);

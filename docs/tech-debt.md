@@ -16,7 +16,7 @@ Items are ordered within each section by priority (High → Low).
 | I-1 | "change Friday to X" not classified as ModifyMealPlan — rules only know "swap" | Week 8 Day 2, TC23 | Low | ✅ Week 16 Day 3 |
 | I-2 | "plan breakfast lunch and dinner" not classified as CreateMealPlan — rules expect "plan my dinners" | Week 8 Day 2, TC24 | Low | ✅ Week 16 Day 3 |
 | I-3 | "make me a new plan" not classified as CreateMealPlan | Week 8 Day 2, TC26 | Low | ✅ Week 16 Day 3 |
-| I-4 | "recipes with garlic and tomatoes" → ValidateDiet false positive — ingredient names trigger dietary rules | Week 8 Day 2, TC03 | Low | ✅ Already passing Week 16 audit |
+| I-4 | "recipes with garlic and tomatoes" → ValidateDiet false positive — ingredient names trigger dietary rules | Week 8 Day 2, TC03 | Low | 🔄 Reopened Phase 2 Week 2 Day 1 — reproduced in test_e2e_sweep.py rerun; Week 16 "audit" may not have covered this exact phrase. Needs investigation: real regression vs. narrower fix scope. |
 | I-5 | "pasta without dairy" classified as ValidateDiet, not SearchRecipe — "without X" is ambiguous | Week 8 Day 2, TC05 | Low | ⏳ Accepted — ambiguous intent, deferred |
 | I-6 | "hello" / greetings classified as SearchRecipe — no greeting/small-talk signals in IntentRouter | Week 8 Day 1 TC35, Day 2 TC50 | Low | ⏳ Deferred — Month 5 |
 | I-7 | "whats on monday?" → GeneralQuestion, not GetMealPlan — day-specific plan queries not handled | Week 8 Day 2, TC25 | Low | ✅ Week 16 Day 3 — "what's on {day}" signals added |
@@ -58,6 +58,8 @@ Items are ordered within each section by priority (High → Low).
 | M-2 | Profile entity extraction fires on every first message of a new session (~12s) — result not cached | Week 8 Day 3 | High | ✅ Month 3 — extraction result cached in Redis per session |
 | M-3 | Reference resolution uses LLM for ordinal references — rules can handle 90% of cases | Week 8 Day 3 | Low | ⏳ Deferred |
 | M-4 | Redis connection timeout still 8-15s under failure — no Redis circuit breaker | Week 8 Day 1 | Medium | ⏳ Deferred |
+| M-5 | Redis connection string (`rediss://user:pass@host:port` URI format) silently mis-parsed by `ConfigurationOptions.Parse` — StackExchange.Redis has no native URI scheme support. Endpoint was garbled (doubled port in logs), meaning Redis had likely never connected successfully in local dev with this format. | Phase 2 Week 2 Day 1 | High | ✅ Fixed — manual URI parsing added in `AddRedis()` |
+| M-6 | `SessionStore`'s 8 Redis operations caught `Exception` with no logging — every failure (including M-5) was invisible; `RecordFailure()` fired with no diagnostic trail | Phase 2 Week 2 Day 1 | Medium | ✅ Fixed — `ILogger<SessionStore>` added, all catch blocks now log `ex` with session ID |
 
 ---
 
@@ -100,6 +102,7 @@ Items are ordered within each section by priority (High → Low).
 | Inf-4 | Docker compose only — no cloud deploy | Month 3 roadmap | High | ✅ Month 3 — Railway (API) + Vercel (frontend) |
 | Inf-5 | RAGAS evaluation pipeline not yet integrated | Month 3 roadmap | High | ✅ Month 3 — custom sequential Ollama-based scorer, compare_experiments.py |
 | Inf-6 | Langfuse observability not yet integrated | Month 3 roadmap | High | ✅ Month 3 |
+| Inf-7 | `CircuitBreaker` keyed `"ollama"` in DI actually wraps Groq/`ILlmProvider` calls — misleading name left over from provider swap | Phase 2 Week 2 Day 1 | Low | ⏳ Deferred — rename to `"llm"` when convenient, touches `ServiceRegistration.cs` + 4 call sites |
 
 ---
 
@@ -116,6 +119,7 @@ Items are ordered within each section by priority (High → Low).
 | T-7 | No partial failure testing (Ollama hanging vs down) | Week 8 Day 1 | Low | ⏳ Deferred |
 | T-8 | E2E eval case 53 (rate limit) uses wrong trigger pattern | Week 11 E2E eval | Low | ⏳ Deferred |
 | T-9 | Implicit dietary LLM extraction is non-deterministic — e2e-046 flips between intents | Week 11 E2E eval, case 46 | Low | ✅ Week 16 Day 3 — removed broad "can i eat" signal, CanEatRegex more precise |
+| T-10 | `test_e2e_sweep.py` reused fixed session IDs (`e2e-search`, `e2e-plan`, etc.) across every run — once Redis persistence actually worked (see M-5), stale profile/plan data from prior runs leaked into fresh runs, producing false failures | Phase 2 Week 2 Day 1 | Medium | ✅ Fixed — `RUN_ID` (uuid) appended to every session ID via `scoped()` helper |
 
 ---
 

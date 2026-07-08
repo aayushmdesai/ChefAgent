@@ -2,6 +2,7 @@ using System.Text.Json;
 using ChefAgent.Shared.Guardrails;
 using ChefAgent.Shared.Models;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace ChefAgent.Shared;
@@ -11,6 +12,7 @@ public class SessionStore
     private readonly IDatabase _db;
     private static readonly TimeSpan DefaultTTL = TimeSpan.FromDays(7);
     private readonly CircuitBreaker _redisCircuitBreaker;
+    private readonly ILogger<SessionStore> _logger;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -20,11 +22,13 @@ public class SessionStore
 
     public SessionStore(
         IConnectionMultiplexer redis,
-        [FromKeyedServices("redis")] CircuitBreaker redisCircuitBreaker
+        [FromKeyedServices("redis")] CircuitBreaker redisCircuitBreaker,
+        ILogger<SessionStore> logger
     )
     {
         _db = redis.GetDatabase();
         _redisCircuitBreaker = redisCircuitBreaker;
+        _logger = logger;
     }
 
     // ── History ───────────────────────────────────────────────
@@ -47,8 +51,13 @@ public class SessionStore
             await _db.KeyExpireAsync(key, DefaultTTL);
             _redisCircuitBreaker.RecordSuccess();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(
+                ex,
+                "[SessionStore] AppendMessageAsync failed for session {SessionId}",
+                sessionId
+            );
             _redisCircuitBreaker.RecordFailure();
             // non-critical — history loss is acceptable
         }
@@ -81,8 +90,13 @@ public class SessionStore
             }
             return result;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(
+                ex,
+                "[SessionStore] GetHistoryAsync failed for session {SessionId}",
+                sessionId
+            );
             _redisCircuitBreaker.RecordFailure();
             return [];
         }
@@ -101,8 +115,13 @@ public class SessionStore
             await _db.StringSetAsync(key, json, DefaultTTL);
             _redisCircuitBreaker.RecordSuccess();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(
+                ex,
+                "[SessionStore] SavePlanAsync failed for session {SessionId}",
+                sessionId
+            );
             _redisCircuitBreaker.RecordFailure();
         }
     }
@@ -120,8 +139,13 @@ public class SessionStore
                 return null;
             return JsonSerializer.Deserialize<MealPlan>(json!, JsonOptions);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(
+                ex,
+                "[SessionStore] GetPlanAsync failed for session {SessionId}",
+                sessionId
+            );
             _redisCircuitBreaker.RecordFailure();
             return null;
         }
@@ -136,8 +160,13 @@ public class SessionStore
             await _db.KeyDeleteAsync(PlanKey(sessionId));
             _redisCircuitBreaker.RecordSuccess();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(
+                ex,
+                "[SessionStore] DeletePlanAsync failed for session {SessionId}",
+                sessionId
+            );
             _redisCircuitBreaker.RecordFailure();
         }
     }
@@ -155,8 +184,13 @@ public class SessionStore
             await _db.StringSetAsync(key, json, DefaultTTL);
             _redisCircuitBreaker.RecordSuccess();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(
+                ex,
+                "[SessionStore] SaveProfileAsync failed for session {SessionId}",
+                sessionId
+            );
             _redisCircuitBreaker.RecordFailure();
         }
     }
@@ -174,8 +208,13 @@ public class SessionStore
                 return null;
             return JsonSerializer.Deserialize<DietaryProfile>(json!, JsonOptions);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(
+                ex,
+                "[SessionStore] GetProfileAsync failed for session {SessionId}",
+                sessionId
+            );
             _redisCircuitBreaker.RecordFailure();
             return null;
         }
@@ -195,8 +234,13 @@ public class SessionStore
             await _db.StringSetAsync(key, json, DefaultTTL);
             _redisCircuitBreaker.RecordSuccess();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(
+                ex,
+                "[SessionStore] SetCachedExtractionAsync failed for session {SessionId}",
+                sessionId
+            );
             _redisCircuitBreaker.RecordFailure();
         }
     }
@@ -222,8 +266,13 @@ public class SessionStore
             var profile = JsonSerializer.Deserialize<DietaryProfile>(json!, JsonOptions);
             return (true, profile); // ran, found something
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(
+                ex,
+                "[SessionStore] GetCachedExtractionAsync failed for session {SessionId}",
+                sessionId
+            );
             _redisCircuitBreaker.RecordFailure();
             return (false, null);
         }
