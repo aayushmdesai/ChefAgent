@@ -27,6 +27,15 @@ try
     var redis = app.Services.GetRequiredService<StackExchange.Redis.IConnectionMultiplexer>();
     await redis.GetDatabase().PingAsync();
     app.Logger.LogInformation("[Startup] Redis pre-warm ping succeeded");
+
+    // Force pipeline construction at startup so capability wiring errors fail
+    // here rather than on the first request that needs a pipeline.
+    var pipelines = app.Services.GetRequiredService<ChefAgent.Shared.PipelineRegistry>();
+    app.Logger.LogInformation(
+        "[Startup] {Count} pipeline(s) registered: {Intents}",
+        pipelines.Count,
+        string.Join(", ", pipelines.RegisteredIntents)
+    );
 }
 catch (Exception ex)
 {

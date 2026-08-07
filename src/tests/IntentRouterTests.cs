@@ -6,6 +6,7 @@ using ChefAgent.Shared.Observability;
 using ChefAgent.Shared.Providers.Llm;
 using Microsoft.Extensions.Logging;
 using Moq;
+using StackExchange.Redis;
 using Xunit;
 
 namespace ChefAgent.Tests;
@@ -23,9 +24,11 @@ public class IntentRouterTests
         var auditLogger = new Mock<ILogger<GuardrailAuditLog>>().Object;
         var audit = new GuardrailAuditLog(auditLogger);
         var circuitBreaker = new CircuitBreaker(cbLogger, audit);
+        var mockMultiplexer = new Mock<IConnectionMultiplexer>();
         var sessionStore = new Mock<SessionStore>(
-            Mock.Of<StackExchange.Redis.IConnectionMultiplexer>(),
-            circuitBreaker
+            mockMultiplexer.Object,
+            circuitBreaker,
+            new Mock<ILogger<SessionStore>>().Object
         ).Object;
 
         var tracingOptions = Mock.Of<Microsoft.Extensions.Options.IOptions<LangfuseOptions>>(o =>

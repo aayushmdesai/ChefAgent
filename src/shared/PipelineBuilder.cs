@@ -1,4 +1,5 @@
-// src/shared/PipelineBuilder.cs
+using ChefAgent.Shared.Models;
+
 namespace ChefAgent.Shared;
 
 /// <summary>
@@ -24,14 +25,15 @@ public record PipelineStep
     public Func<AgentContext, bool>? RunIf { get; init; }
     public bool ContinueOnFailure { get; init; } = false;
     public string? FanOutFrom { get; init; }
+    public string? FanOutItemKey { get; init; }
 }
 
 public class AgentPipeline
 {
-    public string Intent { get; }
+    public UserIntent Intent { get; }
     public IReadOnlyList<PipelineStep> Steps { get; }
 
-    internal AgentPipeline(string intent, IReadOnlyList<PipelineStep> steps)
+    internal AgentPipeline(UserIntent intent, IReadOnlyList<PipelineStep> steps)
     {
         Intent = intent;
         Steps = steps;
@@ -40,17 +42,17 @@ public class AgentPipeline
 
 public class PipelineBuilder
 {
-    private readonly string _intent;
+    private readonly UserIntent _intent;
     private readonly AgentRegistry _registry;
     private readonly List<PipelineStep> _steps = [];
 
-    private PipelineBuilder(string intent, AgentRegistry registry)
+    private PipelineBuilder(UserIntent intent, AgentRegistry registry)
     {
         _intent = intent;
         _registry = registry;
     }
 
-    public static PipelineBuilder For(string intent, AgentRegistry registry) =>
+    public static PipelineBuilder For(UserIntent intent, AgentRegistry registry) =>
         new(intent, registry);
 
     public PipelineBuilder Then(
@@ -80,6 +82,7 @@ public class PipelineBuilder
     public PipelineBuilder ThenForEach(
         string capability,
         string fanOutFrom,
+        string fanOutItemKey,
         Func<AgentContext, bool>? runIf = null,
         bool continueOnFailure = false
     )
@@ -91,6 +94,7 @@ public class PipelineBuilder
                 RunIf = runIf,
                 ContinueOnFailure = continueOnFailure,
                 FanOutFrom = fanOutFrom,
+                FanOutItemKey = fanOutItemKey,
             }
         );
         return this;
@@ -102,10 +106,16 @@ public class PipelineBuilder
             throw new InvalidOperationException($"Pipeline for '{_intent}' has no steps.");
 
         foreach (var step in _steps)
+        {
+            if (step.FanOutFrom is not null && string.IsNullOrWhiteSpace(step.FanOutItemKey))
+                throw new InvalidOperationException(
+                    $"Pipeline '{_intent}' step '{step.Capability}' sets FanOutFrom but no FanOutItemKey."
+                );
             if (_registry.FindByCapability(step.Capability) is null)
                 throw new InvalidOperationException(
                     $"Pipeline '{_intent}' references unregistered capability '{step.Capability}'."
                 );
+        }
 
         return new AgentPipeline(_intent, _steps);
     }

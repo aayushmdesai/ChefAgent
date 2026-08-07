@@ -49,6 +49,9 @@ public static class ServiceRegistration
         services.AddMealPlannerAgent(config);
         services.AddAgentRegistry();
         services.AddApiServices();
+        services.AddAgentRegistry();
+        services.AddPipelineRegistry();
+        services.AddApiServices();
         return services;
     }
 
@@ -408,6 +411,29 @@ public static class ServiceRegistration
         services.AddSingleton<Tracing>();
         services.AddHostedService(sp => sp.GetRequiredService<Tracing>());
 
+        return services;
+    }
+
+    // ── Pipeline Registry ──────────────────────────────────────────
+    // ── Pipeline Registry ──────────────────────────────────────
+    // Built after AgentRegistry: PipelineBuilder.Build() validates every
+    // referenced capability against it and throws on an unregistered one.
+    // A wiring mistake fails app startup rather than surfacing as a confusing
+    // failure on the first real request.
+    private static IServiceCollection AddPipelineRegistry(this IServiceCollection services)
+    {
+        services.AddSingleton(sp =>
+        {
+            var agents = sp.GetRequiredService<AgentRegistry>();
+            var registry = new PipelineRegistry(sp.GetRequiredService<ILogger<PipelineRegistry>>());
+
+            foreach (var pipeline in PipelineDefinitions.BuildAll(agents))
+                registry.Register(pipeline);
+
+            return registry;
+        });
+
+        services.AddSingleton<PipelineRunner>();
         return services;
     }
 }

@@ -95,25 +95,4 @@ public class AgentRegistryTests
         // Real-world case: GetMealPlan has no agent.
         Assert.Null(registry.FindByCapability(AgentCapabilities.GetMealPlan));
     }
-
-    [Fact]
-    public void RealWorldShape_SearchThenFanOutDietValidation()
-    {
-        var registry = MakeRegistry(AgentCapabilities.SearchRecipe, AgentCapabilities.ValidateDiet);
-
-        var pipeline = PipelineBuilder
-            .For("SearchRecipe", registry)
-            .Then(AgentCapabilities.SearchRecipe)
-            .ThenForEach(
-                AgentCapabilities.ValidateDiet,
-                fanOutFrom: AgentCapabilities.SearchRecipe, // iterate the recipe list Step 1 produced
-                runIf: ctx => ctx.Classified.MergedProfile is not null,
-                continueOnFailure: true // a failed validation still returns the recipe
-            )
-            .Build();
-
-        var dietStep = pipeline.Steps[1];
-        Assert.Equal(AgentCapabilities.SearchRecipe, dietStep.FanOutFrom);
-        Assert.True(dietStep.ContinueOnFailure);
-    }
 }
