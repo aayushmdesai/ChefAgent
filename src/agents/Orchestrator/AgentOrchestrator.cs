@@ -43,6 +43,9 @@ public class AgentOrchestrator
     private readonly GuardrailAuditLog _audit;
     private readonly Tracing _tracing;
     private readonly ILogger<AgentOrchestrator> _logger;
+    private readonly PipelineRegistry _pipelines;
+    private readonly PipelineRunner _runner;
+    private readonly bool _pipelinesEnabled;
 
     // Agent loop cap — in HandleCreateMealPlanAsync
     // MealPlannerPlugin already does 7 recipe + 7 diet = 14 calls
@@ -58,7 +61,10 @@ public class AgentOrchestrator
         CircuitBreaker circuitBreaker,
         GuardrailAuditLog audit,
         Tracing tracing,
-        ILogger<AgentOrchestrator> logger
+        ILogger<AgentOrchestrator> logger,
+        PipelineRegistry pipelines,
+        PipelineRunner runner,
+        bool pipelinesEnabled
     )
     {
         _recipeAgent = recipeAgent;
@@ -70,6 +76,9 @@ public class AgentOrchestrator
         _audit = audit;
         _tracing = tracing;
         _logger = logger;
+        _pipelines = pipelines;
+        _runner = runner;
+        _pipelinesEnabled = pipelinesEnabled;
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -149,16 +158,7 @@ public class AgentOrchestrator
         classified = await ResolveReferencesAsync(classified);
 
         // ── Step 4: Route to the right handler ───────────────────
-        var response = classified.Intent switch
-        {
-            UserIntent.SearchRecipe => await HandleSearchRecipeAsync(classified, orchCtx),
-            UserIntent.ValidateDiet => await HandleValidateDietAsync(classified, orchCtx),
-            UserIntent.GetMealPlan => await HandleGetMealPlanAsync(classified, orchCtx),
-            UserIntent.CreateMealPlan => await HandleCreateMealPlanAsync(classified, orchCtx),
-            UserIntent.ModifyMealPlan => await HandleModifyMealPlanAsync(classified, orchCtx),
-            UserIntent.GeneralQuestion => await HandleGeneralQuestionAsync(classified, orchCtx),
-            _ => HandleUnknown(classified),
-        };
+        var response = await DispatchAsync(classified, orchCtx);
 
         // ── Step 4.5: Append confidence disclaimers ───────────────
         response = AppendConfidenceDisclaimer(response, classified);
@@ -391,6 +391,106 @@ public class AgentOrchestrator
             Metadata = BuildMetadata(classified, dietaryApplied: true),
         };
     }
+
+    /// <summary>
+    /// Pipeline-backed dispatch when Pipelines:Enabled, with the Phase 1
+    /// switch as the fallback for intents that have no pipeline or no mapper.
+    /// Both paths stay live until the Day 6 regression comparison clears.
+    /// </summary>
+    private async Task<OrchestratorResponse> DispatchAsync(
+        ClassifiedIntent classified,
+        TraceContext orchCtx
+    )
+    {
+        if (_pipelinesEnabled)
+        {
+            var mapped = await TryRunPipelineAsync(classified, orchCtx);
+            if (mapped is not null)
+                return mapped;
+        }
+
+        return classified.Intent switch
+        {
+            UserIntent.SearchRecipe => await HandleSearchRecipeAsync(classified, orchCtx),
+            UserIntent.ValidateDiet => await HandleValidateDietAsync(classified, orchCtx),
+            UserIntent.GetMealPlan => await HandleGetMealPlanAsync(classified, orchCtx),
+            UserIntent.CreateMealPlan => await HandleCreateMealPlanAsync(classified, orchCtx),
+            UserIntent.ModifyMealPlan => await HandleModifyMealPlanAsync(classified, orchCtx),
+            UserIntent.GeneralQuestion => await HandleGeneralQuestionAsync(classified, orchCtx),
+            _ => HandleUnknown(classified),
+        };
+    }
+
+    /// <summary>
+    /// Returns null when this intent should fall through to the Phase 1 switch:
+    /// no registered pipeline (GetMealPlan, GeneralQuestion, Unknown), no mapper
+    /// yet (planner intents — P2-8), or a pre-pipeline guard fired.
+    /// </summary>
+    private async Task<OrchestratorResponse?> TryRunPipelineAsync(
+        ClassifiedIntent classified,
+        TraceContext orchCtx
+    )
+    {
+        var pipeline = _pipelines.FindByIntent(classified.Intent);
+        if (pipeline is null)
+            return null;
+
+        var shared = new Dictionary<string, object>();
+
+        switch (classified.Intent)
+        {
+            case UserIntent.SearchRecipe:
+                break;
+
+            case UserIntent.ValidateDiet:
+                // Pre-pipeline guard — matches HandleValidateDietAsync, which
+                // checks before searching at all. A RunIf on the diet step would
+                // search first and then skip, producing a different response.
+                if (!HasActionableProfile(classified))
+                    return new OrchestratorResponse
+                    {
+                        Message =
+                            "I'd be happy to check a recipe for you — could you tell me which recipe and any dietary restrictions you have?",
+                        DetectedIntent = UserIntent.ValidateDiet,
+                        Recipes = [],
+                        Confidence = ResponseConfidence.High,
+                        Metadata = BuildMetadata(classified, dietaryApplied: false),
+                    };
+
+                // ValidateDiet validates the single best match, not five (P2-7).
+                shared[PipelineDefinitions.MaxResultsKey] = 1;
+                break;
+
+            default:
+                // Registered but no mapper yet — a registered pipeline doesn't
+                // oblige the orchestrator to use it.
+                return null;
+        }
+
+        var result = await _runner.RunAsync(
+            pipeline,
+            new AgentContext
+            {
+                Classified = classified,
+                TraceCtx = orchCtx,
+                SharedData = shared,
+            }
+        );
+
+        return classified.Intent switch
+        {
+            UserIntent.SearchRecipe => MapSearchRecipeResult(result, classified),
+            UserIntent.ValidateDiet => MapValidateDietResult(result, classified),
+            _ => null,
+        };
+    }
+
+    private static bool HasActionableProfile(ClassifiedIntent classified) =>
+        classified.MergedProfile is not null
+        && (
+            classified.MergedProfile.Allergies.Count > 0
+            || classified.MergedProfile.Restrictions.Count > 0
+        );
 
     // ── Reference Resolution ──────────────────────────────────────────────────
 

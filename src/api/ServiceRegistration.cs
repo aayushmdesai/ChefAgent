@@ -370,10 +370,12 @@ public static class ServiceRegistration
                 sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
                 sp.GetRequiredService<GuardrailAuditLog>(),
                 sp.GetRequiredService<Tracing>(),
-                sp.GetRequiredService<ILogger<AgentOrchestrator>>()
+                sp.GetRequiredService<ILogger<AgentOrchestrator>>(),
+                sp.GetRequiredService<PipelineRegistry>(),
+                sp.GetRequiredService<PipelineRunner>(),
+                config.GetValue<bool>("Pipelines:Enabled", false)
             );
         });
-
         return services;
     }
 

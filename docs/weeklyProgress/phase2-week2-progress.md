@@ -340,4 +340,130 @@ Both mappers compile; nothing calls them yet. Orchestrator dispatch still untouc
 - Cutover: `SearchRecipe` and `ValidateDiet` only. Planner intents stay on direct dispatch until P2-8 is resolved — a registered pipeline doesn't oblige the orchestrator to use it.
 - Feature flag (`Pipelines:Enabled`, default false) so Day 6 can A/B both paths on one build rather than comparing against a recorded number
 - Pre-pipeline guards stay in the orchestrator: `ValidateDiet`'s no-profile early return, `CreateMealPlan`'s session-id check, `ModifyMealPlan`'s target-day check
+---
 
+## Day 5 — Orchestrator cutover behind a feature flag ✅
+
+### Blocked first by an infra incident, not code
+
+Verification couldn't start because `/chat` returned a clean 200 with `"Sorry — I couldn't search for recipes right now."` and `Confidence: Low`. Three distinct failures in sequence, each only visible in the stack trace:
+
+1. **`RpcException Unavailable` — SSL handshake EOF.** Qdrant Cloud free tier had reclaimed the cluster. The endpoint accepted TCP and dropped before TLS completed.
+2. **`RpcException NotFound: Collection 'recipes' doesn't exist!`** — the replacement cluster was empty. Free-tier suspension took the collection with it; 52,155 recipes gone, no snapshot.
+3. **`InvalidArgument: Vector dimension error: expected dim: 768, got 1024`** — reloading from `data/embeddings/recipe_vectors.jsonl` produced a *successful* load of the wrong artifact: a 10,000-document, 768-dimension file from the pre-Voyage Ollama/nomic era. The load reported success; the mismatch only surfaced at query time.
+
+Also hit: `load_qdrant.py` uses `prefer_grpc=False` (REST, port 6333) while the .NET client uses gRPC (6334). Passing 6334 to the script returned non-JSON and died in the response parser.
+
+Resolved by locating and loading the correct 1024d artifact. Search confirmed working — 5 recipes, relevance ~0.68.
+
+**Three findings worth keeping:**
+
+- The e2e regression baseline depends on a free-tier vector store with no backup, and losing it cost a day. Points count should be verified against 52,155 before Day 6 treats the corpus as comparable to Week 8/16's.
+- Every one of the three failures produced a clean 200 with a friendly message. This is the same graceful-degradation-hides-root-cause thread as the Redis URI parse bug (Week 2 Day 1) and would have been undiagnosable without Day 1's `SessionStore` logging work. That fix has now paid for itself twice.
+- **Day 6 procedure change:** a live search must return recipes *before* either sweep starts. A suspended cluster and a pipeline regression are indistinguishable at the response level — both are a pile of failures with clean status codes.
+
+### Decisions
+
+| Question | Decision | Why |
+|---|---|---|
+| Feature flag or straight swap? | Flag — `Pipelines:Enabled`, default `false` in `appsettings.json` | Day 6 can A/B both paths on one build via `Pipelines__Enabled` in `.env.local`, rather than comparing against a recorded number |
+| Which intents route through pipelines? | `SearchRecipe` and `ValidateDiet` only | `CreateMealPlan`/`ModifyMealPlan` are blocked on P2-8 — `MealPlannerPlugin.HandleAsync` doesn't call `SavePlanAsync` and collapses `InvalidOperationException`/`ArgumentException` into one generic failure, losing two distinct user messages. A registered pipeline doesn't oblige the orchestrator to use it. |
+| Pre-pipeline guards | Stay in the orchestrator | `ValidateDiet`'s no-profile return, `CreateMealPlan`'s session-id check, `ModifyMealPlan`'s target-day check all run before any agent work and produce their own responses |
+
+### What Was Built
+
+- `Pipelines:Enabled` in `appsettings.json`, default `false`; overridable per-run via `Pipelines__Enabled` in `.env.local` (double underscore → `:` in ASP.NET config)
+- `AgentOrchestrator` takes `PipelineRegistry`, `PipelineRunner`, and the flag
+- The `switch` in `RouteAsync` replaced by `DispatchAsync` — pipeline path when enabled, Phase 1 switch as fallback. Both paths stay live until the Day 6 comparison clears.
+- `TryRunPipelineAsync` returns `null` for anything that should fall through: no registered pipeline (`GetMealPlan`, `GeneralQuestion`, `Unknown`), no mapper yet (planner intents), or a pre-pipeline guard firing. The P2-8 gate is explicit in code rather than assumed.
+- `ValidateDiet` seeds `SharedData[MaxResultsKey] = 1` — `RecipeSearchPlugin.HandleAsync` defaults to 5, and `HandleValidateDietAsync` validates the single best match (P2-7)
+
+### Verification
+
+Unit suite green — 114 total, 108 passed, 6 skipped. Since the flag defaults to `false`, `DispatchAsync` falls straight through and no existing behavior changes.
+
+Live, with `Pipelines__Enabled=true` confirmed via `printenv` inside the container:
+
+| Query | Result |
+|---|---|
+| `"pasta"`, no profile | 5 recipes, `Here are 5 recipes for "pasta".` |
+| `"pasta"`, `restrictions: ["vegan"]` | 5 recipes, `Found 5 recipes for "pasta" but none fully matched your vegan profile. Check the details for substitution suggestions.` |
+
+Both match Phase 1's message templates exactly. The second exercises `HasActionableProfile`, the fan-out, and `MapSearchRecipeResult`'s badge path.
+
+**A verification-method problem worth recording:** identical responses on both paths is the *goal*, which means the response alone cannot tell you which path ran. One round trip was spent unable to determine whether a request had gone through the pipeline. Adding `[Dispatch]` log lines before the pipeline attempt and at the fallback point — without them, Day 6's A/B would be comparing two runs believed to differ rather than known to.
+
+### Not yet verified
+
+- `ValidateDiet` through the pipeline — the reshaped two-step path hasn't been exercised live
+- `CreateMealPlan` falling through to Phase 1 rather than erroring
+- **Langfuse span nesting (T-12)** — needs a real trace showing `pipeline.SearchRecipe` → `recipe_agent.search` → `embed.provider`, with five `diet_agent.validate` children. Unit tests cannot cover this; with `Enabled=false` every span call is a no-op.
+
+### Definition of Done
+
+- [x] Flag wired, default `false` in committed config
+- [x] `DispatchAsync` routes pipeline-first with Phase 1 fallback
+- [x] Pre-pipeline guards preserved
+- [x] `SearchRecipe` verified live on the pipeline path, both with and without a profile
+- [x] Full unit suite green
+- [ ] `ValidateDiet` verified live
+- [ ] Span nesting verified in Langfuse
+- [ ] `[Dispatch]` logging added
+
+### Tech debt
+
+- **P2-9 added** — `HasActionableProfile` now exists twice: `PipelineDefinitions` (takes `AgentContext`) and `AgentOrchestrator` (takes `ClassifiedIntent`). Same logic, two shapes. This is the third copy the Day 4 extraction was meant to prevent; flagged rather than fixed mid-cutover.
+- **P2-10 added** — feature flag removal condition: delete the Phase 1 switch once the Day 6 A/B clears *and* planner intents are cut over. Two live dispatch implementations is its own drift risk; stating the trigger stops the flag becoming permanent by default.
+- **Inf-8 added** — free-tier Qdrant reclaims clusters and takes collections with them. No snapshot exists for the 52,155-recipe corpus.
+
+### Carried into Day 6
+
+- Confirm `points_count` = 52,155 before the sweep; a smaller corpus makes the 44/50 comparison not apples-to-apples
+- Live search must pass before either sweep starts
+- Paced `test_e2e_sweep.py` on both flag states, same build, diff the results
+- Expect the same four I-4/I-5 failures on both paths — a difference there is the real signal
+---
+
+## Remaining — Week 2
+
+### Day 5 finish (open)
+
+- [ ] `[Dispatch]` log lines — pipeline-path taken, and fallback reason. Without these, Day 6's A/B compares two runs *believed* to differ rather than known to.
+- [ ] `ValidateDiet` verified live on the pipeline path. The reshaped search → fan-out validate chain has never executed. Expect a `dietaryCheck` object in the response.
+- [ ] `CreateMealPlan` confirmed falling through to Phase 1 rather than erroring — the P2-8 gate working as intended.
+- [ ] **Langfuse span nesting (T-12).** Needs a real trace: `pipeline.SearchRecipe` → `recipe_agent.search` → `embed.provider`, plus five `diet_agent.validate` children. If `embed.provider` sits flat at the root, `TraceCtx` isn't being replaced correctly. Unit tests cannot cover this — with `Enabled=false` every span call is a no-op.
+
+### Day 6 — regression comparison
+
+Preconditions, both non-negotiable after Day 5's incident:
+
+- [ ] `points_count` = 52,155 confirmed. A smaller corpus makes the 44/50 comparison not apples-to-apples, and any difference could be corpus size rather than the cutover.
+- [ ] A live search returns recipes before either sweep starts. A suspended cluster and a pipeline regression look identical at the response level.
+
+Then:
+
+- [ ] Paced `test_e2e_sweep.py` with `Pipelines__Enabled=false` — establishes the control on today's corpus
+- [ ] Restart, same build, `Pipelines__Enabled=true` — the pipeline path
+- [ ] Diff. Compare against this script's own **44/50** baseline, not the 56/60 frozen production number (different harness, different denominator — see Day 1).
+- [ ] Expect the same four I-4/I-5 failures (TC03, TC05, TC09, TC47) on both paths. A *difference* between the two runs is the real signal; a shared failure is pre-existing.
+- [ ] Confirm via `[Dispatch]` logs that the two runs actually took different paths
+
+### Day 7 / wrap
+
+- [ ] Week 2 progress doc finalized
+- [ ] Tech-debt file reconciled — P2-3 through P2-10, T-11, T-12, Inf-8 all recorded with correct status
+- [ ] Day-boundary commits
+- [ ] Reconcile the Day 1 section: "Remaining failures (3, all pre-existing/tracked)" lists four rows, and 47/50 implies three. Day 6 reuses that number, so the discrepancy should be resolved before it propagates.
+
+### Decision needed this week, not deferred again
+
+- [ ] **IntentRouter discovering intents from the registry.** In the Week 1–2 roadmap block, on every carry-forward list since Week 1, has not moved. Either it lands this week or it's explicitly deferred to Week 3 — silently rolling a third time is how scope quietly disappears.
+
+### Explicitly not this week
+
+- Planner-intent cutover (`CreateMealPlan`, `ModifyMealPlan`) — gated on P2-8
+- Feature-flag removal and Phase 1 switch deletion — gated on P2-10's stated trigger
+- Agent-owned tracing (P2-6) — the transitional runner-owned spans stay until after the cutover settles
+- `/recipes/search-validated` consolidation onto the runner
+- `HandleAsync` coverage gaps (P2-1, P2-2)
+- `GetMealPlan` no-agent fallback
