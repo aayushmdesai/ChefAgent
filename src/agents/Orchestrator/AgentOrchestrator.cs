@@ -219,6 +219,179 @@ public class AgentOrchestrator
         return response;
     }
 
+    // ── Pipeline → OrchestratorResponse ───────────────────────────────────────
+
+    /// <summary>
+    /// Maps a SearchRecipe PipelineResult onto the response shape
+    /// HandleSearchRecipeAsync produces today. Behavior parity is the bar:
+    /// same messages, same confidence levels, same sort order, same metadata.
+    /// </summary>
+    private OrchestratorResponse MapSearchRecipeResult(
+        PipelineResult result,
+        ClassifiedIntent classified
+    )
+    {
+        // Search step failed outright — same as the catch around SearchRecipesAsync.
+        if (result.AbortedAt == AgentCapabilities.SearchRecipe)
+            return ErrorResponse(
+                classified,
+                "Sorry — I couldn't search for recipes right now. Please try again."
+            );
+
+        var recipes =
+            result.SharedData.TryGetValue(AgentCapabilities.SearchRecipe, out var raw)
+            && raw is List<RecipeDocument> list
+                ? list
+                : [];
+
+        if (recipes.Count == 0)
+            return new OrchestratorResponse
+            {
+                Message =
+                    $"I couldn't find any recipes for \"{classified.SearchQuery}\". Try a different query.",
+                DetectedIntent = UserIntent.SearchRecipe,
+                Recipes = [],
+                Confidence = ResponseConfidence.High,
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+
+        var dietStep = result.Steps.FirstOrDefault(s =>
+            s.Capability == AgentCapabilities.ValidateDiet
+        );
+
+        // Diet validation skipped by RunIf — no profile, or an empty one.
+        if (dietStep is null || dietStep.Skipped)
+            return new OrchestratorResponse
+            {
+                Message = BuildSearchMessage(recipes, classified, dietaryApplied: false),
+                DetectedIntent = UserIntent.SearchRecipe,
+                Recipes = recipes.Select(r => new ValidatedRecipe { Recipe = r }).ToList(),
+                Confidence = ResponseConfidence.High,
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+
+        var validated = new List<ValidatedRecipe>();
+        var dietaryUnavailable = false;
+
+        foreach (var (item, agentResult) in dietStep.FanOutResults ?? [])
+        {
+            if (item is not RecipeDocument recipe)
+                continue;
+
+            if (agentResult.Success && agentResult.Data is DietaryValidation validation)
+            {
+                validated.Add(new ValidatedRecipe { Recipe = recipe, Dietary = validation });
+            }
+            else
+            {
+                // Matches the per-recipe catch: recipe still returned, unbadged.
+                dietaryUnavailable = true;
+                validated.Add(new ValidatedRecipe { Recipe = recipe, Dietary = null });
+            }
+        }
+
+        // Sort: compatible first, incompatible after.
+        var sorted = validated.OrderByDescending(r => r.Dietary?.IsCompatible ?? false).ToList();
+        var compatibleCount = sorted.Count(r => r.Dietary?.IsCompatible == true);
+
+        return new OrchestratorResponse
+        {
+            Message = BuildSearchMessage(
+                recipes,
+                classified,
+                dietaryApplied: true,
+                compatibleCount: compatibleCount,
+                total: sorted.Count,
+                dietaryUnavailable: dietaryUnavailable
+            ),
+            DetectedIntent = UserIntent.SearchRecipe,
+            Recipes = sorted,
+            Confidence = dietaryUnavailable ? ResponseConfidence.Low : ResponseConfidence.Medium,
+            Metadata = BuildMetadata(
+                classified,
+                dietaryApplied: true,
+                compatibleCount: compatibleCount,
+                dietaryUnavailable: dietaryUnavailable
+            ),
+        };
+    }
+
+    /// <summary>
+    /// Maps a ValidateDiet PipelineResult. Assumes the caller already returned
+    /// early when there's no actionable profile — the pipeline never runs in
+    /// that case.
+    /// </summary>
+    private OrchestratorResponse MapValidateDietResult(
+        PipelineResult result,
+        ClassifiedIntent classified
+    )
+    {
+        if (result.AbortedAt == AgentCapabilities.SearchRecipe)
+            return ErrorResponse(classified, "Sorry — I couldn't find that recipe right now.");
+
+        var recipes =
+            result.SharedData.TryGetValue(AgentCapabilities.SearchRecipe, out var raw)
+            && raw is List<RecipeDocument> list
+                ? list
+                : [];
+
+        if (recipes.Count == 0)
+            return new OrchestratorResponse
+            {
+                Message =
+                    $"I couldn't find a recipe matching \"{classified.SearchQuery}\" to validate.",
+                DetectedIntent = UserIntent.ValidateDiet,
+                Recipes = [],
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+
+        var recipe = recipes[0];
+
+        var dietStep = result.Steps.FirstOrDefault(s =>
+            s.Capability == AgentCapabilities.ValidateDiet
+        );
+        var first = dietStep?.FanOutResults?.FirstOrDefault();
+
+        if (
+            first?.Result is not { Success: true }
+            || first?.Result.Data is not DietaryValidation validation
+        )
+            return new OrchestratorResponse
+            {
+                Message =
+                    $"Found \"{recipe.Title}\" but dietary validation is unavailable right now. Please review manually.",
+                DetectedIntent = UserIntent.ValidateDiet,
+                Recipes = [new ValidatedRecipe { Recipe = recipe, Dietary = null }],
+                Confidence = ResponseConfidence.Low,
+                Metadata = BuildMetadata(classified, dietaryApplied: false),
+            };
+
+        var resultMessage = validation.IsCompatible
+            ? $"\"{recipe.Title}\" looks compatible with your dietary profile. {validation.Explanation}"
+            : $"\"{recipe.Title}\" has some issues for your profile. {validation.Explanation}";
+
+        if (!validation.IsCompatible && validation.Substitutions.Count > 0)
+        {
+            var subs = string.Join(
+                ", ",
+                validation
+                    .Substitutions.Take(2)
+                    .Select(s => $"{s.OriginalIngredient} → {s.SuggestedReplacement}")
+            );
+            resultMessage += $" Suggested swaps: {subs}.";
+        }
+
+        return new OrchestratorResponse
+        {
+            Message = resultMessage,
+            DetectedIntent = UserIntent.ValidateDiet,
+            Recipes = [new ValidatedRecipe { Recipe = recipe, Dietary = validation }],
+            DietaryCheck = validation,
+            Confidence = ResponseConfidence.Medium,
+            Metadata = BuildMetadata(classified, dietaryApplied: true),
+        };
+    }
+
     // ── Reference Resolution ──────────────────────────────────────────────────
 
     private static readonly HashSet<string> ReferenceWords =

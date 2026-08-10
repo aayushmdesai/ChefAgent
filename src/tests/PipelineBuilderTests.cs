@@ -158,4 +158,28 @@ public class PipelineBuilderTests
         Assert.False(dietStep.RunIf!(MakeContext(mergedProfile: null)));
         Assert.True(dietStep.RunIf!(MakeContext(new DietaryProfile { Restrictions = ["vegan"] })));
     }
+
+    [Theory]
+    [InlineData(false, false, false)] // no profile at all
+    [InlineData(true, false, false)] // profile exists but empty — must skip
+    [InlineData(true, true, false)] // has allergies
+    [InlineData(true, false, true)] // has restrictions
+    public void DietGate_MatchesOrchestratorSemantics(
+        bool hasProfile,
+        bool hasAllergies,
+        bool hasRestrictions
+    )
+    {
+        DietaryProfile? profile = hasProfile
+            ? new DietaryProfile
+            {
+                Allergies = hasAllergies ? ["peanuts"] : [],
+                Restrictions = hasRestrictions ? ["vegan"] : [],
+            }
+            : null;
+
+        var expected = hasProfile && (hasAllergies || hasRestrictions);
+
+        Assert.Equal(expected, PipelineDefinitions.HasActionableProfile(MakeContext(profile)));
+    }
 }

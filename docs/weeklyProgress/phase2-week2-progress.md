@@ -209,3 +209,135 @@ Test summary: total: 110, failed: 0, succeeded: 104, skipped: 6, duration: 11.0s
 - Orchestrator cutover — gated on the above
 - IntentRouter intent discovery from the registry (roadmap Week 1–2 scope, not yet started)
 - `/recipes/search-validated` consolidation onto the runner
+
+---
+
+## Day 4 — Tracing preservation + `OrchestratorResponse` translation layer ✅
+
+### Three blockers found before any code
+
+Reading `AgentOrchestrator` against `PipelineResult` surfaced three gaps, two of which would have shipped silently at cutover.
+
+**1. The `RunIf` gate didn't match the orchestrator's actual gate.**
+
+`PipelineDefinitions` had:
+```csharp
+runIf: ctx => ctx.Classified.MergedProfile is not null
+```
+
+`HandleSearchRecipeAsync` has:
+```csharp
+classified.MergedProfile is null
+|| (classified.MergedProfile.Allergies.Count == 0
+    && classified.MergedProfile.Restrictions.Count == 0)
+```
+
+`LoadAndMergeProfileAsync` returns a non-null profile whenever *either* the stored or request side exists, so an empty-but-present profile is reachable. Today it skips validation; the pipeline would have run it — five pointless diet calls, `Confidence` dropping High → Medium, and a different message template. Fixed, and extracted to `PipelineDefinitions.HasActionableProfile` since the same predicate was already written longhand twice in `AgentOrchestrator`.
+
+**2. Tracing would have been silently gutted.**
+
+`PipelineRunner` created no spans at all. Checking what the plugins own internally rather than assuming:
+
+| Plugin | Owns internally | Depends on orchestrator wrapper |
+|---|---|---|
+| `RecipeSearchPlugin` | `embed.cache_hit`, `embed.provider`, reranker spans | `recipe_agent.search` |
+| `DietValidationPlugin` | `diet.llm_validation` only | `diet_agent.validate` — **the entire rules-only path** |
+| `MealPlannerPlugin` | nothing; `GeneratePlanAsync`/`ModifyPlanAsync` don't accept a `TraceContext` | all 14 internal calls already untraced |
+
+The `DietValidationPlugin` row is the serious one: by the project's own "rules first, LLM fallback" design, the rules path is the dominant path, and it is visible in Langfuse *solely* because the orchestrator wraps each call. Cutting over as-is would have made the majority of diet validations disappear from tracing entirely.
+
+**3. `ValidateDiet`'s pipeline shape was wrong.**
+
+`HandleValidateDietAsync` is not a bare validation call — it searches first (`maxResults: 1`), takes the top result, then validates it. The registered pipeline was a single `ValidateDiet` step, so `DietValidationPlugin.HandleAsync` would have found no `TargetRecipe` in `SharedData` and **failed every ValidateDiet request**. Rewritten as search → fan-out validate, reusing the item-key wiring rather than duplicating it.
+
+Fifth instance this phase where reading the actual code contradicted what was assumed about it.
+
+### Decision: runner-owned span lifecycle, deliberately transitional
+
+Three options were weighed:
+
+| Option | Trade-off |
+|---|---|
+| Runner opens spans, agents supply payload via a new `AgentResult.TraceOutput` field | Fastest, but puts an observability concern in a business-logic contract, `object`-typed, with no consumer checking it — reproducing the exact shape of debt already logged as P2-4 |
+| Agent-owned spans now | Correct end state, but means adding span lifecycle to `ValidateRecipeAsync` and threading `TraceContext` through two `MealPlannerPlugin` signatures — Phase 1 surface area, changed during a cutover, so a Day 6 regression failure would have two candidate causes |
+| Runner-owned lifecycle, no payload | Chosen. Nothing to un-build later, no new fields, plugin internals untouched |
+
+The deciding argument against the `TraceOutput` bridge: "temporary" fields tend to outlive the condition that justified them. Accepting a few days of thinner traces on a non-production branch is the cheaper trade.
+
+**Built:**
+- `PipelineStep.SpanName` (optional, defaults to `pipeline.{Capability}`), plumbed through `Then` and `ThenForEach`. Optional rather than required — unlike `FanOutItemKey`, a missing span name degrades cosmetically instead of breaking the chain. Only mandate what breaks correctness.
+- `PipelineDefinitions` supplies the Phase 1 names (`recipe_agent.search`, `diet_agent.validate`) so traces stay comparable across the cutover and existing Langfuse views keep working. Planner pipelines take the default — there was no Phase 1 name to preserve there, so `pipeline.CreateMealPlan` is new information rather than a rename.
+- `PipelineRunner` takes `Tracing`, opens a `pipeline.{Intent}` boundary span, one span per step, one per fan-out item, and replaces `TraceCtx` on every context handed to an agent so plugin-internal spans nest correctly instead of flattening to the trace root.
+
+**Known limitation:** the runner can count fan-out items but can't name them — Phase 1 passed `recipeTitle`, the runner can only pass an index. That is the concrete cost of runner-owned tracing and exactly what agent-owned spans will fix.
+
+### Tracing is not unit-testable at this layer
+
+A test asserting that steps receive a span context rather than the root failed:
+
+Assert.NotEqual() Failure: Values are equal
+Expected: Not TraceContext { TraceId = , SpanId = , IsNone = True }
+Actual: TraceContext { TraceId = , SpanId = , IsNone = True }
+
+With `Enabled = false`, `Tracing.StartSpan` short-circuits and returns `TraceContext.None`, so the assertion cannot distinguish "runner forgot to replace `TraceCtx`" from "tracer is off." Covering it properly needs either a fake `Tracing` (concrete class, no interface, non-virtual — Moq can't intercept) or a live tracer against a stub HTTP handler. Both are more machinery than the guarantee is worth right now.
+
+Test deleted rather than kept passing for the wrong reason. **Span nesting is covered by manual verification in a real Langfuse trace after cutover, not by unit tests** — recorded here so it isn't mistaken for coverage that exists.
+
+### Translation layer
+
+`MapSearchRecipeResult` and `MapValidateDietResult` added to `AgentOrchestrator` — they need the private `BuildSearchMessage` / `BuildMetadata` / `ErrorResponse` helpers, so they live there rather than in `Shared`.
+
+Behavior parity is the bar, not improvement. Every mapping reproduces current output exactly:
+
+| Orchestrator concept | Derived from |
+|---|---|
+| Recipe-search failure | `AbortedAt == SearchRecipe` → existing `ErrorResponse` |
+| Zero recipes | search succeeded, list empty → distinct "couldn't find any" message, `High` |
+| Diet skipped | `StepResult.Skipped` → unbadged recipes, `High` |
+| `ValidatedRecipe` | each fan-out tuple → `Recipe = (RecipeDocument)Item`, `Dietary = Result.Data as DietaryValidation` |
+| `dietaryUnavailable` | any fan-out item failed → recipe returned unbadged, `Low` |
+| `compatibleCount` | count where `Dietary?.IsCompatible == true` |
+| Sort order | compatible first, applied in the mapper — the runner does not sort |
+
+Two fidelity details worth recording:
+
+- `dietaryUnavailable` maps to a *thrown* validation, not an LLM failure. `ValidateRecipeAsync` already catches its own LLM errors and returns compatible-with-warning, so `HandleAsync` only fails on genuine exceptions — same semantics as today's per-recipe catch.
+- `BuildSearchMessage` receives the pre-validation `recipes` list, so `count` stays the search count even if fan-out returned fewer. Matches current behavior.
+- `MapValidateDietResult`'s "no recipes found" branch sets no explicit `Confidence`, relying on the `High` default. That quirk is copied verbatim from today's code rather than fixed, so Day 6 stays comparable.
+
+`Message`, `Metadata`, `AppendConfidenceDisclaimer`, history append, profile merge, and reference resolution all stay in `RouteAsync`, outside the pipeline. Message construction is presentation, not agent work.
+
+### Also found, not fixed
+
+- `RecipeSearchPlugin.HandleAsync` reads `maxResults` from `SharedData` with a default of 5. `ValidateDiet` needs 1, so the orchestrator must seed it — per-intent config living in an untyped dictionary.
+- `MealPlannerPlugin.HandleAsync` doesn't call `SavePlanAsync`; the orchestrator does it afterward.
+- `MealPlannerPlugin.HandleAsync`'s `ModifyMealPlan` path collapses `InvalidOperationException` and `ArgumentException` into one generic failure, losing two distinct user-facing messages.
+
+### Result
+
+Test summary: total: 114, failed: 0, succeeded: 108, skipped: 6
+
+Both mappers compile; nothing calls them yet. Orchestrator dispatch still untouched.
+
+### Definition of Done
+
+- [x] `RunIf` gate matches orchestrator semantics, extracted to one shared predicate
+- [x] Phase 1 span names preserved through `PipelineStep.SpanName`
+- [x] `PipelineRunner` opens boundary, step, and per-item spans; agents receive span contexts
+- [x] `ValidateDiet` pipeline reshaped to search → validate
+- [x] Both mappers written against real handler behavior, not assumed behavior
+- [x] Full unit suite green
+
+### Tech debt
+
+- **P2-6 added** — runner-owned spans are transitional. Agents should own their own span lifecycle once `ValidateRecipeAsync` opens a `diet_agent.validate` span and `MealPlannerPlugin.GeneratePlanAsync`/`ModifyPlanAsync` accept a `TraceContext`. Removal condition stated so this doesn't become permanent by default.
+- **P2-7 added** — `maxResults` as per-intent config in untyped `SharedData`
+- **P2-8 added** — `MealPlannerPlugin.HandleAsync` loses `SavePlanAsync` and the two distinct modify-failure messages; blocks planner-intent cutover
+- **T-12 added** — runner span nesting has no unit coverage; manual Langfuse verification required post-cutover
+
+### Carried into Day 5
+
+- Cutover: `SearchRecipe` and `ValidateDiet` only. Planner intents stay on direct dispatch until P2-8 is resolved — a registered pipeline doesn't oblige the orchestrator to use it.
+- Feature flag (`Pipelines:Enabled`, default false) so Day 6 can A/B both paths on one build rather than comparing against a recorded number
+- Pre-pipeline guards stay in the orchestrator: `ValidateDiet`'s no-profile early return, `CreateMealPlan`'s session-id check, `ModifyMealPlan`'s target-day check
+

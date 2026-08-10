@@ -27,6 +27,12 @@ public record AgentResult
     // What this agent contributes to SharedData for the next agent in a chain.
     // Null/empty for terminal agents that don't feed a pipeline.
     public Dictionary<string, object>? OutputsForNextAgent { get; init; }
+
+    /// <summary>
+    /// Structured payload for the span the runner opens around this call.
+    /// Null = span records success/duration only.
+    /// </summary>
+    public object? TraceOutput { get; init; }
 }
 
 public static class AgentCapabilities

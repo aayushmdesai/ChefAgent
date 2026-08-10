@@ -1,3 +1,4 @@
+using ChefAgent.Shared.Observability;
 using Microsoft.Extensions.Logging;
 
 namespace ChefAgent.Shared;
@@ -22,9 +23,10 @@ public record PipelineResult
     public string? AbortedAt { get; init; }
 }
 
-public class PipelineRunner(AgentRegistry registry, ILogger<PipelineRunner> logger)
+public class PipelineRunner(AgentRegistry registry, Tracing tracing, ILogger<PipelineRunner> logger)
 {
     private readonly AgentRegistry _registry = registry;
+    private readonly Tracing _tracing = tracing;
     private readonly ILogger<PipelineRunner> _logger = logger;
 
     public async Task<PipelineResult> RunAsync(
@@ -36,57 +38,64 @@ public class PipelineRunner(AgentRegistry registry, ILogger<PipelineRunner> logg
         var steps = new List<StepResult>();
         var shared = context.SharedData;
 
-        foreach (var step in pipeline.Steps)
+        var pipelineCtx = _tracing.StartSpan(
+            context.TraceCtx,
+            $"pipeline.{pipeline.Intent}",
+            input: new { intent = pipeline.Intent.ToString(), stepCount = pipeline.Steps.Count }
+        );
+
+        try
         {
-            var current = context with { SharedData = shared };
-
-            if (step.RunIf is not null && !step.RunIf(current))
+            foreach (var step in pipeline.Steps)
             {
-                _logger.LogDebug(
-                    "[{CorrelationId}] Pipeline '{Intent}': step '{Capability}' skipped by RunIf",
-                    context.TraceCtx.CorrelationId,
-                    pipeline.Intent,
-                    step.Capability
-                );
-                steps.Add(new StepResult { Capability = step.Capability, Skipped = true });
-                continue;
-            }
+                var current = context with { SharedData = shared, TraceCtx = pipelineCtx };
 
-            // Build() already guarantees this resolves.
-            var agent = _registry.FindByCapability(step.Capability)!;
-
-            var stepResult = step.FanOutFrom is null
-                ? await RunSingleAsync(agent, step, current, shared, ct)
-                : await RunFanOutAsync(agent, step, current, shared, ct);
-
-            steps.Add(stepResult);
-
-            var failed = stepResult.Result is { Success: false };
-            if (failed && !step.ContinueOnFailure)
-            {
-                _logger.LogWarning(
-                    "[{CorrelationId}] Pipeline '{Intent}' aborted at '{Capability}': {Error}",
-                    context.TraceCtx.CorrelationId,
-                    pipeline.Intent,
-                    step.Capability,
-                    stepResult.Result?.ErrorMessage
-                );
-                return new PipelineResult
+                if (step.RunIf is not null && !step.RunIf(current))
                 {
-                    Success = false,
-                    Steps = steps,
-                    SharedData = shared,
-                    AbortedAt = step.Capability,
-                };
-            }
-        }
+                    _logger.LogDebug(
+                        "[{CorrelationId}] Pipeline '{Intent}': step '{Capability}' skipped by RunIf",
+                        context.TraceCtx.CorrelationId,
+                        pipeline.Intent,
+                        step.Capability
+                    );
+                    steps.Add(new StepResult { Capability = step.Capability, Skipped = true });
+                    continue;
+                }
 
-        return new PipelineResult
+                var agent = _registry.FindByCapability(step.Capability)!;
+
+                var stepResult = step.FanOutFrom is null
+                    ? await RunSingleAsync(agent, step, current, shared, pipelineCtx, ct)
+                    : await RunFanOutAsync(agent, step, current, shared, pipelineCtx, ct);
+
+                steps.Add(stepResult);
+
+                if (stepResult.Result is { Success: false } && !step.ContinueOnFailure)
+                {
+                    _tracing.EndSpan(pipelineCtx, statusMessage: "error");
+                    return new PipelineResult
+                    {
+                        Success = false,
+                        Steps = steps,
+                        SharedData = shared,
+                        AbortedAt = step.Capability,
+                    };
+                }
+            }
+
+            _tracing.EndSpan(pipelineCtx, output: new { stepsRun = steps.Count });
+            return new PipelineResult
+            {
+                Success = true,
+                Steps = steps,
+                SharedData = shared,
+            };
+        }
+        catch
         {
-            Success = true,
-            Steps = steps,
-            SharedData = shared,
-        };
+            _tracing.EndSpan(pipelineCtx, statusMessage: "error");
+            throw;
+        }
     }
 
     private async Task<StepResult> RunSingleAsync(
@@ -94,11 +103,21 @@ public class PipelineRunner(AgentRegistry registry, ILogger<PipelineRunner> logg
         PipelineStep step,
         AgentContext context,
         Dictionary<string, object> shared,
+        TraceContext parentCtx,
         CancellationToken ct
     )
     {
-        var result = await InvokeAsync(agent, context, ct);
+        var spanCtx = _tracing.StartSpan(
+            parentCtx,
+            SpanNameFor(step),
+            input: new { agent = agent.Name }
+        );
+
+        var result = await InvokeAsync(agent, context with { TraceCtx = spanCtx }, ct);
+
+        _tracing.EndSpan(spanCtx, statusMessage: result.Success ? "ok" : "error");
         Merge(shared, result);
+
         return new StepResult
         {
             Capability = step.Capability,
@@ -112,6 +131,7 @@ public class PipelineRunner(AgentRegistry registry, ILogger<PipelineRunner> logg
         PipelineStep step,
         AgentContext context,
         Dictionary<string, object> shared,
+        TraceContext parentCtx,
         CancellationToken ct
     )
     {
@@ -135,33 +155,38 @@ public class PipelineRunner(AgentRegistry registry, ILogger<PipelineRunner> logg
 
         var perItem = new List<(object Item, AgentResult Result)>();
 
+        var stepCtx = _tracing.StartSpan(parentCtx, SpanNameFor(step));
+
         foreach (var item in enumerable)
         {
             if (item is null)
                 continue;
 
-            // Each branch gets its own SharedData AND its own ClassifiedIntent.
-            // ClassifiedIntent has mutable setters (SessionId, TargetDay,
-            // TargetSlot, ModifyConstraint) — sharing one instance across N
-            // branches would let one item's agent corrupt its siblings.
+            var itemCtx = _tracing.StartSpan(
+                stepCtx,
+                SpanNameFor(step),
+                input: new { index = perItem.Count }
+            );
             var itemShared = new Dictionary<string, object>(shared)
             {
                 [step.FanOutItemKey!] = item,
             };
-
             var itemContext = context with
             {
                 Classified = context.Classified with { },
                 SharedData = itemShared,
+                TraceCtx = itemCtx,
             };
 
             var result = await InvokeAsync(agent, itemContext, ct);
+            _tracing.EndSpan(itemCtx, statusMessage: result.Success ? "ok" : "error");
             perItem.Add((item, result));
 
             if (!result.Success && !step.ContinueOnFailure)
                 break;
         }
 
+        _tracing.EndSpan(stepCtx, output: new { itemCount = perItem.Count });
         var allSucceeded = perItem.All(r => r.Result.Success);
 
         // Fan-out outputs are per-item and can't be flattened into SharedData
@@ -216,4 +241,7 @@ public class PipelineRunner(AgentRegistry registry, ILogger<PipelineRunner> logg
         foreach (var (key, value) in result.OutputsForNextAgent)
             shared[key] = value;
     }
+
+    private static string SpanNameFor(PipelineStep step) =>
+        step.SpanName ?? $"pipeline.{step.Capability}";
 }

@@ -52,8 +52,16 @@ public class PipelineRunnerTests
         return registry;
     }
 
+    private static Tracing MakeTracing()
+    {
+        var options = Mock.Of<Microsoft.Extensions.Options.IOptions<LangfuseOptions>>(o =>
+            o.Value == new LangfuseOptions { Enabled = false, BaseUrl = "http://localhost" }
+        );
+        return new Tracing(options, new Mock<ILogger<Tracing>>().Object, new HttpClient());
+    }
+
     private static PipelineRunner MakeRunner(AgentRegistry registry) =>
-        new(registry, new Mock<ILogger<PipelineRunner>>().Object);
+        new(registry, MakeTracing(), new Mock<ILogger<PipelineRunner>>().Object);
 
     private static AgentContext MakeContext(DietaryProfile? profile = null) =>
         new()

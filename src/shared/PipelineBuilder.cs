@@ -26,6 +26,13 @@ public record PipelineStep
     public bool ContinueOnFailure { get; init; } = false;
     public string? FanOutFrom { get; init; }
     public string? FanOutItemKey { get; init; }
+
+    /// <summary>
+    /// Langfuse span name for this step. Defaults to "pipeline.{Capability}".
+    /// Set explicitly to preserve Phase 1 span names ("recipe_agent.search",
+    /// "diet_agent.validate") so traces stay comparable across the cutover.
+    /// </summary>
+    public string? SpanName { get; init; }
 }
 
 public class AgentPipeline
@@ -58,7 +65,8 @@ public class PipelineBuilder
     public PipelineBuilder Then(
         string capability,
         Func<AgentContext, bool>? runIf = null,
-        bool continueOnFailure = false
+        bool continueOnFailure = false,
+        string? spanName = null
     )
     {
         _steps.Add(
@@ -67,6 +75,7 @@ public class PipelineBuilder
                 Capability = capability,
                 RunIf = runIf,
                 ContinueOnFailure = continueOnFailure,
+                SpanName = spanName,
             }
         );
         return this;
@@ -84,7 +93,8 @@ public class PipelineBuilder
         string fanOutFrom,
         string fanOutItemKey,
         Func<AgentContext, bool>? runIf = null,
-        bool continueOnFailure = false
+        bool continueOnFailure = false,
+        string? spanName = null
     )
     {
         _steps.Add(
@@ -95,6 +105,7 @@ public class PipelineBuilder
                 ContinueOnFailure = continueOnFailure,
                 FanOutFrom = fanOutFrom,
                 FanOutItemKey = fanOutItemKey,
+                SpanName = spanName,
             }
         );
         return this;
