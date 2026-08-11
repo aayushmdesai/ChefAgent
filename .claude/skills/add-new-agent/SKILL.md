@@ -25,7 +25,7 @@ test -f src/shared/IAgent.cs && echo "IAgent pattern (phase-2)" || echo "Phase 1
 2. Add capability name(s) as `const string` fields on `AgentCapabilities` (`src/shared/IAgent.cs`) — not an enum, deliberately, to avoid a translation layer at the `IntentRouter` JSON-classifier boundary.
 3. Register the agent instance with `AgentRegistry` in `ServiceRegistration.cs`'s `AddAgentRegistry()` — registration throws on a duplicate capability, by design; that's a startup-time wiring bug, not something to route around.
 4. If this agent should be reachable from `/chat`, reference its capability from a `PipelineDefinitions` entry — see [[add-pipeline-definition]].
-5. `HandleAsync` on agents that depend on concrete external clients (`QdrantClient`) or concrete sibling plugins rather than interfaces won't be unit-testable with Moq — this is a known, already-logged pattern (tech-debt `P2-1`/`P2-2`), not something to work around ad hoc; either accept an integration-style test or note the same limitation.
+5. `HandleAsync` on agents that depend on concrete external clients (`QdrantClient`) or concrete sibling plugins rather than interfaces won't be unit-testable with Moq — this is a known pattern, already hit twice (see the `[Fact(Skip = "P2-1: ...")]`/`[Fact(Skip = "P2-2: ...")]` placeholders in `RecipeSearchPluginTests.cs`). Those `P2-` labels are cited from `phase2-week1-progress.md` — verified they are **not** actually in `docs/tech-debt.md` (that file has no `P2-`-prefixed entries at all, despite the progress docs repeatedly saying items were "added" there). Either accept an integration-style test or note the same limitation with a skip-marked placeholder like the existing ones.
 
 ## Verification (both patterns)
 

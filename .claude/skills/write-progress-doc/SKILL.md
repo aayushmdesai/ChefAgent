@@ -21,6 +21,8 @@ Concretely, before checking a box or writing "Built: X":
 
 If a Definition-of-Done item can't be verified this way right now, leave it unchecked and say why — an honest open checkbox is far cheaper than a false one discovered days later, which is exactly what happened repeatedly on `phase-2`.
 
+**"Tech debt: X added" is a claim too, and it's currently failing on `phase-2` specifically.** Phase 1's `I-`/`S-`/`E-`/`M-`/`P-`/`D-`/`G-`/`Inf-`/`T-`/`DS-` items genuinely landed in `docs/tech-debt.md`. Verified by direct grep: `phase2-week1/2-progress.md` say `P2-1` through `P2-10` were "added" — **none of them are actually in `docs/tech-debt.md`**; that file's header still reads "Last updated: Week 16." If a day's work logs a new tech-debt item, actually add the row to `docs/tech-debt.md` in the same session, don't just narrate it in the progress doc and assume it propagated.
+
 ## Verification
 
 Every claim in the finished doc traces to a `grep`/`find`/`dotnet test`/live-request result obtained in *this* session while writing it. If invoked via `/close-day`, the `done-verifier` agent (see root `CLAUDE.md`'s workflow-chain section) independently re-checks this before the doc is finalized — don't skip self-verification just because that backstop exists.
