@@ -1,0 +1,7 @@
+# Resilience pattern for LLM/external calls
+
+LLM-touching calls are meant to be wrapped by both a `CircuitBreaker` (checked via `IsAllowed()` before calling, `RecordSuccess()`/`RecordFailure()` after) and `OutputGuard.CallWithRetryAsync` (retries once, then falls back to a non-LLM/rules path rather than throwing). At the orchestrator/endpoint layer, calls into agents are wrapped in `try/catch` that logs and returns a graceful response instead of propagating an exception — e.g. `/chat`'s conversation-history fetch is wrapped with a `/* non-critical — proceed without history */`-style comment, and `AgentOrchestrator`'s recipe-search calls are try/caught.
+
+**Why:** This is the intended, dominant pattern for handling flaky external dependencies (LLM providers, Redis) without ever 500ing a request outright — confirmed via `CircuitBreaker.cs`, `OutputGuard.cs`, `Program.cs`'s Redis pre-warm (`AbortOnConnectFail = false`, ping wrapped in try/catch), and `AgentOrchestrator.cs`.
+
+**How to apply — but note this isn't airtight today:** `/recipes/search` and `/recipes/search-validated` in `Endpoints.cs` call Qdrant directly with **no try/catch**, unlike the `/chat` path — an unreachable Qdrant will 500 on those two endpoints. Don't assume every code path already follows this pattern; when touching those two endpoints or adding a new one that calls an external dependency, apply the pattern rather than copying the gap.

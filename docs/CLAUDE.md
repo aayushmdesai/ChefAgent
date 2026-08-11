@@ -1,0 +1,28 @@
+# docs/ — trust map
+
+This repo has a documented history of docs describing things that don't match the code (see [[docs-are-unverified]]). This file is a per-file trust rating from an August 2026 investigation that cross-checked ~50 specific doc claims against actual code. Re-verify anything load-bearing rather than trusting this table indefinitely — it will itself go stale.
+
+| File | Trust level | Notes |
+|---|---|---|
+| `docs/weeklyProgress/week1..week19-progress.md` | **Current, primary source** | The most reliable doc set — read the most recent weeks first. `week14-progress.md` doesn't exist in this repo (that week's work was on a separate sibling repo, `mcp-dotnet-diagnostics` — unrelated to ChefAgent, see below). |
+| `docs/month1..month4-retrospective.md` | **Current, synthesized** | Summarize the weekly docs faithfully for their period; fine as a faster read, but the weekly docs are the primary source if a detail matters. |
+| `docs/adrs/001-013` | **Mixed — verify before citing** | Content is accurate for each decision described, but README.md's ADR index links to 9 of 13 wrong filenames (e.g. links `002-qdrant.md`, actual file is `002-vector-database.md`) — don't navigate to an ADR via the README table, use the `docs/adrs/` directory listing directly. Also: ADR-001's planned Python/LangGraph secondary agent was never built (confirmed: zero Python outside `eval/`/`scripts/`, no `langgraph` dependency anywhere) — treat that section as abandoned intent, not implemented architecture. ADR-009 (custom eval scorer over RAGAS) was reversed in Week 19 (real RAGAS adopted) without the ADR file itself being updated to note the reversal. |
+| `docs/tech-debt.md` | **Stale** | Header says "Last updated: Week 16" but the repo has Week 17-19 work. At least one item is confirmed stale: `S-3` describes query-expansion default as still "deferred — hardware constraint," but it was flipped to enabled-by-default in Week 18. Treat any "deferred"/"open" item as needing a fresh code check, not just this doc. |
+| `README.md` | **Stale in specific, checkable ways** | (1) "80+ tests" — actual count is ~68 across only 4 test files, see [src/CLAUDE.md](../src/CLAUDE.md). (2) ADR table links 9/13 wrong filenames, see above. (3) "Current Status" table and "Known Limitations" section still describe Week 12-era state (e.g. lists `GeneralQuestion` as stateless and Upstash cold-start as unresolved) — both were fixed in Week 18 (conversation-context feature, Redis pre-warm) but the README was never updated past roughly Week 16/v1.0.0. |
+| `CHANGELOG.md` | **Stale — stops at v1.0.0 / Week 12** | No entries for the MCP-diagnostics detour, dataset expansion, Voyage migration, provider-interface completion, query-expansion default flip, Redis pre-warm fix, or the real-RAGAS adoption — all of which shipped in Weeks 13-19. |
+| `eval/README.md` | **Stale** | Describes `retrieve.py` calling `/recipes/search` and scoring via Colab + `score_simple.py`. Current pipeline (Week 19+) has `retrieve.py` targeting `/chat` and scoring locally via `score_ragas.py` (Claude judge + Voyage embeddings). See [eval/CLAUDE.md](../eval/CLAUDE.md) and [[run-eval-pipeline]] for the current shape. |
+| `docs/GRAPH_REPORT.md` | **Auto-generated snapshot, dated 2026-06-03** | A codebase graph/community-detection dump, not narrative — useful as a rough cross-reference for "does this file/class exist" as of that date, not for anything more recent. |
+| `docs/architecture/screenshots/observability_test_summary.md` | **Historical only** | Week 10 Langfuse test-run output; a point-in-time artifact, not a living doc. |
+| `eval/datasets/*_test_results.md`, `*_report.md`, `*_matrix.md` | **Historical, per-week snapshots** | Accurate for the week they were generated (Weeks 1-11); several explicitly show ❌ rows for known limitations that were never fixed (e.g. Diet Agent test matrix: Worcestershire/anchovies, coconut, almond milk, spice-blend false positives) — don't assume a later week silently resolved something these mark failing unless a later doc says so explicitly. |
+
+## Self-reported inaccuracies worth knowing about
+
+The docs corpus itself admits catching errors late, which is useful context for how much scrutiny to apply to anything eval-number-shaped:
+- A Week 18 portfolio-site audit found an eval-quality regression that had been displayed as a gain due to inconsistent delta re-baselining — caught only on a second audit pass ("two audit passes caught what one missed").
+- The Week 19 e2e harness has a self-admitted cosmetic bug: its aggregate `Intent accuracy: 0/59 (0%)` summary line miscomputes even though every individual case classifies correctly — not confirmed fixed as of the last entry.
+- Resume/portfolio eval numbers (87%→93%, old vs. new context-relevance decimals from two different judges) were carried stale across multiple weeks before a Week 19 reconciliation pass.
+
+## Not in this repo
+
+- **`mcp-dotnet-diagnostics`** — a separate, unrelated project (Weeks 13-14 detour, its own MCP server/NuGet package). Not referenced further here; if you land on a doc mentioning it, treat it as out-of-scope for ChefAgent work.
+- **Portfolio site** — a separate repo that displays this project's eval numbers (resume, `ChefAgentSection.jsx`-style components). Not part of this codebase, but note the dependency: if eval numbers here change materially, that site has a stale-data problem elsewhere that this repo can't detect or fix.

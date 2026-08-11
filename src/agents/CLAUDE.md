@@ -1,0 +1,24 @@
+# src/agents/ — the 4-agent architecture
+
+Four separate `.csproj` projects, each a distinct concern, coordinated by `AgentOrchestrator`:
+
+- **`RecipeAgent/`** (`ChefAgent.Agents.Recipe`) — `RecipeSearchPlugin.SearchRecipesAsync` embeds the query via `IEmbeddingProvider`, searches Qdrant, optionally expands the query and/or reranks results via `ILlmProvider` (see footguns below). Owns `QueryPreprocessor` (negation parsing, query expansion, abstract-query detection via `IsAbstract()` — rules-based signal-word check for things like "impressive", "cozy", "quick" before ever calling the LLM) and `RecipeReranker`.
+- **`DietAgent/`** (`ChefAgent.Agents.Diet`) — `DietValidationPlugin`, a 3-tier validator (rules → ambiguous-tier escalation → LLM fallback) built on `DietaryRules.cs`, which actually lives in `src/shared/` (not this project — moved there in Week 11 because both Diet and Recipe agents needed it), namespace `ChefAgent.Agents.Diet` despite the file's location. Has a public `GetCategoryIngredients(string category)` for expanding categories like `"dairy"`/`"gluten"`/`"nuts"`/`"eggs"`/`"soy"`/`"sesame"` into full ingredient sets (used for negation handling, e.g. "dairy-free").
+- **`PlannerAgent/`** (`ChefAgent.Agents.Planner`) — `MealPlannerPlugin`, sequential (not parallel) calls into `RecipeSearchPlugin` per meal slot, backed by `SessionStore` (Redis) for plan persistence with a 7-day TTL. Sequential-not-parallel is deliberate — parallelizing risks a 429 cascade against the embedding provider's rate limit (open tech-debt item, not fixed).
+- **`Orchestrator/`** (`ChefAgent.Agents.Orchestrator`) — `IntentRouter` (rules-first classifier, `ILlmProvider` used only for entity extraction) and `AgentOrchestrator` (routes a classified intent to the right agent(s), holds conversation history via `SessionStore`).
+
+## Orchestration flow
+
+`/chat` → `Endpoints.cs` → `AgentOrchestrator` → `IntentRouter.ClassifyAsync` (rules regex first; short `<=8`-word follow-ups get reclassified from `SearchRecipe` to `GeneralQuestion` if the prior assistant turn was `GeneralQuestion` — a context-continuation heuristic) → dispatch to `RecipeSearchPlugin` / `DietValidationPlugin` / `MealPlannerPlugin` based on the resolved intent. `IntentRouter` has `DietQuestionRegex` (e.g. "is X vegan/halal/kosher/gluten-free/safe") and `CanEatRegex` (third-person forms, "can vegans eat X") as dedicated diet-question detectors ahead of the general intent classification.
+
+## Footguns specific to this layer
+
+1. **`Qdrant.Client` version mismatch across projects** — `ChefAgent.Agents.Recipe.csproj` pins `Qdrant.Client` 1.12.0; `ChefAgent.Api.csproj` pins 1.18.1. Not documented anywhere, no known incident, but a real live mismatch: an API call added in the Recipe project using a 1.18.1-only method signature will fail to compile or NuGet will silently resolve a conflicting version across the solution. Check both `.csproj` files before assuming a Qdrant.Client API is available.
+
+2. **`expand` default is inconsistent between the DTO and the method.** `RecipeSearchPlugin.SearchRecipesAsync`'s own parameter defaults `expand = true` (flipped from `false` in Week 18, once Groq replaced Ollama and the CPU-latency reason for the old default disappeared). But `RecipeSearchRequest` (the HTTP DTO for `/recipes/search` and `/recipes/search-validated`, `src/api/RequestDtos.cs`) still independently defaults `Expand = false`. Since `/chat` calls `SearchRecipesAsync` directly (never through the DTO), it inherits `true`; `/recipes/search` callers who don't explicitly pass `"expand": true` in the request body get `false`. The two endpoints silently diverge in retrieval behavior for the same query — don't assume `/recipes/search` and `/chat` search identically.
+
+3. **The LLM reranker is not reachable from `/chat` at all.** `ChatRequest` has no `Rerank`/`rerank` field. `AgentOrchestrator`'s calls into `SearchRecipesAsync` never pass a `rerank` argument, so it stays at the method's own default (`false`). Reranking only ever runs via `/recipes/search`/`/recipes/search-validated` with `"rerank": true` explicitly set in the request body. ADRs/tech-debt describe the reranker as "built," which is true — but "built" does not mean "used by the primary chat path."
+
+4. **A tracked file is duplicated at a doubly-nested path.** `src/agents/RecipeAgent/Dictionaries/frequency_dictionary_en_80k.txt` is the correct location the `.csproj` expects (`<None Update="Dictionaries\frequency_dictionary_en_80k.txt">`). A second, accidental copy is committed one level too deep at `src/agents/RecipeAgent/src/agents/RecipeAgent/Dictionaries/frequency_dictionary_en_80k.txt` — an artifact of some past copy/move gone wrong. Don't edit the nested copy; it isn't the one the build uses.
+
+See [[resilience-pattern]] for how agent calls are expected to handle failures, and [[dotnet-naming-conventions]] for the project-per-agent structure convention.
