@@ -1,0 +1,62 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(dotnet build*)",
+      "Bash(dotnet test*)",
+      "Bash(npm run lint*)",
+      "Bash(find *)",
+      "Bash(ls*)",
+      "Bash(grep *)",
+      "Bash(curl http://localhost:5100/*)",
+      "Bash(curl https://chefagent-production.up.railway.app/health*)",
+      "Bash(python3 -m venv*)",
+      "Bash(pip install*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "branch=$(git branch --show-current); commit=$(git log -1 --format=\"%h %ad %s\" --date=short 2>/dev/null); jq -n --arg b \"$branch\" --arg c \"$commit\" '{hookSpecificOutput:{hookEventName:\"SessionStart\",additionalContext:(\"Current branch: \" + $b + \" | Last commit: \" + $c + \". Run /start-session for full orientation.\")}}'",
+            "statusMessage": "Checking current branch..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // empty' | { read -r f; case \"$f\" in *\"/src/frontend/\"*.jsx) [ -x src/frontend/node_modules/.bin/eslint ] && src/frontend/node_modules/.bin/eslint --config src/frontend/eslint.config.js \"$f\" ;; esac; } 2>&1 || true",
+            "statusMessage": "Linting frontend change..."
+          },
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // empty' | { read -r f; case \"$f\" in *\"/src/\"*.cs) dotnet build src/ChefAgent.sln --no-restore ;; esac; } 2>&1 || true",
+            "statusMessage": "Compile-checking backend change..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if git status --porcelain -- 'src/*.cs' 2>/dev/null | grep -q .; then out=$(dotnet build src/ChefAgent.sln --no-restore --configuration Debug 2>&1); code=$?; if [ $code -ne 0 ]; then jq -n --arg o \"$out\" '{systemMessage: (\"⚠ dotnet build failed — do not consider backend work done until this is green:\\n\" + ($o | .[0:800]))}'; fi; fi",
+            "statusMessage": "Build-checking uncommitted backend changes...",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
