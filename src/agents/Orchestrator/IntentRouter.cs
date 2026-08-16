@@ -39,6 +39,7 @@ public class IntentRouter
     private readonly CircuitBreaker _circuitBreaker;
     private readonly SessionStore _sessionStore;
     private readonly Tracing _tracing;
+    private readonly AgentRegistry _registry;
 
     // ── Signal Word Sets ──────────────────────────────────────────────────────
 
@@ -305,6 +306,7 @@ public class IntentRouter
         [FromKeyedServices("ollama")] CircuitBreaker circuitBreaker,
         SessionStore sessionStore,
         Tracing tracing,
+        AgentRegistry registry,
         ILogger<IntentRouter> logger
     )
     {
@@ -312,8 +314,29 @@ public class IntentRouter
         _circuitBreaker = circuitBreaker;
         _sessionStore = sessionStore;
         _tracing = tracing;
+        _registry = registry;
         _logger = logger;
     }
+
+    // Agent-backed intents and the capability each requires. GetMealPlan (reads
+    // SessionStore) and GeneralQuestion (LLM) are deliberately absent — they have
+    // no agent, so the registry never gates them. The router discovers which of
+    // these are actually handleable from the registry rather than assuming the
+    // whole UserIntent enum is always live.
+    private static readonly IReadOnlyDictionary<UserIntent, string> IntentCapabilities =
+        new Dictionary<UserIntent, string>
+        {
+            [UserIntent.SearchRecipe] = AgentCapabilities.SearchRecipe,
+            [UserIntent.ValidateDiet] = AgentCapabilities.ValidateDiet,
+            [UserIntent.CreateMealPlan] = AgentCapabilities.CreateMealPlan,
+            [UserIntent.ModifyMealPlan] = AgentCapabilities.ModifyMealPlan,
+        };
+
+    // An agent-backed intent is live only if the registry has its capability.
+    // Non-agent-backed intents (GetMealPlan, GeneralQuestion) are always live.
+    private bool IsLive(UserIntent intent) =>
+        !IntentCapabilities.TryGetValue(intent, out var capability)
+        || _registry.IsRegistered(capability);
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -459,28 +482,37 @@ public class IntentRouter
 
     // ── Intent Classification ─────────────────────────────────────────────────
 
-    private static UserIntent ClassifyIntent(string lower)
+    // Instance method (was static) so agent-backed branches can consult the
+    // registry via IsLive: a keyword-matched intent whose agent isn't registered
+    // falls through toward the SearchRecipe default rather than routing to a dead
+    // intent the orchestrator can't handle.
+    private UserIntent ClassifyIntent(string lower)
     {
         if (
-            ValidateDietSignals.Any(s => lower.Contains(s))
-            || DietQuestionRegex.IsMatch(lower)
-            || CanEatRegex.IsMatch(lower)
+            (
+                ValidateDietSignals.Any(s => lower.Contains(s))
+                || DietQuestionRegex.IsMatch(lower)
+                || CanEatRegex.IsMatch(lower)
+            )
+            && IsLive(UserIntent.ValidateDiet)
         )
             return UserIntent.ValidateDiet;
 
         if (GetMealPlanSignals.Any(s => lower.Contains(s)))
             return UserIntent.GetMealPlan;
 
-        if (MealPlanSignals.Any(s => lower.Contains(s)))
+        if (MealPlanSignals.Any(s => lower.Contains(s)) && IsLive(UserIntent.CreateMealPlan))
             return UserIntent.CreateMealPlan;
 
-        if (ModifyMealPlanSignals.Any(s => lower.Contains(s)))
+        if (ModifyMealPlanSignals.Any(s => lower.Contains(s)) && IsLive(UserIntent.ModifyMealPlan))
             return UserIntent.ModifyMealPlan;
 
         if (GeneralQuestionSignals.Any(s => lower.Contains(s)))
             return UserIntent.GeneralQuestion;
 
-        // Default — SearchRecipe is the most common intent.
+        // Default — SearchRecipe is the most common intent, and the terminal
+        // fallback, so it stays ungated: if its capability were somehow missing,
+        // routing elsewhere wouldn't help (startup fail-fast guards that case).
         // Natural language for recipe search is too varied for keyword rules.
         // Log as "rules-default" — collect for future LLM classifier training.
         return UserIntent.SearchRecipe;

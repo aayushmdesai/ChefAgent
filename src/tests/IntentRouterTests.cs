@@ -18,7 +18,40 @@ namespace ChefAgent.Tests;
 /// </summary>
 public class IntentRouterTests
 {
-    private IntentRouter MakeRouter()
+    // Minimal IAgent stub — the router only reads Capabilities via the registry.
+    private sealed class StubAgent(string name, params string[] capabilities) : IAgent
+    {
+        public string Name { get; } = name;
+        public IReadOnlyList<string> Capabilities { get; } = capabilities;
+
+        public Task<AgentResult> HandleAsync(AgentContext context, CancellationToken ct = default) =>
+            Task.FromResult(new AgentResult { Success = true });
+    }
+
+    // Registry with the full agent-backed capability set registered — the normal
+    // startup state, so existing classification tests behave as before.
+    private static AgentRegistry FullRegistry()
+    {
+        var registry = new AgentRegistry(new Mock<ILogger<AgentRegistry>>().Object);
+        registry.Register(
+            new StubAgent(
+                "RecipeAgent",
+                AgentCapabilities.SearchRecipe,
+                AgentCapabilities.SearchByIngredients
+            )
+        );
+        registry.Register(new StubAgent("DietAgent", AgentCapabilities.ValidateDiet));
+        registry.Register(
+            new StubAgent(
+                "PlannerAgent",
+                AgentCapabilities.CreateMealPlan,
+                AgentCapabilities.ModifyMealPlan
+            )
+        );
+        return registry;
+    }
+
+    private IntentRouter MakeRouter(AgentRegistry? registry = null)
     {
         var cbLogger = new Mock<ILogger<CircuitBreaker>>().Object;
         var auditLogger = new Mock<ILogger<GuardrailAuditLog>>().Object;
@@ -52,6 +85,7 @@ public class IntentRouterTests
             circuitBreaker,
             sessionStore,
             tracing,
+            registry ?? FullRegistry(),
             new Mock<ILogger<IntentRouter>>().Object
         );
     }
@@ -176,5 +210,42 @@ public class IntentRouterTests
     {
         var result = await MakeRouter().ClassifyAsync("make me a new plan");
         Assert.Equal(UserIntent.CreateMealPlan, result.Intent);
+    }
+
+    // ── Registry-driven intent discovery ─────────────────────────────────
+    // The router only routes to an agent-backed intent the registry can handle.
+
+    [Fact]
+    public async Task ValidateDiet_FallsBackToSearch_WhenCapabilityNotRegistered()
+    {
+        // Registry without ValidateDiet — e.g. DietAgent not registered.
+        var registry = new AgentRegistry(new Mock<ILogger<AgentRegistry>>().Object);
+        registry.Register(new StubAgent("RecipeAgent", AgentCapabilities.SearchRecipe));
+
+        var result = await MakeRouter(registry).ClassifyAsync("is pasta safe for a nut allergy?");
+
+        // ValidateDiet keywords match, but with no DietAgent the intent isn't live,
+        // so it degrades to the SearchRecipe default instead of routing to a dead intent.
+        Assert.Equal(UserIntent.SearchRecipe, result.Intent);
+    }
+
+    [Fact]
+    public async Task ValidateDiet_Classified_WhenCapabilityRegistered()
+    {
+        // Same query, full registry — the intent is live, so routing is unchanged.
+        var result = await MakeRouter(FullRegistry())
+            .ClassifyAsync("is pasta safe for a nut allergy?");
+        Assert.Equal(UserIntent.ValidateDiet, result.Intent);
+    }
+
+    [Fact]
+    public async Task CreateMealPlan_FallsBackToSearch_WhenCapabilityNotRegistered()
+    {
+        var registry = new AgentRegistry(new Mock<ILogger<AgentRegistry>>().Object);
+        registry.Register(new StubAgent("RecipeAgent", AgentCapabilities.SearchRecipe));
+
+        var result = await MakeRouter(registry).ClassifyAsync("create a meal plan for dinner");
+
+        Assert.Equal(UserIntent.SearchRecipe, result.Intent);
     }
 }
