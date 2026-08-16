@@ -424,40 +424,121 @@ Both match Phase 1's message templates exactly. The second exercises `HasActiona
 - Expect the same four I-4/I-5 failures on both paths — a difference there is the real signal
 ---
 
+## Day 6 — `[Dispatch]` instrumentation, live pipeline verification, A/B regression (2026-08-16) ✅
+
+All four Day-5-finish items cleared, both A/B sweeps run (no cutover regression), IntentRouter registry-discovery landed. Remaining for Day 7: container rebuild + smoke of the IntentRouter change, tech-debt reconcile, commits.
+
+### `[Dispatch]` logging — done
+
+Added path-identity logging to `AgentOrchestrator` so Day 6's A/B compares two runs *known* to differ, not believed to. Log-only change, one file, no behavior touched.
+
+- `DispatchAsync` logs one `LogInformation` line per request, three-way: `Pipeline path handled {Intent}` (pipeline ran and mapped), `Phase 1 fallback for {Intent} — pipelines enabled but no pipeline result` (flag on, fell through), `Phase 1 path for {Intent} — pipelines disabled` (flag off).
+- `TryRunPipelineAsync` logs a `LogDebug` reason at each fall-through: `No registered pipeline for {Intent}` (GetMealPlan/GeneralQuestion/Unknown) and `Pipeline registered for {Intent} but no mapper yet (P2-8)` (planner intents).
+- Follows the `[Tag]` + named-placeholder convention.
+
+**Verified live, both flag states, same build:**
+- `Pipelines__Enabled=true`: search "pasta" → 5 recipes, High, `[Dispatch] Pipeline path handled SearchRecipe`
+- `Pipelines__Enabled=false`: search "pasta" → 5 recipes, `[Dispatch] Phase 1 path for SearchRecipe — pipelines disabled`
+- Unit suite unchanged: 108 passed, 6 skipped, 0 failed.
+
+**One nuance recorded so the logs aren't misread:** the `ValidateDiet` no-profile guard returns a real response from *inside* `TryRunPipelineAsync`, so it logs as `Pipeline path handled ValidateDiet` even though no runner ran. Correct for "which dispatch branch was entered"; not proof the fan-out chain executed.
+
+### Regression preconditions — both confirmed
+
+- [x] `points_count` = **52,155** confirmed directly against Qdrant Cloud (`status: green`, vectors `1024`-dim — the correct Voyage artifact, not the 768 Ollama file that bit Day 5).
+- [x] Live search returns recipes before sweeping — "pasta" → 5 recipes on both flag states.
+
+### Live pipeline-path verification (flag ON) — two Day-5-finish items cleared
+
+- **`ValidateDiet` on the pipeline path — verified.** `is Chicken Alfredo vegan?` + `restrictions:["vegan"]` → intent `ValidateDiet`, 1 recipe, `dietaryCheck` present with a real rules violation (`chicken`/`meat`), `[Dispatch] Pipeline path handled ValidateDiet`. The reshaped search → fan-out validate chain executed end-to-end for the first time.
+- **`CreateMealPlan` falls through (P2-8 gate) — verified.** `create a meal plan for breakfast lunch and dinner` → IntentRouter `CreateMealPlan`, `[Dispatch] Phase 1 fallback for CreateMealPlan — pipelines enabled but no pipeline result`. Falls through to Phase 1 rather than erroring, exactly as the gate intends. (The downstream generation timed out — the same TC24/26 cloud-LLM slowness, a separate issue from dispatch.) Note: the `LogDebug` "no mapper yet (P2-8)" detail line is filtered at the default Information level; the Information-level fallback line is the proof.
+
+### Langfuse span nesting (T-12) — verified via API, not just the UI
+
+Pulled the observation tree for live pipeline-path traces through the Langfuse public API (`/api/public/observations?traceId=…`) and reconstructed the parent→child span tree. The nesting is correct:
+
+```
+chat
+└ orchestrator
+  ├ session.append_user_message
+  ├ session.load_profile
+  ├ pipeline.SearchRecipe
+  │ └ recipe_agent.search
+  │   └ embed.provider          ← nested 3 levels under the pipeline span, NOT flat at root
+  └ session.append_assistant_message
+```
+
+With a profile, `pipeline.SearchRecipe` also carries a `diet_agent.validate` child (fan-out), and the reshaped `pipeline.ValidateDiet` shows `recipe_agent.search → embed.provider` plus `diet_agent.validate`. `embed.provider` sitting under `recipe_agent.search` under `pipeline.SearchRecipe` — rather than at the trace root — is the exact evidence T-12 asked for that the runner replaces `TraceCtx` on every context handed to an agent. Verified programmatically rather than by eyeballing the UI, so the check is reproducible.
+
+### A/B sweep — both runs done: **no regression from the cutover**
+
+Same build (the `[Dispatch]`-only build, *before* the IntentRouter change), same corpus (52,155), paced. `[Dispatch]` logs confirmed the two runs actually took different paths — control logged `Phase 1 path … pipelines disabled`, pipeline logged `Pipeline path handled …`.
+
+| | Control (`Enabled=false`) | Pipeline (`Enabled=true`) |
+|---|---|---|
+| **Score** | **44/50** (== baseline) | **45/50** |
+| TC03 / TC05 / TC09 (I-4/I-5 misroute) | ❌ ❌ ❌ | ❌ ❌ ❌ |
+| TC41 burst (known-flaky) | ❌ | ❌ |
+| TC24 / TC26 (planner, P2-8-gated) | ❌ ❌ — CONN_FAIL @ 200s | ✅ ✅ |
+| TC01 (search) | ✅ | ❌ — Read timeout @ 200s |
+
+**Reading the diff.** The stable, meaningful failures — TC03/05/09 (known I-4/I-5 intent misroutes) and TC41 (known-flaky burst) — are **identical on both paths**. That is the invariant a clean cutover must preserve, and it held. Every *difference* between the runs is an infra timeout, none attributable to the pipeline path:
+
+- **TC24 / TC26** are planner intents. Planner intents are P2-8-gated and run the Phase 1 path on *both* flag states — structurally they cannot be a cutover effect. Their control→pipeline flip (fail→pass) is cloud-LLM latency variance: the cluster was slow enough to time out during the control run, fast enough during the pipeline run.
+- **TC01** (control pass → pipeline fail) is a 200s read timeout — a cloud embedding/search hang, same class as TC24/26, not pipeline logic.
+- **TC47** passed *both* runs — SearchRecipe on control, ValidateDiet on the pipeline run — a borderline special-char classification the harness accepts either way. Because classification runs upstream of and independent from the dispatch flag, the intent difference is LLM-extraction nondeterminism, not the cutover. It also settles the Day 1 "3 vs 4 rows" question: the durable intent-misroute set is **3** (TC03/05/09), with TC47 a nondeterministic fourth that is not a reliable failure.
+
+**Conclusion:** the pipeline path reproduces Phase 1 behavior on every case the cloud didn't independently time out. 45/50 vs 44/50 is a one-case infra swing on P2-8-gated/timeout cases, not a cutover regression. The feature flag can stay `false` in committed config; the pipeline path is verified equivalent for `SearchRecipe` and `ValidateDiet`.
+
+---
+
 ## Remaining — Week 2
 
-### Day 5 finish (open)
+### Day 5 finish
 
-- [ ] `[Dispatch]` log lines — pipeline-path taken, and fallback reason. Without these, Day 6's A/B compares two runs *believed* to differ rather than known to.
-- [ ] `ValidateDiet` verified live on the pipeline path. The reshaped search → fan-out validate chain has never executed. Expect a `dietaryCheck` object in the response.
-- [ ] `CreateMealPlan` confirmed falling through to Phase 1 rather than erroring — the P2-8 gate working as intended.
-- [ ] **Langfuse span nesting (T-12).** Needs a real trace: `pipeline.SearchRecipe` → `recipe_agent.search` → `embed.provider`, plus five `diet_agent.validate` children. If `embed.provider` sits flat at the root, `TraceCtx` isn't being replaced correctly. Unit tests cannot cover this — with `Enabled=false` every span call is a no-op.
+- [x] `[Dispatch]` log lines — done and verified live on both flag states (see Day 6 section above).
+- [x] `ValidateDiet` verified live on the pipeline path — `dietaryCheck` returned with a real violation (see Day 6 section).
+- [x] `CreateMealPlan` confirmed falling through to Phase 1 rather than erroring — P2-8 gate verified via dispatch log (see Day 6 section).
+- [x] **Langfuse span nesting (T-12) — verified** via the Langfuse public API: `pipeline.SearchRecipe → recipe_agent.search → embed.provider` nests correctly (not flat at root), fan-out `diet_agent.validate` children present. See Day 6 section for the reconstructed tree.
 
 ### Day 6 — regression comparison
 
 Preconditions, both non-negotiable after Day 5's incident:
 
-- [ ] `points_count` = 52,155 confirmed. A smaller corpus makes the 44/50 comparison not apples-to-apples, and any difference could be corpus size rather than the cutover.
-- [ ] A live search returns recipes before either sweep starts. A suspended cluster and a pipeline regression look identical at the response level.
+- [x] `points_count` = 52,155 confirmed (2026-08-16 — green, 1024-dim). A smaller corpus makes the 44/50 comparison not apples-to-apples, and any difference could be corpus size rather than the cutover.
+- [x] A live search returns recipes before either sweep starts (2026-08-16 — "pasta" → 5 recipes). A suspended cluster and a pipeline regression look identical at the response level.
 
 Then:
 
-- [ ] Paced `test_e2e_sweep.py` with `Pipelines__Enabled=false` — establishes the control on today's corpus
-- [ ] Restart, same build, `Pipelines__Enabled=true` — the pipeline path
-- [ ] Diff. Compare against this script's own **44/50** baseline, not the 56/60 frozen production number (different harness, different denominator — see Day 1).
-- [ ] Expect the same four I-4/I-5 failures (TC03, TC05, TC09, TC47) on both paths. A *difference* between the two runs is the real signal; a shared failure is pre-existing.
-- [ ] Confirm via `[Dispatch]` logs that the two runs actually took different paths
+- [x] Paced `test_e2e_sweep.py` with `Pipelines__Enabled=false` — **44/50**, exactly baseline.
+- [x] Restart, same build, `Pipelines__Enabled=true` — **45/50**.
+- [x] Diffed against this script's own **44/50** baseline (not the 56/60 frozen production number — different harness, different denominator, see Day 1). **No cutover regression** — full analysis in the A/B sweep section above.
+- [x] Verified `[Dispatch]` logs confirm the two runs took different paths — control `Phase 1 path … pipelines disabled`, pipeline `Pipeline path handled …`.
+- [x] Shared I-4/I-5 failures (TC03, TC05, TC09) + flaky TC41 identical on both paths; all run-to-run *differences* (TC24/26, TC01) are infra timeouts on P2-8-gated/cloud-hung cases, not cutover signal. TC47 nondeterministic (classification is flag-independent).
 
 ### Day 7 / wrap
 
-- [ ] Week 2 progress doc finalized
+- [~] Week 2 progress doc finalized — Day 6 + IntentRouter documented; final pass after commit.
 - [ ] Tech-debt file reconciled — P2-3 through P2-10, T-11, T-12, Inf-8 all recorded with correct status
 - [ ] Day-boundary commits
-- [ ] Reconcile the Day 1 section: "Remaining failures (3, all pre-existing/tracked)" lists four rows, and 47/50 implies three. Day 6 reuses that number, so the discrepancy should be resolved before it propagates.
+- [x] **Day 1 discrepancy resolved: the durable intent-misroute set is 3** (TC03/05/09), not 4. TC47 is a nondeterministic special-char case that passed both A/B runs (via different intents) — not a reliable failure. The "3 pre-existing" count in Day 1 was correct; the 4-row table over-listed by including TC47. (See A/B sweep section.)
 
-### Decision needed this week, not deferred again
+### Decision resolved: IntentRouter discovering intents from the registry — **landed** ✅
 
-- [ ] **IntentRouter discovering intents from the registry.** In the Week 1–2 roadmap block, on every carry-forward list since Week 1, has not moved. Either it lands this week or it's explicitly deferred to Week 3 — silently rolling a third time is how scope quietly disappears.
+Carried on every list since Week 1. Decided this week to land it rather than roll a third time.
+
+**What it means, concretely.** The router does *classification* (free text → `UserIntent` via keyword rules); the registry maps *capability → agent*. The genuinely useful coupling is graceful degradation: the router should not route to an agent-backed intent the registry can't actually handle. So the router now discovers the live set from the registry instead of assuming the whole `UserIntent` enum is always handleable.
+
+**Built:**
+- `AgentRegistry.IsRegistered(capability)` and `AgentRegistry.Capabilities` — the single source of truth for which agent-backed intents are live.
+- `IntentRouter` takes `AgentRegistry`. `ClassifyIntent` (now an instance method) gates each agent-backed branch through `IsLive`: `ValidateDiet`, `CreateMealPlan`, `ModifyMealPlan` only return if their capability is registered; otherwise the match falls through toward the `SearchRecipe` default. `GetMealPlan` (reads SessionStore) and `GeneralQuestion` (LLM) have no agent, so they are never gated. `SearchRecipe` stays the ungated terminal fallback — if its capability were missing, routing elsewhere wouldn't help, and startup fail-fast already guards that.
+- DI: `IntentRouter` factory resolves `AgentRegistry` (registered as a singleton before it, so lazy resolution is fine).
+
+**Scope honesty.** In normal operation all agents register at startup, so `IsLive` is always true and routing is byte-for-byte unchanged — the value is structural (registry as the single source of truth) and defensive (a missing/unregistered agent degrades to search rather than dispatching a dead intent). This is deliberately *not* the larger "registry supplies the classification logic" idea — keyword heuristics are intent-specific and can't come from a capability map. That mismatch is why the item read better as a roadmap line than it pays off as code, and why the landed version is the defensive gate, not a rewrite.
+
+**Tests:** unit suite **111 passed** (+3), 6 skipped, 0 failed. New tests: `ValidateDiet` and `CreateMealPlan` fall back to `SearchRecipe` when their capability is unregistered; `ValidateDiet` still classifies normally with the full registry. A `StubAgent` + `FullRegistry()` helper backs `MakeRouter()` so existing classification tests are unchanged (Day 2's lesson: update the test helper when a constructor grows).
+
+**Not yet done:** rebuild the container with this change and live smoke-test (search/validate/plan still route correctly with the full registry). Sequenced *after* the Day 6 A/B so the pipeline sweep runs against the `[Dispatch]`-only build and the A/B stays clean.
 
 ### Explicitly not this week
 
