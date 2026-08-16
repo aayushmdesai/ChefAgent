@@ -354,6 +354,7 @@ public static class ServiceRegistration
                 sp.GetRequiredKeyedService<CircuitBreaker>("ollama"),
                 sp.GetRequiredService<SessionStore>(),
                 sp.GetRequiredService<Tracing>(),
+                sp.GetRequiredService<AgentRegistry>(),
                 sp.GetRequiredService<ILogger<IntentRouter>>()
             );
         });

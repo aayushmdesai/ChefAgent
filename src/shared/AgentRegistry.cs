@@ -53,5 +53,15 @@ public class AgentRegistry
     public IAgent? FindByCapability(string capability) =>
         _byCapability.TryGetValue(capability, out var agent) ? agent : null;
 
+    /// <summary>
+    /// True if an agent is registered for this capability. The single source of
+    /// truth for whether an agent-backed intent is actually handleable — used by
+    /// IntentRouter to avoid routing to an intent whose agent isn't registered.
+    /// </summary>
+    public bool IsRegistered(string capability) => _byCapability.ContainsKey(capability);
+
+    /// <summary>Capabilities currently registered, for callers that discover the live set.</summary>
+    public IReadOnlyCollection<string> Capabilities => _byCapability.Keys;
+
     public int Count => _byCapability.Count;
 }
