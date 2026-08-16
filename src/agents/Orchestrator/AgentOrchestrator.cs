@@ -406,7 +406,22 @@ public class AgentOrchestrator
         {
             var mapped = await TryRunPipelineAsync(classified, orchCtx);
             if (mapped is not null)
+            {
+                _logger.LogInformation("[Dispatch] Pipeline path handled {Intent}", classified.Intent);
                 return mapped;
+            }
+
+            _logger.LogInformation(
+                "[Dispatch] Phase 1 fallback for {Intent} — pipelines enabled but no pipeline result",
+                classified.Intent
+            );
+        }
+        else
+        {
+            _logger.LogInformation(
+                "[Dispatch] Phase 1 path for {Intent} — pipelines disabled",
+                classified.Intent
+            );
         }
 
         return classified.Intent switch
@@ -433,7 +448,13 @@ public class AgentOrchestrator
     {
         var pipeline = _pipelines.FindByIntent(classified.Intent);
         if (pipeline is null)
+        {
+            _logger.LogDebug(
+                "[Dispatch] No registered pipeline for {Intent} — falling through",
+                classified.Intent
+            );
             return null;
+        }
 
         var shared = new Dictionary<string, object>();
 
@@ -464,6 +485,10 @@ public class AgentOrchestrator
             default:
                 // Registered but no mapper yet — a registered pipeline doesn't
                 // oblige the orchestrator to use it.
+                _logger.LogDebug(
+                    "[Dispatch] Pipeline registered for {Intent} but no mapper yet (P2-8) — falling through",
+                    classified.Intent
+                );
                 return null;
         }
 
