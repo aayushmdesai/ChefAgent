@@ -520,7 +520,7 @@ Then:
 
 - [x] Week 2 progress doc finalized — Day 6, IntentRouter, and container smoke-test documented.
 - [x] Tech-debt file reconciled — added `P2-1`…`P2-10`, `T-11`, `T-12`, `Inf-8`, `Inf-9` (the progress docs referenced `P2-` items as "added" but none had actually been written into `tech-debt.md`), plus a new `Inf-9` for the duplicate `AddAgentRegistry()`/`AddApiServices()` calls found this session. Also corrected the summary table, which had never counted the Week 2 Day 1 additions (now 67 total / 28 resolved, recomputed from the section rows). `T-12` now 🔄 (manual span-nesting verification done, unit coverage still absent).
-- [~] Day-boundary commits — Day 6 work committed + merged into `phase-2-agentic` (be551fb); Day 7 doc/tech-debt commit pending; push to origin is the user's action (permission guard).
+- [x] Day-boundary commits — Day 6 work committed + merged into `phase-2-agentic` (be551fb), Day 7 doc/tech-debt committed (4cc52e2). Only the push to origin remains (the user's action — permission guard blocks the agent).
 - [x] **Day 1 discrepancy resolved: the durable intent-misroute set is 3** (TC03/05/09), not 4. TC47 is a nondeterministic special-char case that passed both A/B runs (via different intents) — not a reliable failure. The "3 pre-existing" count in Day 1 was correct; the 4-row table over-listed by including TC47. (See A/B sweep section.)
 
 ### Decision resolved: IntentRouter discovering intents from the registry — **landed** ✅
