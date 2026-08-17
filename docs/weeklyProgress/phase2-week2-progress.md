@@ -426,7 +426,7 @@ Both match Phase 1's message templates exactly. The second exercises `HasActiona
 
 ## Day 6 — `[Dispatch]` instrumentation, live pipeline verification, A/B regression (2026-08-16) ✅
 
-All four Day-5-finish items cleared, both A/B sweeps run (no cutover regression), IntentRouter registry-discovery landed. Remaining for Day 7: container rebuild + smoke of the IntentRouter change, tech-debt reconcile, commits.
+All four Day-5-finish items cleared, both A/B sweeps run (no cutover regression), IntentRouter registry-discovery landed and container-smoke-verified. Remaining for Day 7: tech-debt reconcile, final doc pass.
 
 ### `[Dispatch]` logging — done
 
@@ -518,9 +518,9 @@ Then:
 
 ### Day 7 / wrap
 
-- [~] Week 2 progress doc finalized — Day 6 + IntentRouter documented; final pass after commit.
-- [ ] Tech-debt file reconciled — P2-3 through P2-10, T-11, T-12, Inf-8 all recorded with correct status
-- [ ] Day-boundary commits
+- [x] Week 2 progress doc finalized — Day 6, IntentRouter, and container smoke-test documented.
+- [x] Tech-debt file reconciled — added `P2-1`…`P2-10`, `T-11`, `T-12`, `Inf-8`, `Inf-9` (the progress docs referenced `P2-` items as "added" but none had actually been written into `tech-debt.md`), plus a new `Inf-9` for the duplicate `AddAgentRegistry()`/`AddApiServices()` calls found this session. Also corrected the summary table, which had never counted the Week 2 Day 1 additions (now 67 total / 28 resolved, recomputed from the section rows). `T-12` now 🔄 (manual span-nesting verification done, unit coverage still absent).
+- [~] Day-boundary commits — Day 6 work committed + merged into `phase-2-agentic` (be551fb); Day 7 doc/tech-debt commit pending; push to origin is the user's action (permission guard).
 - [x] **Day 1 discrepancy resolved: the durable intent-misroute set is 3** (TC03/05/09), not 4. TC47 is a nondeterministic special-char case that passed both A/B runs (via different intents) — not a reliable failure. The "3 pre-existing" count in Day 1 was correct; the 4-row table over-listed by including TC47. (See A/B sweep section.)
 
 ### Decision resolved: IntentRouter discovering intents from the registry — **landed** ✅
@@ -538,7 +538,7 @@ Carried on every list since Week 1. Decided this week to land it rather than rol
 
 **Tests:** unit suite **111 passed** (+3), 6 skipped, 0 failed. New tests: `ValidateDiet` and `CreateMealPlan` fall back to `SearchRecipe` when their capability is unregistered; `ValidateDiet` still classifies normally with the full registry. A `StubAgent` + `FullRegistry()` helper backs `MakeRouter()` so existing classification tests are unchanged (Day 2's lesson: update the test helper when a constructor grows).
 
-**Not yet done:** rebuild the container with this change and live smoke-test (search/validate/plan still route correctly with the full registry). Sequenced *after* the Day 6 A/B so the pipeline sweep runs against the `[Dispatch]`-only build and the A/B stays clean.
+**Container smoke-test — done (2026-08-16).** Rebuilt the `api` container from the merged code (all 5 capabilities registered at startup) and fired one query per intent. With the full registry, the gate never misfires and routing is unchanged: `pasta`→SearchRecipe, `is pasta safe for a nut allergy?`→ValidateDiet, `what's my plan?`→GetMealPlan, `create a meal plan for dinner`→CreateMealPlan, `swap Monday to a vegetarian meal`→ModifyMealPlan (all via rules, confirmed in `[IntentRouter]` logs). Sequenced *after* the Day 6 A/B so the pipeline sweep ran against the `[Dispatch]`-only build and the comparison stayed clean.
 
 ### Explicitly not this week
 
