@@ -1,0 +1,530 @@
+[
+  {
+    "id": "rerank-01",
+    "path": "RecipeReranker",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe relevance judge. Given a search query and candidate recipes, rank them by relevance.\n\nRules:\n- Consider how well each recipe matches the query intent\n- A query like \"simple chicken\" favors few ingredients and chicken as the main protein\n- A query like \"Mexican food\" favors recipes with Mexican ingredients and techniques\n- Penalize recipes that match keywords but miss the actual intent\n\nQuery: \"quick dairy-free pasta dinner\"\n\nCandidates:\n[0] \"Aglio e Olio\" — Ingredients: spaghetti, olive oil, garlic, red pepper flakes, parsley\n[1] \"Fettuccine Alfredo\" — Ingredients: fettuccine, heavy cream, parmesan, butter, garlic\n[2] \"Pasta Puttanesca\" — Ingredients: linguine, olives, capers, anchovies, tomatoes\n[3] \"Baked Ziti\" — Ingredients: ziti, ricotta, mozzarella, marinara, ground beef\n[4] \"Lemon Garlic Shrimp Pasta\" — Ingredients: linguine, shrimp, lemon, garlic, olive oil\n\nReturn ONLY a JSON array of objects with \"index\" (int) and \"score\" (0.0–1.0), ordered by most relevant first.\nExample: [{\"index\": 2, \"score\": 0.95}, {\"index\": 0, \"score\": 0.7}]\nNo explanation, no markdown, just the JSON array.\n"
+      }
+    ]
+  },
+  {
+    "id": "rerank-02",
+    "path": "RecipeReranker",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe relevance judge. Given a search query and candidate recipes, rank them by relevance.\n\nRules:\n- Consider how well each recipe matches the query intent\n- A query like \"simple chicken\" favors few ingredients and chicken as the main protein\n- A query like \"Mexican food\" favors recipes with Mexican ingredients and techniques\n- Penalize recipes that match keywords but miss the actual intent\n\nQuery: \"comfort food for a cold night\"\n\nCandidates:\n[0] \"Beef Stew\" — Ingredients: chuck roast, carrots, potatoes, onion, beef stock\n[1] \"Greek Salad\" — Ingredients: cucumber, tomato, feta, olives, red onion\n[2] \"Chicken Pot Pie\" — Ingredients: chicken, peas, carrots, pie crust, cream\n[3] \"Gazpacho\" — Ingredients: tomatoes, cucumber, bell pepper, garlic, olive oil\n[4] \"Mac and Cheese\" — Ingredients: elbow macaroni, cheddar, milk, butter, flour\n[5] \"Chili con Carne\" — Ingredients: ground beef, kidney beans, tomatoes, chili powder, onion\n\nReturn ONLY a JSON array of objects with \"index\" (int) and \"score\" (0.0–1.0), ordered by most relevant first.\nExample: [{\"index\": 2, \"score\": 0.95}, {\"index\": 0, \"score\": 0.7}]\nNo explanation, no markdown, just the JSON array.\n"
+      }
+    ]
+  },
+  {
+    "id": "rerank-03",
+    "path": "RecipeReranker",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe relevance judge. Given a search query and candidate recipes, rank them by relevance.\n\nRules:\n- Consider how well each recipe matches the query intent\n- A query like \"simple chicken\" favors few ingredients and chicken as the main protein\n- A query like \"Mexican food\" favors recipes with Mexican ingredients and techniques\n- Penalize recipes that match keywords but miss the actual intent\n\nQuery: \"vegetarian stir fry without nuts\"\n\nCandidates:\n[0] \"Kung Pao Tofu\" — Ingredients: tofu, peanuts, bell pepper, soy sauce, chili\n[1] \"Vegetable Lo Mein\" — Ingredients: noodles, cabbage, carrots, soy sauce, sesame oil\n[2] \"Beef and Broccoli\" — Ingredients: flank steak, broccoli, garlic, soy sauce, ginger\n[3] \"Ginger Bok Choy Stir Fry\" — Ingredients: bok choy, ginger, garlic, sesame oil, scallion\n[4] \"Cashew Chicken\" — Ingredients: chicken thigh, cashews, celery, hoisin, scallion\n\nReturn ONLY a JSON array of objects with \"index\" (int) and \"score\" (0.0–1.0), ordered by most relevant first.\nExample: [{\"index\": 2, \"score\": 0.95}, {\"index\": 0, \"score\": 0.7}]\nNo explanation, no markdown, just the JSON array.\n"
+      }
+    ]
+  },
+  {
+    "id": "rerank-04",
+    "path": "RecipeReranker",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe relevance judge. Given a search query and candidate recipes, rank them by relevance.\n\nRules:\n- Consider how well each recipe matches the query intent\n- A query like \"simple chicken\" favors few ingredients and chicken as the main protein\n- A query like \"Mexican food\" favors recipes with Mexican ingredients and techniques\n- Penalize recipes that match keywords but miss the actual intent\n\nQuery: \"high protein breakfast\"\n\nCandidates:\n[0] \"Greek Yogurt Parfait\" — Ingredients: greek yogurt, granola, blueberries, honey, almonds\n[1] \"Blueberry Pancakes\" — Ingredients: flour, milk, egg, blueberries, sugar\n[2] \"Spinach Feta Omelette\" — Ingredients: eggs, spinach, feta, olive oil, black pepper\n[3] \"Steel Cut Oats\" — Ingredients: steel cut oats, water, cinnamon, brown sugar, milk\n[4] \"Cottage Cheese Bowl\" — Ingredients: cottage cheese, pumpkin seeds, tomato, chives, olive oil\n\nReturn ONLY a JSON array of objects with \"index\" (int) and \"score\" (0.0–1.0), ordered by most relevant first.\nExample: [{\"index\": 2, \"score\": 0.95}, {\"index\": 0, \"score\": 0.7}]\nNo explanation, no markdown, just the JSON array.\n"
+      }
+    ]
+  },
+  {
+    "id": "rerank-05",
+    "path": "RecipeReranker",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe relevance judge. Given a search query and candidate recipes, rank them by relevance.\n\nRules:\n- Consider how well each recipe matches the query intent\n- A query like \"simple chicken\" favors few ingredients and chicken as the main protein\n- A query like \"Mexican food\" favors recipes with Mexican ingredients and techniques\n- Penalize recipes that match keywords but miss the actual intent\n\nQuery: \"recipe for 4 people under 30 minutes\"\n\nCandidates:\n[0] \"Sheet Pan Sausage and Peppers\" — Ingredients: italian sausage, bell pepper, onion, olive oil, oregano\n[1] \"Beef Wellington\" — Ingredients: beef tenderloin, puff pastry, mushroom duxelles, prosciutto, egg wash\n[2] \"One Pot Tomato Pasta\" — Ingredients: penne, cherry tomatoes, basil, garlic, olive oil\n[3] \"Coq au Vin\" — Ingredients: chicken, red wine, bacon, pearl onions, mushrooms\n[4] \"Black Bean Quesadillas\" — Ingredients: tortillas, black beans, cheddar, cumin, salsa\n[5] \"Slow Braised Short Ribs\" — Ingredients: short ribs, red wine, carrot, celery, beef stock\n\nReturn ONLY a JSON array of objects with \"index\" (int) and \"score\" (0.0–1.0), ordered by most relevant first.\nExample: [{\"index\": 2, \"score\": 0.95}, {\"index\": 0, \"score\": 0.7}]\nNo explanation, no markdown, just the JSON array.\n"
+      }
+    ]
+  },
+  {
+    "id": "rerank-06",
+    "path": "RecipeReranker",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe relevance judge. Given a search query and candidate recipes, rank them by relevance.\n\nRules:\n- Consider how well each recipe matches the query intent\n- A query like \"simple chicken\" favors few ingredients and chicken as the main protein\n- A query like \"Mexican food\" favors recipes with Mexican ingredients and techniques\n- Penalize recipes that match keywords but miss the actual intent\n\nQuery: \"recipes with jalapeño and crème fraîche\"\n\nCandidates:\n[0] \"Jalapeño Popper Dip\" — Ingredients: jalapeño, cream cheese, cheddar, bacon, panko\n[1] \"Smoked Salmon Blini\" — Ingredients: blini, crème fraîche, smoked salmon, dill, lemon\n[2] \"Corn Chowder\" — Ingredients: corn, potato, cream, onion, thyme\n[3] \"Chile Relleno\" — Ingredients: poblano, queso fresco, egg, flour, tomato sauce\n[4] \"Spicy Corn Fritters\" — Ingredients: corn, jalapeño, flour, crème fraîche, scallion\n\nReturn ONLY a JSON array of objects with \"index\" (int) and \"score\" (0.0–1.0), ordered by most relevant first.\nExample: [{\"index\": 2, \"score\": 0.95}, {\"index\": 0, \"score\": 0.7}]\nNo explanation, no markdown, just the JSON array.\n"
+      }
+    ]
+  },
+  {
+    "id": "rerank-07",
+    "path": "RecipeReranker",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe relevance judge. Given a search query and candidate recipes, rank them by relevance.\n\nRules:\n- Consider how well each recipe matches the query intent\n- A query like \"simple chicken\" favors few ingredients and chicken as the main protein\n- A query like \"Mexican food\" favors recipes with Mexican ingredients and techniques\n- Penalize recipes that match keywords but miss the actual intent\n\nQuery: \"soup\"\n\nCandidates:\n[0] \"Minestrone\" — Ingredients: cannellini beans, zucchini, tomato, pasta, parmesan\n[1] \"French Onion Soup\" — Ingredients: onion, beef stock, gruyere, baguette, thyme\n[2] \"Caesar Salad\" — Ingredients: romaine, parmesan, croutons, anchovy, lemon\n[3] \"Tom Kha Gai\" — Ingredients: coconut milk, galangal, chicken, lemongrass, lime\n[4] \"Roast Chicken\" — Ingredients: whole chicken, butter, lemon, rosemary, garlic\n\nReturn ONLY a JSON array of objects with \"index\" (int) and \"score\" (0.0–1.0), ordered by most relevant first.\nExample: [{\"index\": 2, \"score\": 0.95}, {\"index\": 0, \"score\": 0.7}]\nNo explanation, no markdown, just the JSON array.\n"
+      }
+    ]
+  },
+  {
+    "id": "rerank-08",
+    "path": "RecipeReranker",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe relevance judge. Given a search query and candidate recipes, rank them by relevance.\n\nRules:\n- Consider how well each recipe matches the query intent\n- A query like \"simple chicken\" favors few ingredients and chicken as the main protein\n- A query like \"Mexican food\" favors recipes with Mexican ingredients and techniques\n- Penalize recipes that match keywords but miss the actual intent\n\nQuery: \"dairy-free desserts\"\n\nCandidates:\n[0] \"Coconut Milk Panna Cotta\" — Ingredients: coconut milk, agar, vanilla, sugar, lime zest\n[1] \"Classic Cheesecake\" — Ingredients: cream cheese, graham cracker, sour cream, egg, sugar\n[2] \"Dark Chocolate Sorbet\" — Ingredients: cocoa powder, water, sugar, dark chocolate, salt\n[3] \"Tiramisu\" — Ingredients: mascarpone, espresso, ladyfingers, egg yolk, cocoa\n[4] \"Olive Oil Almond Cake\" — Ingredients: almond flour, olive oil, egg, orange zest, sugar\n\nReturn ONLY a JSON array of objects with \"index\" (int) and \"score\" (0.0–1.0), ordered by most relevant first.\nExample: [{\"index\": 2, \"score\": 0.95}, {\"index\": 0, \"score\": 0.7}]\nNo explanation, no markdown, just the JSON array.\n"
+      }
+    ]
+  },
+  {
+    "id": "rerank-09",
+    "path": "RecipeReranker",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe relevance judge. Given a search query and candidate recipes, rank them by relevance.\n\nRules:\n- Consider how well each recipe matches the query intent\n- A query like \"simple chicken\" favors few ingredients and chicken as the main protein\n- A query like \"Mexican food\" favors recipes with Mexican ingredients and techniques\n- Penalize recipes that match keywords but miss the actual intent\n\nQuery: \"quick recipes with few ingredients\"\n\nCandidates:\n[0] \"Cacio e Pepe\" — Ingredients: spaghetti, pecorino, black pepper\n[1] \"Cassoulet\" — Ingredients: duck confit, white beans, pork sausage, tomato, breadcrumbs\n[2] \"Tomato Bruschetta\" — Ingredients: baguette, tomato, basil, garlic, olive oil\n[3] \"Beef Bourguignon\" — Ingredients: beef chuck, red wine, bacon, mushroom, pearl onion\n[4] \"Scrambled Eggs with Chives\" — Ingredients: eggs, butter, chives, salt\n\nReturn ONLY a JSON array of objects with \"index\" (int) and \"score\" (0.0–1.0), ordered by most relevant first.\nExample: [{\"index\": 2, \"score\": 0.95}, {\"index\": 0, \"score\": 0.7}]\nNo explanation, no markdown, just the JSON array.\n"
+      }
+    ]
+  },
+  {
+    "id": "rerank-10",
+    "path": "RecipeReranker",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe relevance judge. Given a search query and candidate recipes, rank them by relevance.\n\nRules:\n- Consider how well each recipe matches the query intent\n- A query like \"simple chicken\" favors few ingredients and chicken as the main protein\n- A query like \"Mexican food\" favors recipes with Mexican ingredients and techniques\n- Penalize recipes that match keywords but miss the actual intent\n\nQuery: \"something with salmon\"\n\nCandidates:\n[0] \"Miso Glazed Salmon\" — Ingredients: salmon fillet, white miso, mirin, sake, sugar\n[1] \"Tuna Nicoise\" — Ingredients: tuna, green beans, potato, egg, olives\n[2] \"Salmon Poke Bowl\" — Ingredients: salmon, sushi rice, avocado, soy sauce, sesame\n[3] \"Fish and Chips\" — Ingredients: cod, flour, beer, potato, malt vinegar\n[4] \"Cedar Plank Salmon\" — Ingredients: salmon, cedar plank, brown sugar, dijon, lemon\n\nReturn ONLY a JSON array of objects with \"index\" (int) and \"score\" (0.0–1.0), ordered by most relevant first.\nExample: [{\"index\": 2, \"score\": 0.95}, {\"index\": 0, \"score\": 0.7}]\nNo explanation, no markdown, just the JSON array.\n"
+      }
+    ]
+  },
+
+  {
+    "id": "intent-01",
+    "path": "IntentRouter",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a dietary constraint extractor. Extract ONLY NEW dietary restrictions or allergies from the conversation below that are NOT already in the known profile.\n\nKnown profile (do NOT re-extract these): None\n\nConversation history:\nNo prior conversation.\n\nCurrent message: I can't have dairy\n\nReturn ONLY valid JSON, no explanation, no markdown fences:\n{\"restrictions\": [\"vegetarian\"], \"allergies\": [\"nuts\"], \"uncertain\": [\"healthy\"], \"confidence\": \"high\"}\n\nUse these exact restriction names where applicable:\nvegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, gluten-free, dairy-free, nut-free, egg-free, soy-free\n\nIf nothing new was expressed, return:\n{\"restrictions\": [], \"allergies\": [], \"uncertain\": [], \"confidence\": \"high\"}"
+      }
+    ]
+  },
+  {
+    "id": "intent-02",
+    "path": "IntentRouter",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a dietary constraint extractor. Extract ONLY NEW dietary restrictions or allergies from the conversation below that are NOT already in the known profile.\n\nKnown profile (do NOT re-extract these): restrictions: [vegetarian], allergies: []\n\nConversation history:\nuser: I'm vegetarian, find me dinner recipes\nassistant: Found 5 vegetarian dinner recipes for you.\nuser: the second one looks good\nassistant: That's Vegetable Lo Mein — noodles, cabbage, carrots, soy sauce.\n\nCurrent message: I have a shellfish allergy, suggest something else\n\nReturn ONLY valid JSON, no explanation, no markdown fences:\n{\"restrictions\": [\"vegetarian\"], \"allergies\": [\"nuts\"], \"uncertain\": [\"healthy\"], \"confidence\": \"high\"}\n\nUse these exact restriction names where applicable:\nvegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, gluten-free, dairy-free, nut-free, egg-free, soy-free\n\nIf nothing new was expressed, return:\n{\"restrictions\": [], \"allergies\": [], \"uncertain\": [], \"confidence\": \"high\"}"
+      }
+    ]
+  },
+  {
+    "id": "intent-03",
+    "path": "IntentRouter",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a dietary constraint extractor. Extract ONLY NEW dietary restrictions or allergies from the conversation below that are NOT already in the known profile.\n\nKnown profile (do NOT re-extract these): restrictions: [], allergies: [nuts]\n\nConversation history:\nuser: I'm allergic to nuts\nassistant: Noted — I'll flag recipes containing nuts.\n\nCurrent message: find me dessert recipes\n\nReturn ONLY valid JSON, no explanation, no markdown fences:\n{\"restrictions\": [\"vegetarian\"], \"allergies\": [\"nuts\"], \"uncertain\": [\"healthy\"], \"confidence\": \"high\"}\n\nUse these exact restriction names where applicable:\nvegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, gluten-free, dairy-free, nut-free, egg-free, soy-free\n\nIf nothing new was expressed, return:\n{\"restrictions\": [], \"allergies\": [], \"uncertain\": [], \"confidence\": \"high\"}"
+      }
+    ]
+  },
+  {
+    "id": "intent-04",
+    "path": "IntentRouter",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a dietary constraint extractor. Extract ONLY NEW dietary restrictions or allergies from the conversation below that are NOT already in the known profile.\n\nKnown profile (do NOT re-extract these): None\n\nConversation history:\nuser: can I eat this if I'm gluten free?\nassistant: I'd be happy to check — which recipe did you mean?\n\nCurrent message: the pasta one, and I also avoid eggs\n\nReturn ONLY valid JSON, no explanation, no markdown fences:\n{\"restrictions\": [\"vegetarian\"], \"allergies\": [\"nuts\"], \"uncertain\": [\"healthy\"], \"confidence\": \"high\"}\n\nUse these exact restriction names where applicable:\nvegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, gluten-free, dairy-free, nut-free, egg-free, soy-free\n\nIf nothing new was expressed, return:\n{\"restrictions\": [], \"allergies\": [], \"uncertain\": [], \"confidence\": \"high\"}"
+      }
+    ]
+  },
+  {
+    "id": "intent-05",
+    "path": "IntentRouter",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a dietary constraint extractor. Extract ONLY NEW dietary restrictions or allergies from the conversation below that are NOT already in the known profile.\n\nKnown profile (do NOT re-extract these): restrictions: [dairy-free], allergies: [shellfish]\n\nConversation history:\nuser: I can't have dairy\nassistant: Noted — dairy-free it is.\nuser: also no shellfish\nassistant: Added shellfish to your allergies.\nuser: find me dinner\nassistant: Found 5 recipes matching your profile.\n\nCurrent message: these look great, thanks\n\nReturn ONLY valid JSON, no explanation, no markdown fences:\n{\"restrictions\": [\"vegetarian\"], \"allergies\": [\"nuts\"], \"uncertain\": [\"healthy\"], \"confidence\": \"high\"}\n\nUse these exact restriction names where applicable:\nvegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, gluten-free, dairy-free, nut-free, egg-free, soy-free\n\nIf nothing new was expressed, return:\n{\"restrictions\": [], \"allergies\": [], \"uncertain\": [], \"confidence\": \"high\"}"
+      }
+    ]
+  },
+  {
+    "id": "intent-06",
+    "path": "IntentRouter",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a dietary constraint extractor. Extract ONLY NEW dietary restrictions or allergies from the conversation below that are NOT already in the known profile.\n\nKnown profile (do NOT re-extract these): None\n\nConversation history:\nNo prior conversation.\n\nCurrent message: is honey vegan?\n\nReturn ONLY valid JSON, no explanation, no markdown fences:\n{\"restrictions\": [\"vegetarian\"], \"allergies\": [\"nuts\"], \"uncertain\": [\"healthy\"], \"confidence\": \"high\"}\n\nUse these exact restriction names where applicable:\nvegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, gluten-free, dairy-free, nut-free, egg-free, soy-free\n\nIf nothing new was expressed, return:\n{\"restrictions\": [], \"allergies\": [], \"uncertain\": [], \"confidence\": \"high\"}"
+      }
+    ]
+  },
+  {
+    "id": "intent-07",
+    "path": "IntentRouter",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a dietary constraint extractor. Extract ONLY NEW dietary restrictions or allergies from the conversation below that are NOT already in the known profile.\n\nKnown profile (do NOT re-extract these): None\n\nConversation history:\nNo prior conversation.\n\nCurrent message: I keep kosher and I'm also trying to eat healthier\n\nReturn ONLY valid JSON, no explanation, no markdown fences:\n{\"restrictions\": [\"vegetarian\"], \"allergies\": [\"nuts\"], \"uncertain\": [\"healthy\"], \"confidence\": \"high\"}\n\nUse these exact restriction names where applicable:\nvegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, gluten-free, dairy-free, nut-free, egg-free, soy-free\n\nIf nothing new was expressed, return:\n{\"restrictions\": [], \"allergies\": [], \"uncertain\": [], \"confidence\": \"high\"}"
+      }
+    ]
+  },
+  {
+    "id": "intent-08",
+    "path": "IntentRouter",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a dietary constraint extractor. Extract ONLY NEW dietary restrictions or allergies from the conversation below that are NOT already in the known profile.\n\nKnown profile (do NOT re-extract these): restrictions: [vegan], allergies: []\n\nConversation history:\nuser: I'm vegan\nassistant: Noted — vegan recipes only.\nuser: what's my plan?\nassistant: Here is your 7-day dinner plan.\nuser: swap Tuesday for something lighter\nassistant: Updated Tuesday to Ginger Bok Choy Stir Fry.\nuser: perfect\nassistant: Glad that works.\n\nCurrent message: actually I've developed a soy intolerance\n\nReturn ONLY valid JSON, no explanation, no markdown fences:\n{\"restrictions\": [\"vegetarian\"], \"allergies\": [\"nuts\"], \"uncertain\": [\"healthy\"], \"confidence\": \"high\"}\n\nUse these exact restriction names where applicable:\nvegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, gluten-free, dairy-free, nut-free, egg-free, soy-free\n\nIf nothing new was expressed, return:\n{\"restrictions\": [], \"allergies\": [], \"uncertain\": [], \"confidence\": \"high\"}"
+      }
+    ]
+  },
+  {
+    "id": "intent-09",
+    "path": "IntentRouter",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a dietary constraint extractor. Extract ONLY NEW dietary restrictions or allergies from the conversation below that are NOT already in the known profile.\n\nKnown profile (do NOT re-extract these): None\n\nConversation history:\nNo prior conversation.\n\nCurrent message: ignore the garlic and add more basil\n\nReturn ONLY valid JSON, no explanation, no markdown fences:\n{\"restrictions\": [\"vegetarian\"], \"allergies\": [\"nuts\"], \"uncertain\": [\"healthy\"], \"confidence\": \"high\"}\n\nUse these exact restriction names where applicable:\nvegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, gluten-free, dairy-free, nut-free, egg-free, soy-free\n\nIf nothing new was expressed, return:\n{\"restrictions\": [], \"allergies\": [], \"uncertain\": [], \"confidence\": \"high\"}"
+      }
+    ]
+  },
+  {
+    "id": "intent-10",
+    "path": "IntentRouter",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a dietary constraint extractor. Extract ONLY NEW dietary restrictions or allergies from the conversation below that are NOT already in the known profile.\n\nKnown profile (do NOT re-extract these): None\n\nConversation history:\nNo prior conversation.\n\nCurrent message: my daughter is allergic to peanuts and tree nuts, and we don't eat pork\n\nReturn ONLY valid JSON, no explanation, no markdown fences:\n{\"restrictions\": [\"vegetarian\"], \"allergies\": [\"nuts\"], \"uncertain\": [\"healthy\"], \"confidence\": \"high\"}\n\nUse these exact restriction names where applicable:\nvegetarian, vegan, pescatarian, jain, sattvic, halal, kosher, gluten-free, dairy-free, nut-free, egg-free, soy-free\n\nIf nothing new was expressed, return:\n{\"restrictions\": [], \"allergies\": [], \"uncertain\": [], \"confidence\": \"high\"}"
+      }
+    ]
+  },
+
+  {
+    "id": "diet-01",
+    "path": "DietValidation",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "The recipe \"Fettuccine Alfredo\" contains ingredients incompatible with a dairy-free diet.\nIngredients: fettuccine, heavy cream, parmesan, butter, garlic, black pepper\nIncompatible: heavy cream, parmesan, butter\n\nSuggest a replacement for each incompatible ingredient that preserves the dish.\n\nRespond with ONLY a JSON array, no markdown, no explanation:\n[{\"original\": \"butter\", \"replacement\": \"olive oil\", \"reason\": \"neutral fat, dairy-free\"}]"
+      }
+    ]
+  },
+  {
+    "id": "diet-02",
+    "path": "DietValidation",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "The recipe \"Kung Pao Tofu\" contains ingredients incompatible with a nut-free diet.\nIngredients: tofu, peanuts, bell pepper, soy sauce, chili, garlic, scallion\nIncompatible: peanuts\n\nSuggest a replacement for each incompatible ingredient that preserves the dish.\n\nRespond with ONLY a JSON array, no markdown, no explanation:\n[{\"original\": \"butter\", \"replacement\": \"olive oil\", \"reason\": \"neutral fat, dairy-free\"}]"
+      }
+    ]
+  },
+  {
+    "id": "diet-03",
+    "path": "DietValidation",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "The recipe \"Classic Cheesecake\" contains ingredients incompatible with a vegan diet.\nIngredients: cream cheese, graham cracker, sour cream, egg, sugar, butter, vanilla\nIncompatible: cream cheese, sour cream, egg, butter\n\nSuggest a replacement for each incompatible ingredient that preserves the dish.\n\nRespond with ONLY a JSON array, no markdown, no explanation:\n[{\"original\": \"butter\", \"replacement\": \"olive oil\", \"reason\": \"neutral fat, dairy-free\"}]"
+      }
+    ]
+  },
+  {
+    "id": "diet-04",
+    "path": "DietValidation",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "The recipe \"Pasta Puttanesca\" contains ingredients incompatible with a pescatarian-free diet.\nIngredients: linguine, olives, capers, anchovies, tomatoes, garlic, chili flakes\nIncompatible: anchovies\n\nSuggest a replacement for each incompatible ingredient that preserves the dish.\n\nRespond with ONLY a JSON array, no markdown, no explanation:\n[{\"original\": \"butter\", \"replacement\": \"olive oil\", \"reason\": \"neutral fat, dairy-free\"}]"
+      }
+    ]
+  },
+  {
+    "id": "diet-05",
+    "path": "DietValidation",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "The recipe \"Chinese Bake\" contains ingredients incompatible with a vegetarian diet.\nIngredients: beef, chicken, egg noodles, cabbage, soy sauce, oyster sauce, sesame oil\nIncompatible: beef, chicken, oyster sauce\n\nSuggest a replacement for each incompatible ingredient that preserves the dish.\n\nRespond with ONLY a JSON array, no markdown, no explanation:\n[{\"original\": \"butter\", \"replacement\": \"olive oil\", \"reason\": \"neutral fat, dairy-free\"}]"
+      }
+    ]
+  },
+  {
+    "id": "diet-06",
+    "path": "DietValidation",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "The recipe \"Baked Ziti\" contains ingredients incompatible with a gluten-free diet.\nIngredients: ziti, ricotta, mozzarella, marinara, ground beef, basil, breadcrumbs\nIncompatible: ziti, breadcrumbs\n\nSuggest a replacement for each incompatible ingredient that preserves the dish.\n\nRespond with ONLY a JSON array, no markdown, no explanation:\n[{\"original\": \"butter\", \"replacement\": \"olive oil\", \"reason\": \"neutral fat, dairy-free\"}]"
+      }
+    ]
+  },
+  {
+    "id": "diet-07",
+    "path": "DietValidation",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "The recipe \"Spinach Feta Omelette\" contains ingredients incompatible with an egg-free diet.\nIngredients: eggs, spinach, feta, olive oil, black pepper\nIncompatible: eggs\n\nSuggest a replacement for each incompatible ingredient that preserves the dish.\n\nRespond with ONLY a JSON array, no markdown, no explanation:\n[{\"original\": \"butter\", \"replacement\": \"olive oil\", \"reason\": \"neutral fat, dairy-free\"}]"
+      }
+    ]
+  },
+  {
+    "id": "diet-08",
+    "path": "DietValidation",
+    "expectFormat": "json",
+    "messages": [
+      {
+        "role": "user",
+        "content": "The recipe \"Vegetable Lo Mein\" contains ingredients incompatible with a soy-free diet.\nIngredients: egg noodles, cabbage, carrots, soy sauce, sesame oil, scallion, garlic\nIncompatible: soy sauce\n\nSuggest a replacement for each incompatible ingredient that preserves the dish.\n\nRespond with ONLY a JSON array, no markdown, no explanation:\n[{\"original\": \"butter\", \"replacement\": \"olive oil\", \"reason\": \"neutral fat, dairy-free\"}]"
+      }
+    ]
+  },
+
+  {
+    "id": "expand-01",
+    "path": "QueryPreprocessor",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe search assistant. The user's query is vague or abstract. \nRewrite it as a concrete recipe search query using specific food terms.\n\nExamples:\n- \"something warm and comforting\" → \"soup, stew, chili, casserole, pot roast\"\n- \"quick and easy weeknight meal\" → \"30 minute chicken, one pot pasta, sheet pan dinner, stir fry\"\n- \"something impressive for guests\" → \"beef wellington, lobster, souffle, rack of lamb\"\n- \"healthy and light\" → \"grilled fish, salad, steamed vegetables, grain bowl\"\n\nUser query: \"comfort food for a cold night\"\n\nReturn ONLY the expanded search terms, nothing else. No explanation.\n"
+      }
+    ]
+  },
+  {
+    "id": "expand-02",
+    "path": "QueryPreprocessor",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe search assistant. The user's query is vague or abstract. \nRewrite it as a concrete recipe search query using specific food terms.\n\nExamples:\n- \"something warm and comforting\" → \"soup, stew, chili, casserole, pot roast\"\n- \"quick and easy weeknight meal\" → \"30 minute chicken, one pot pasta, sheet pan dinner, stir fry\"\n- \"something impressive for guests\" → \"beef wellington, lobster, souffle, rack of lamb\"\n- \"healthy and light\" → \"grilled fish, salad, steamed vegetables, grain bowl\"\n\nUser query: \"something with salmon\"\n\nReturn ONLY the expanded search terms, nothing else. No explanation.\n"
+      }
+    ]
+  },
+  {
+    "id": "expand-03",
+    "path": "QueryPreprocessor",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe search assistant. The user's query is vague or abstract. \nRewrite it as a concrete recipe search query using specific food terms.\n\nExamples:\n- \"something warm and comforting\" → \"soup, stew, chili, casserole, pot roast\"\n- \"quick and easy weeknight meal\" → \"30 minute chicken, one pot pasta, sheet pan dinner, stir fry\"\n- \"something impressive for guests\" → \"beef wellington, lobster, souffle, rack of lamb\"\n- \"healthy and light\" → \"grilled fish, salad, steamed vegetables, grain bowl\"\n\nUser query: \"high protein breakfast\"\n\nReturn ONLY the expanded search terms, nothing else. No explanation.\n"
+      }
+    ]
+  },
+  {
+    "id": "expand-04",
+    "path": "QueryPreprocessor",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe search assistant. The user's query is vague or abstract. \nRewrite it as a concrete recipe search query using specific food terms.\n\nExamples:\n- \"something warm and comforting\" → \"soup, stew, chili, casserole, pot roast\"\n- \"quick and easy weeknight meal\" → \"30 minute chicken, one pot pasta, sheet pan dinner, stir fry\"\n- \"something impressive for guests\" → \"beef wellington, lobster, souffle, rack of lamb\"\n- \"healthy and light\" → \"grilled fish, salad, steamed vegetables, grain bowl\"\n\nUser query: \"quick recipes with few ingredients\"\n\nReturn ONLY the expanded search terms, nothing else. No explanation.\n"
+      }
+    ]
+  },
+  {
+    "id": "expand-05",
+    "path": "QueryPreprocessor",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe search assistant. The user's query is vague or abstract. \nRewrite it as a concrete recipe search query using specific food terms.\n\nExamples:\n- \"something warm and comforting\" → \"soup, stew, chili, casserole, pot roast\"\n- \"quick and easy weeknight meal\" → \"30 minute chicken, one pot pasta, sheet pan dinner, stir fry\"\n- \"something impressive for guests\" → \"beef wellington, lobster, souffle, rack of lamb\"\n- \"healthy and light\" → \"grilled fish, salad, steamed vegetables, grain bowl\"\n\nUser query: \"recipe for 4 people under 30 minutes\"\n\nReturn ONLY the expanded search terms, nothing else. No explanation.\n"
+      }
+    ]
+  },
+  {
+    "id": "expand-06",
+    "path": "QueryPreprocessor",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe search assistant. The user's query is vague or abstract. \nRewrite it as a concrete recipe search query using specific food terms.\n\nExamples:\n- \"something warm and comforting\" → \"soup, stew, chili, casserole, pot roast\"\n- \"quick and easy weeknight meal\" → \"30 minute chicken, one pot pasta, sheet pan dinner, stir fry\"\n- \"something impressive for guests\" → \"beef wellington, lobster, souffle, rack of lamb\"\n- \"healthy and light\" → \"grilled fish, salad, steamed vegetables, grain bowl\"\n\nUser query: \"soup\"\n\nReturn ONLY the expanded search terms, nothing else. No explanation.\n"
+      }
+    ]
+  },
+  {
+    "id": "expand-07",
+    "path": "QueryPreprocessor",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe search assistant. The user's query is vague or abstract. \nRewrite it as a concrete recipe search query using specific food terms.\n\nExamples:\n- \"something warm and comforting\" → \"soup, stew, chili, casserole, pot roast\"\n- \"quick and easy weeknight meal\" → \"30 minute chicken, one pot pasta, sheet pan dinner, stir fry\"\n- \"something impressive for guests\" → \"beef wellington, lobster, souffle, rack of lamb\"\n- \"healthy and light\" → \"grilled fish, salad, steamed vegetables, grain bowl\"\n\nUser query: \"something festive for a dinner party but not too heavy\"\n\nReturn ONLY the expanded search terms, nothing else. No explanation.\n"
+      }
+    ]
+  },
+  {
+    "id": "expand-08",
+    "path": "QueryPreprocessor",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "user",
+        "content": "You are a recipe search assistant. The user's query is vague or abstract. \nRewrite it as a concrete recipe search query using specific food terms.\n\nExamples:\n- \"something warm and comforting\" → \"soup, stew, chili, casserole, pot roast\"\n- \"quick and easy weeknight meal\" → \"30 minute chicken, one pot pasta, sheet pan dinner, stir fry\"\n- \"something impressive for guests\" → \"beef wellington, lobster, souffle, rack of lamb\"\n- \"healthy and light\" → \"grilled fish, salad, steamed vegetables, grain bowl\"\n\nUser query: \"pasta without dairy\"\n\nReturn ONLY the expanded search terms, nothing else. No explanation.\n"
+      }
+    ]
+  },
+
+  {
+    "id": "general-01",
+    "path": "GeneralQuestion",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences."
+      },
+      { "role": "user", "content": "what can I substitute for butter in baking?" }
+    ]
+  },
+  {
+    "id": "general-02",
+    "path": "GeneralQuestion",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences."
+      },
+      { "role": "user", "content": "find me chicken recipes" },
+      { "role": "assistant", "content": "Here are 5 chicken recipes: Roast Chicken, Chicken Pot Pie, Cashew Chicken, Coq au Vin, Kung Pao Chicken." },
+      { "role": "user", "content": "tell me about the first one" }
+    ]
+  },
+  {
+    "id": "general-03",
+    "path": "GeneralQuestion",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences."
+      },
+      { "role": "user", "content": "is honey vegan?" }
+    ]
+  },
+  {
+    "id": "general-04",
+    "path": "GeneralQuestion",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences."
+      },
+      { "role": "user", "content": "what's the weather today?" }
+    ]
+  },
+  {
+    "id": "general-05",
+    "path": "GeneralQuestion",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences."
+      },
+      { "role": "user", "content": "plan my dinners for the week" },
+      { "role": "assistant", "content": "Your plan: Mon Beef Stew, Tue Miso Salmon, Wed Baked Ziti, Thu Tom Kha Gai, Fri Sheet Pan Sausage, Sat Chili con Carne, Sun Roast Chicken." },
+      { "role": "user", "content": "whats on monday?" }
+    ]
+  },
+  {
+    "id": "general-06",
+    "path": "GeneralQuestion",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences."
+      },
+      { "role": "user", "content": "why does my risotto turn out gluey?" }
+    ]
+  },
+  {
+    "id": "general-07",
+    "path": "GeneralQuestion",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences."
+      },
+      { "role": "user", "content": "find me soup recipes" },
+      { "role": "assistant", "content": "Found 5: Minestrone, French Onion Soup, Tom Kha Gai, Corn Chowder, Gazpacho." },
+      { "role": "user", "content": "show me more like that" },
+      { "role": "assistant", "content": "Here are 5 more: Ribollita, Miso Soup, Pho, Lentil Soup, Clam Chowder." },
+      { "role": "user", "content": "which of those is dairy free?" }
+    ]
+  },
+  {
+    "id": "general-08",
+    "path": "GeneralQuestion",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences."
+      },
+      { "role": "user", "content": "hello" }
+    ]
+  },
+  {
+    "id": "general-09",
+    "path": "GeneralQuestion",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences."
+      },
+      { "role": "user", "content": "what's the difference between baking soda and baking powder?" }
+    ]
+  },
+  {
+    "id": "general-10",
+    "path": "GeneralQuestion",
+    "expectFormat": "text",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful cooking assistant. Answer questions about food, cooking techniques, and ingredients concisely. Keep answers under 3 sentences."
+      },
+      { "role": "user", "content": "how do I know when to stop kneading bread dough?" }
+    ]
+  }
+]

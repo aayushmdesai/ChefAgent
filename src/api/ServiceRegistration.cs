@@ -6,7 +6,7 @@
 //
 // Dependency graph:
 //   QdrantClient          ← infrastructure
-//   ILlmProvider          ← config-driven: Groq (prod) or Ollama (local)
+//   ILlmProvider          ← config-driven: Nebius/Groq (prod) or Ollama (local)
 //   IEmbeddingProvider    ← config-driven: Voyage (prod) or Ollama (local)
 //   RecipeSearchPlugin    ← depends on QdrantClient + IEmbeddingProvider
 //   QueryPreprocessor     ← depends on ILlmProvider
@@ -102,6 +102,18 @@ public static class ServiceRegistration
 
         services.AddSingleton<ILlmProvider>(sp =>
         {
+            if (llmProvider == "nebius")
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Cloud");
+                var apiKey =
+                    config["Nebius:ApiKey"]
+                    ?? throw new InvalidOperationException(
+                        "Nebius:ApiKey required when LlmProvider=nebius"
+                    );
+                var model = config["Nebius:Model"] ?? "meta-llama/Llama-3.3-70B-Instruct";
+                var baseUrl = config["Nebius:BaseUrl"];
+                return new NebiusProvider(httpClient, apiKey, model, baseUrl);
+            }
             if (llmProvider == "groq")
             {
                 var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Cloud");
