@@ -1,0 +1,19 @@
+{
+  "RunId": "20260824-213739",
+  "Seed": 20260824,
+  "Models": [
+    "meta-llama/Llama-3.3-70B-Instruct"
+  ],
+  "ConcurrencyLevels": [
+    1,
+    8,
+    32
+  ],
+  "QueryCount": 46,
+  "ExecutedOrder": [
+    "meta-llama/Llama-3.3-70B-Instruct@c32",
+    "meta-llama/Llama-3.3-70B-Instruct@c8",
+    "meta-llama/Llama-3.3-70B-Instruct@c1"
+  ],
+  "StartedAt": "2026-08-24T21:37:39.538382+00:00"
+}

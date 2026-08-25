@@ -14,6 +14,7 @@ A multi-agent AI cooking assistant built with C#/.NET and Semantic Kernel. Ask i
 |--|--|
 | **Frontend** | https://chefagent.vercel.app |
 | **API** | https://chefagent-production.up.railway.app |
+| **Nebius benchmark** | [bench/WRITEUP.md](bench/WRITEUP.md) — 690 requests, honest results |
 
 ```bash
 # Try it now
@@ -42,6 +43,8 @@ curl -X POST https://chefagent-production.up.railway.app/chat \
 | **MCP Server** | ✅ Weeks 13-14 complete | mcp-dotnet-diagnostics, NuGet published, Glama listed |
 | **LinkedIn + Dataset** | ✅ Week 15 complete | 3 posts written, dataset expanded 10k → 52k recipes |
 | **Production fix + Eval** | ✅ Week 16 complete | Voyage AI migration, IntentRouter fixes, 87% e2e pass rate |
+| **Inference benchmark** | ✅ Week 17 complete | Nebius Token Factory port, 690-request interleaved sweep, [writeup](bench/WRITEUP.md) |
+
 
 ---
 
@@ -70,7 +73,7 @@ POST /chat  (ASP.NET Core Minimal API)
                 recipes + dietary notes + meal plan + confidence flag
 ```
 
-**Provider abstraction:** `ILlmProvider` and `IEmbeddingProvider` interfaces decouple agents from specific LLM/embedding backends. Three provider swaps (HuggingFace → Nomic → Voyage AI for embeddings, Ollama → Groq for LLM) required zero agent code changes.
+**Provider abstraction:** `ILlmProvider` and `IEmbeddingProvider` interfaces decouple agents from specific LLM/embedding backends. Four provider swaps (HuggingFace → Nomic → Voyage AI for embeddings, Ollama → Groq → Nebius Token Factory for LLM) required zero agent code changes.
 
 ---
 
@@ -79,7 +82,7 @@ POST /chat  (ASP.NET Core Minimal API)
 | Layer | Technology |
 |---|---|
 | **Orchestration** | Semantic Kernel (C#) |
-| **LLM** | Groq — Llama 3.3 70B (cloud) / Ollama llama3.2 (local fallback) |
+| **LLM** | Groq — Llama 3.3 70B (cloud) / Nebius Token Factory (benchmarked, see bench/) / Ollama llama3.2 (local fallback) |
 | **Embeddings** | Voyage AI — voyage-4-lite, 1024d (cloud) / Ollama (local fallback) |
 | **Vector DB** | Qdrant Cloud (1GB free) / Qdrant Docker (local) |
 | **Session state** | Upstash Redis (cloud) / Redis Docker (local) |
@@ -186,7 +189,7 @@ ChefAgent/
 │   ├── shared/
 │   │   ├── Providers/
 │   │   │   ├── Embeddings/           # IEmbeddingProvider, Ollama, HuggingFace, Nomic, Voyage
-│   │   │   └── Llm/                  # ILlmProvider, OllamaLlmProvider, GroqProvider
+│   │   │   └── Llm/                  # ILlmProvider, OllamaLlmProvider, GroqProvider, NebiusProvider
 │   │   ├── Guardrails/               # InputGuard, OutputGuard, CircuitBreaker, GuardrailAuditLog
 │   │   ├── Observability/            # LangfuseOptions, MetricsCollector, TraceContext, Tracing
 │   │   ├── DietaryRules.cs
@@ -195,6 +198,13 @@ ChefAgent/
 │   │   └── Models.cs
 │   └── tests/                        # xUnit, 80+ tests
 ├── frontend/                         # React + Tailwind (Vite)
+├── bench/                            # Level 1 inference benchmark
+│   ├── BenchmarkRunner.cs            # interleaved concurrency sweep, health probes
+│   ├── analyze.py                    # reads raw jsonl, pooled stats + stability check
+│   ├── queries.json                  # 46 prompts from the 5 real LLM call sites
+│   ├── FINDINGS.md                   # working log, VERIFIED vs HYPOTHESIS
+│   ├── WRITEUP.md                    # published results
+│   └── results/                      # every run kept, incl. failed ones
 ├── eval/
 │   ├── datasets/                     # golden datasets, experiment results
 │   ├── experiments/                  # timestamped experiment JSON files
@@ -212,16 +222,16 @@ ChefAgent/
 
 | ADR | Decision |
 |---|---|
-| [ADR-001](docs/adrs/001-semantic-kernel.md) | Semantic Kernel over raw HTTP clients |
-| [ADR-002](docs/adrs/002-qdrant.md) | Qdrant as vector database |
-| [ADR-003](docs/adrs/003-ollama.md) | Ollama for local LLM + embeddings |
-| [ADR-004](docs/adrs/004-diet-rules-over-llm.md) | Rules-first dietary validation |
-| [ADR-005](docs/adrs/005-intent-router.md) | Rules-based intent classification |
-| [ADR-006](docs/adrs/006-redis-session.md) | Redis for session memory |
-| [ADR-007](docs/adrs/007-circuit-breaker.md) | Circuit breaker for LLM resilience |
-| [ADR-008](docs/adrs/008-ci-pipeline.md) | GitHub Actions CI |
+| [ADR-001](docs/adrs/001-orchestration-framework.md) | Semantic Kernel over raw HTTP clients |
+| [ADR-002](docs/adrs/002-vector-database.md) | Qdrant as vector database |
+| [ADR-003](docs/adrs/003-llm-provider.md) | Ollama for local LLM + embeddings |
+| [ADR-004](docs/adrs/004-diet-agent-architecture.md) | Rules-first dietary validation |
+| [ADR-005](docs/adrs/005-orchestrator-design.md) | Rules-based intent classification |
+| [ADR-006](docs/adrs/006-planner-agent-architecture.md) | Planner agent architecture |
+| [ADR-007](docs/adrs/007-session-memory-design.md) | Redis for session memory |
+| [ADR-008](docs/adrs/008-guardrails-architecture.md) | Five-layer guardrails architecture |
 | [ADR-009](docs/adrs/009-evaluation-pipeline.md) | RAGAS-style evaluation pipeline |
-| [ADR-010](docs/adrs/010-langfuse-observability.md) | Langfuse for observability |
+| [ADR-010](docs/adrs/010-observability-architecture.md) | Langfuse for observability |
 | [ADR-011](docs/adrs/011-evaluation-strategy.md) | Three-layer evaluation strategy |
 | [ADR-012](docs/adrs/012-cloud-deployment.md) | Cloud deployment strategy |
 | [ADR-013](docs/adrs/013-voyage-embedding-migration.md) | Voyage AI embedding migration |
@@ -236,7 +246,7 @@ ChefAgent/
 | Month 2 (Weeks 5–8) | Planner Agent, Session Memory, Guardrails | ✅ Complete |
 | Month 3 (Weeks 9–12) | Eval pipeline, Observability, Cloud deployment | ✅ Complete — v1.0.0 |
 | Month 4 (Weeks 13–16) | MCP server, LinkedIn posts, Voyage migration, IntentRouter fixes | ✅ Complete |
-| Month 5 | Portfolio site, resume, outreach | 🔜 Planned |
+| Month 5 | Inference benchmarking, portfolio site, outreach | 🔄 In progress |
 
 ---
 
