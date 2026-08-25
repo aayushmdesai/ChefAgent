@@ -1,0 +1,30 @@
+{
+  "RunId": "20260825-155808",
+  "Seed": 20260825,
+  "Rounds": 5,
+  "Model": "meta-llama/Llama-3.3-70B-Instruct",
+  "ConcurrencyLevels": [
+    1,
+    8,
+    32
+  ],
+  "QueryCount": 46,
+  "ExecutedOrder": [
+    "r1:c8",
+    "r1:c32",
+    "r1:c1",
+    "r2:c32",
+    "r2:c1",
+    "r2:c8",
+    "r3:c1",
+    "r3:c8",
+    "r3:c32",
+    "r4:c32",
+    "r4:c8",
+    "r4:c1",
+    "r5:c1",
+    "r5:c8",
+    "r5:c32"
+  ],
+  "StartedAt": "2026-08-25T17:06:08.027062+00:00"
+}

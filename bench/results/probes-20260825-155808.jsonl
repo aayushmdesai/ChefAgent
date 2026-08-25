@@ -1,0 +1,10 @@
+{"RunId":"20260825-155808","Round":1,"When":"round-start","At":"2026-08-25T16:00:08.964686+00:00","TtftMs":22824.6174,"TotalMs":22926.5513,"CompletionTokens":2,"Error":null}
+{"RunId":"20260825-155808","Round":1,"When":"round-end","At":"2026-08-25T16:17:40.3306+00:00","TtftMs":10793.3096,"TotalMs":10815.9852,"CompletionTokens":2,"Error":null}
+{"RunId":"20260825-155808","Round":2,"When":"round-start","At":"2026-08-25T16:17:51.15479+00:00","TtftMs":16039.5257,"TotalMs":17353.7113,"CompletionTokens":2,"Error":null}
+{"RunId":"20260825-155808","Round":2,"When":"round-end","At":"2026-08-25T16:32:33.107799+00:00","TtftMs":9078.9662,"TotalMs":9078.9954,"CompletionTokens":2,"Error":null}
+{"RunId":"20260825-155808","Round":3,"When":"round-start","At":"2026-08-25T16:32:42.19678+00:00","TtftMs":15350.1798,"TotalMs":15350.2071,"CompletionTokens":2,"Error":null}
+{"RunId":"20260825-155808","Round":3,"When":"round-end","At":"2026-08-25T16:45:18.042405+00:00","TtftMs":227.7299,"TotalMs":247.8945,"CompletionTokens":2,"Error":null}
+{"RunId":"20260825-155808","Round":4,"When":"round-start","At":"2026-08-25T16:45:18.29245+00:00","TtftMs":8373.6015,"TotalMs":9602.6096,"CompletionTokens":2,"Error":null}
+{"RunId":"20260825-155808","Round":4,"When":"round-end","At":"2026-08-25T16:55:38.630848+00:00","TtftMs":343.932,"TotalMs":359.4094,"CompletionTokens":2,"Error":null}
+{"RunId":"20260825-155808","Round":5,"When":"round-start","At":"2026-08-25T16:55:38.993784+00:00","TtftMs":227.2312,"TotalMs":256.6868,"CompletionTokens":2,"Error":null}
+{"RunId":"20260825-155808","Round":5,"When":"round-end","At":"2026-08-25T17:05:58.714318+00:00","TtftMs":9291.3796,"TotalMs":9310.4996,"CompletionTokens":2,"Error":null}
