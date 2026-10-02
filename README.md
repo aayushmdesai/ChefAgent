@@ -1,6 +1,7 @@
 ![CI](https://github.com/aayushmdesai/ChefAgent/actions/workflows/ci.yml/badge.svg)
 
 # ChefAgent
+> Status: Paused (Oct 2026). The live demo is offline. Code, architecture, ADRs, and eval results are kept here for reference.
 
 A multi-agent AI cooking assistant built with C#/.NET and Semantic Kernel. Ask it to find recipes, validate dietary restrictions, or plan a week of meals — in plain language.
 
@@ -8,20 +9,11 @@ A multi-agent AI cooking assistant built with C#/.NET and Semantic Kernel. Ask i
 
 ---
 
-## Live Demo
+## Demo
 
-| | URL |
-|--|--|
-| **Frontend** | https://chefagent.vercel.app |
-| **API** | https://chefagent-production.up.railway.app |
-| **Nebius benchmark** | [bench/WRITEUP.md](bench/WRITEUP.md) — 690 requests, honest results |
+The hosted demo (Vercel UI + Railway API) is offline while the project is paused. To run it yourself, see [Quick Start](#quick-start).
 
-```bash
-# Try it now
-curl -X POST https://chefagent-production.up.railway.app/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "find me a quick dairy-free pasta dinner", "sessionId": "demo"}'
-```
+Benchmark write-up: [bench/WRITEUP.md](bench/WRITEUP.md), 690 requests, honest results
 
 ---
 
@@ -246,7 +238,7 @@ ChefAgent/
 | Month 2 (Weeks 5–8) | Planner Agent, Session Memory, Guardrails | ✅ Complete |
 | Month 3 (Weeks 9–12) | Eval pipeline, Observability, Cloud deployment | ✅ Complete — v1.0.0 |
 | Month 4 (Weeks 13–16) | MCP server, LinkedIn posts, Voyage migration, IntentRouter fixes | ✅ Complete |
-| Month 5 | Inference benchmarking, portfolio site, outreach | 🔄 In progress |
+| Month 5 | Inference benchmarking, portfolio site, outreach | ⏸️ Paused |
 
 ---
 
